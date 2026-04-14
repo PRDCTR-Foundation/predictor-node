@@ -1,6 +1,5 @@
-# Substrate Node Template
-
-A fresh [Substrate](https://substrate.io/) node, ready for hacking :rocket:
+# predictor-node
+Predictor: A prediction market AppChain enabled by polkadot-sdk framework
 
 A standalone version of this template is available for each release of Polkadot
 in the [Substrate Developer Hub Parachain
@@ -37,7 +36,7 @@ After you build the project, you can use the following command to explore its
 parameters and subcommands:
 
 ```sh
-./target/release/solochain-template-node -h
+./target/release/predictor-node -h
 ```
 
 You can generate and view the [Rust
@@ -54,19 +53,19 @@ The following command starts a single-node development chain that doesn't
 persist state:
 
 ```sh
-./target/release/solochain-template-node --dev
+./target/release/predictor-node --dev
 ```
 
 To purge the development chain's state, run the following command:
 
 ```sh
-./target/release/solochain-template-node purge-chain --dev
+./target/release/predictor-node purge-chain --dev
 ```
 
 To start the development chain with detailed logging, run the following command:
 
 ```sh
-RUST_BACKTRACE=1 ./target/release/solochain-template-node -ldebug --dev
+RUST_BACKTRACE=1 ./target/release/predictor-node -ldebug --dev
 ```
 
 Development chains:
@@ -86,7 +85,7 @@ similar to the following:
 $ mkdir my-chain-state
 
 // Use of that folder to store the chain state
-$ ./target/release/solochain-template-node --dev --base-path ./my-chain-state/
+$ ./target/release/predictor-node --dev --base-path ./my-chain-state/
 
 // Check the folder structure created inside the base path after running the chain
 $ ls ./my-chain-state
