@@ -193,6 +193,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
+
+[[package]]
 name = "ark-bls12-377"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -504,6 +510,12 @@ name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+
+[[package]]
+name = "az"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be5eb007b7cacc6c660343e96f650fedf4b5a77512399eb952ca6642cf8d13f7"
 
 [[package]]
 name = "backtrace"
@@ -2032,6 +2044,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "fixed"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36a65312835c1097a0c926ff3702df965285fadc33d948b87397ff8961bad881"
+dependencies = [
+ "az",
+ "bytemuck",
+ "half",
+ "num-traits",
+ "typenum",
+]
+
+[[package]]
 name = "fixed-hash"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2710,6 +2735,12 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "half"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b43ede17f21864e81be2fa654110bf1e793774238d86ef8555c37e6519c0403"
 
 [[package]]
 name = "handlebars"
@@ -4611,6 +4642,12 @@ dependencies = [
  "quote",
  "syn 2.0.87",
 ]
+
+[[package]]
+name = "more-asserts"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fafa6961cabd9c63bcd77a45d7e3b7f3b552b70417831fb0f56db717e72407e"
 
 [[package]]
 name = "multiaddr"
@@ -9426,6 +9463,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
+name = "test-case"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb2550dd13afcd286853192af8601920d959b14c401fcece38071d53bf0768a8"
+dependencies = [
+ "test-case-macros",
+]
+
+[[package]]
+name = "test-case-core"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adcb7fd841cd518e279be3d5a3eb0636409487998a4aff22f3de87b81e88384f"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "test-case-macros"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c89e72a01ed4c579669add59014b9a524d609c0c88c6a585ce37485879f6ffb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+ "test-case-core",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10968,6 +11038,30 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "synstructure 0.13.1",
+]
+
+[[package]]
+name = "zeitgeist-primitives"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "fixed",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "more-asserts",
+ "num-traits",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-runtime",
+ "test-case",
+ "typenum",
 ]
 
 [[package]]
