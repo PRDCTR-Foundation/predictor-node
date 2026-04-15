@@ -40,10 +40,11 @@ use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime,
-    RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
-    System, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
+    AccountId, Amount, Aura, Balance, Balances, Block, BlockNumber, CurrencyId, Hash, Nonce,
+    PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason,
+    RuntimeOrigin, RuntimeTask, System, Tokens, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
 };
+use orml_traits::parameter_type_with_key;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -153,4 +154,43 @@ impl pallet_sudo::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
+}
+
+parameter_type_with_key! {
+    pub ExistentialDeposits: |_currency_id: CurrencyId| -> Balance {
+        EXISTENTIAL_DEPOSIT
+    };
+}
+
+pub struct DustRemovalWhitelist;
+impl frame_support::traits::Contains<AccountId> for DustRemovalWhitelist {
+    fn contains(_a: &AccountId) -> bool {
+        false
+    }
+}
+
+impl orml_tokens::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Balance = Balance;
+    type Amount = Amount;
+    type CurrencyId = CurrencyId;
+    type WeightInfo = ();
+    type ExistentialDeposits = ExistentialDeposits;
+    type CurrencyHooks = ();
+    type MaxLocks = ConstU32<50>;
+    type MaxReserves = ConstU32<50>;
+    type ReserveIdentifier = [u8; 8];
+    type DustRemovalWhitelist = DustRemovalWhitelist;
+}
+
+parameter_types! {
+    pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
+}
+
+impl orml_currencies::Config for Runtime {
+    type MultiCurrency = Tokens;
+    type NativeCurrency =
+        orml_currencies::BasicCurrencyAdapter<Runtime, Balances, Amount, BlockNumber>;
+    type GetNativeCurrencyId = GetNativeCurrencyId;
+    type WeightInfo = ();
 }
