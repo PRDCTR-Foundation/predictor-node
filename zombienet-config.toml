@@ -1,0 +1,13 @@
+[relaychain]
+default_command = "./target/release/solochain-template-node"
+default_args = ["--validator", "-lruntime=debug"]
+
+chain = "local"
+
+  [[relaychain.nodes]]
+  name = "alice"
+  validator = true
+
+  [[relaychain.nodes]]
+  name = "bob"
+  validator = true

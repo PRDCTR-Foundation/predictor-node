@@ -115,6 +115,44 @@ also find the source code and instructions for hosting your own instance in the
 If you want to see the multi-node consensus algorithm in action, see [Simulate a
 network](https://docs.substrate.io/tutorials/build-a-blockchain/simulate-network/).
 
+### Running with Zombienet
+
+You can spawn a multi-node predictor network using
+[Zombienet](https://github.com/paritytech/zombienet). A ready-made config lives
+at `zombienet-config.toml` in the repo root and points at the release binary
+produced by this project.
+
+Prerequisites:
+
+1. Build the node:
+
+   ```sh
+   cargo build --release
+   ```
+
+   The resulting binary must exist at
+   `./target/release/solochain-template-node` (the path the Zombienet config
+   points to).
+
+2. Install Zombienet — either download a release from the
+   [releases page](https://github.com/paritytech/zombienet/releases) or use the
+   `zombienet` CLI from the sibling repo.
+
+Spawn the network from this repo's root:
+
+```sh
+zombienet spawn zombienet-config.toml
+```
+
+This starts two validator nodes (`alice` and `bob`) running the `local` chain
+spec (`local_testnet_config` in `node/src/chain_spec.rs`). Zombienet prints the
+RPC/WS endpoints on startup; connect Polkadot-JS Apps to the `alice` WS
+endpoint to interact with the chain.
+
+> Note: Zombienet has no native solochain concept, so the predictor binary is
+> plugged into the `[relaychain]` slot of the config. This works because
+> Zombienet simply spawns the binary as a process.
+
 ## Template Structure
 
 A Substrate project such as this consists of a number of components that are
