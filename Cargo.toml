@@ -102,3 +102,10 @@ test-case = "3.3.1"
 
 # HydraDX (wasm)
 # hydra-dx-math = { git = "https://github.com/galacticcouncil/HydraDX-node", package = "hydra-dx-math", tag = "v43.0.0", default-features = false }
+
+# Aventus
+sp-avn-common = { git = "https://github.com/AventusProtocolFoundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
+
+# Predictor (wasm)
+common-primitives = { path = "primitives/common", default-features = false }
+prediction-market-primitives = { path = "primitives/prediction-market", default-features = false }
