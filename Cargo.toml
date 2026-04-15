@@ -9,7 +9,7 @@ version = "0.1.0"
 [workspace]
 members = [
     "node",
-    "pallets/template",
+    # "pallets/*",
     "runtime",
 ]
 resolver = "2"
@@ -22,7 +22,7 @@ serde_json = { version = "1.0.127", default-features = false }
 futures = { version = "0.3.30" }
 
 scale-info = { version = "2.11.1", default-features = false }
-codec = { version = "3.6.12", default-features = false, package = "parity-scale-codec" }
+parity-scale-codec = { version = "3.6.12", default-features = false, package = "parity-scale-codec" }
 substrate-wasm-builder = { version = "24.0.2", default-features = false }
 substrate-build-script-utils = { version = "11.0.0", default-features = false }
 
