@@ -29,7 +29,11 @@ Use the following command to build the node without launching it:
 ```sh
 cargo build --release
 ```
+### Formatting
 
+```sh
+cargo +nightly-2023-05-22 fmt --all
+```
 ### Embedded Docs
 
 After you build the project, you can use the following command to explore its
