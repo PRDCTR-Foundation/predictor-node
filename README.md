@@ -131,7 +131,7 @@ Prerequisites:
    ```
 
    The resulting binary must exist at
-   `./target/release/solochain-template-node` (the path the Zombienet config
+   `./target/release/predictor-node` (the path the Zombienet config
    points to).
 
 2. Install Zombienet — either download a release from the
@@ -141,7 +141,7 @@ Prerequisites:
 Spawn the network from this repo's root:
 
 ```sh
-zombienet spawn zombienet-config.toml
+zombienet spawn -p native zombienet-config.toml
 ```
 
 This starts two validator nodes (`alice` and `bob`) running the `local` chain
