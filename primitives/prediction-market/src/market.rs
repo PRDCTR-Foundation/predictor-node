@@ -135,11 +135,8 @@ where
     /// - The reported outcome does not exist
     /// - The reported outcome does not have a corresponding asset type
     pub fn report_into_asset(&self) -> Option<Asset<MarketId>> {
-        let outcome = if let Some(ref report) = self.report {
-            &report.outcome
-        } else {
-            return None
-        };
+        let outcome =
+            if let Some(ref report) = self.report { &report.outcome } else { return None };
 
         self.outcome_report_into_asset(outcome)
     }
