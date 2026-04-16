@@ -2,7 +2,12 @@
 default_command = "./target/release/predictor-node"
 default_args = ["--validator", "-lruntime=debug"]
 
+# Generate the raw spec on-the-fly into zombienet's temp dir. `--raw` output
+# bypasses zombienet's plain→raw pass, which otherwise rewrites `session.keys`
+# with a polkadot-style block (babe/beefy/nimbus/…) and drops our custom
+# `avn` key. `{{chainName}}` is substituted by zombienet.
 chain = "local"
+chain_spec_command = "./target/release/predictor-node build-spec --chain local --disable-default-bootnode --raw"
 
   [[relaychain.nodes]]
   name = "alice"

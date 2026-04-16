@@ -49,11 +49,24 @@ frame-system-rpc-runtime-api.workspace = true
 pallet-transaction-payment-rpc-runtime-api.workspace = true
 frame-benchmarking = { optional = true, workspace = true }
 frame-system-benchmarking = { optional = true, workspace = true }
-
 orml-currencies.workspace = true
 orml-tokens.workspace = true
 orml-traits.workspace = true
 orml-benchmarking = { optional = true, workspace = true }
+
+pallet-summary.workspace = true
+pallet-avn.workspace = true
+pallet-authors-manager.workspace = true
+pallet-eth-bridge.workspace = true
+sp-avn-common.workspace = true
+sp-watchtower.workspace = true
+pallet-session.workspace = true
+pallet-offences.workspace = true
+pallet-scheduler.workspace = true
+pallet-preimage.workspace = true
+pallet-token-manager.workspace = true
+sp-application-crypto.workspace = true
+sp-staking.workspace = true
 
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
@@ -87,6 +100,20 @@ std = [
 	"orml-tokens/std",
 	"orml-traits/std",
 	"orml-benchmarking?/std",
+
+	"pallet-summary/std",
+	"pallet-avn/std",
+	"pallet-authors-manager/std",
+	"pallet-eth-bridge/std",
+	"sp-avn-common/std",
+	"sp-watchtower/std",
+	"pallet-session/std",
+	"pallet-offences/std",
+	"pallet-scheduler/std",
+	"pallet-preimage/std",
+	"pallet-token-manager/std",
+	"sp-application-crypto/std",
+	"sp-staking/std",
 
 	"sp-api/std",
 	"sp-block-builder/std",
