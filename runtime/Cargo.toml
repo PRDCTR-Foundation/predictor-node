@@ -20,6 +20,7 @@ scale-info = { features = [
 	"derive",
 	"serde",
 ], workspace = true }
+serde = { workspace = true }
 frame-support = { features = ["experimental"], workspace = true }
 frame-system.workspace = true
 frame-try-runtime = { optional = true, workspace = true }
@@ -49,6 +50,11 @@ pallet-transaction-payment-rpc-runtime-api.workspace = true
 frame-benchmarking = { optional = true, workspace = true }
 frame-system-benchmarking = { optional = true, workspace = true }
 
+orml-currencies.workspace = true
+orml-tokens.workspace = true
+orml-traits.workspace = true
+orml-benchmarking = { optional = true, workspace = true }
+
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
 
@@ -57,6 +63,7 @@ default = ["std"]
 std = [
 	"parity-scale-codec/std",
 	"scale-info/std",
+	"serde/std",
 
 	"frame-executive/std",
 	"frame-metadata-hash-extension/std",
@@ -75,6 +82,11 @@ std = [
 	"pallet-timestamp/std",
 	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
+
+	"orml-currencies/std",
+	"orml-tokens/std",
+	"orml-traits/std",
+	"orml-benchmarking?/std",
 
 	"sp-api/std",
 	"sp-block-builder/std",
@@ -103,6 +115,7 @@ runtime-benchmarks = [
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"orml-benchmarking",
 ]
 
 try-runtime = [
@@ -117,6 +130,8 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",
+	"orml-currencies/try-runtime",
+	"orml-tokens/try-runtime",
 ]
 
 # Enable the metadata hash generation.
