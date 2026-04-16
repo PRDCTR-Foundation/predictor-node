@@ -30,6 +30,5 @@ pub mod orderbook;
 mod outcome_report;
 mod proxy_type;
 mod serde_wrapper;
-pub mod test_helper;
 pub mod traits;
 pub mod types;

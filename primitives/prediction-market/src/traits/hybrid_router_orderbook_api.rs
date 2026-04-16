@@ -19,13 +19,13 @@ use sp_runtime::DispatchError;
 
 use crate::hybrid_router_api_types::{ApiError, OrderbookSoftFail, OrderbookTrade};
 
-/// A type alias for the return struct of order-book trades.
+/// A type alias for the return struct of orderbook trades.
 type OrderbookTradeOf<T> = OrderbookTrade<
     <T as HybridRouterOrderbookApi>::AccountId,
     <T as HybridRouterOrderbookApi>::Balance,
 >;
 
-/// A type alias for the error type of the order-book part of the hybrid router.
+/// A type alias for the error type of the orderbook part of the hybrid router.
 type ApiErrorOf = ApiError<OrderbookSoftFail>;
 
 /// Trait for handling the order book part of the hybrid router.
@@ -44,8 +44,7 @@ pub trait HybridRouterOrderbookApi {
     /// - `order_id`: The id of the order to return.
     fn order(order_id: Self::OrderId) -> Result<Self::Order, DispatchError>;
 
-    /// Fills the order with the specified `order_id` with the specified `maker_partial_fill`
-    /// amount.
+    /// Fills the order with the specified `order_id` with the specified `maker_partial_fill` amount.
     ///
     /// # Arguments
     ///
@@ -53,8 +52,7 @@ pub trait HybridRouterOrderbookApi {
     /// - `order_id`: The id of the order to fill.
     /// - `maker_partial_fill`: The amount to fill the order with.
     ///
-    /// Returns the trade information about the filled maker and taker amounts, and the external
-    /// fee.
+    /// Returns the trade information about the filled maker and taker amounts, and the external fee.
     fn fill_order(
         who: Self::AccountId,
         order_id: Self::OrderId,
