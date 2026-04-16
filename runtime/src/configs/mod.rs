@@ -40,11 +40,15 @@ use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Amount, Aura, Balance, Balances, Block, BlockNumber, CurrencyId, Hash, Nonce,
-    PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason,
-    RuntimeOrigin, RuntimeTask, System, Tokens, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
+    AccountId, Amount, Aura, AuthorsManager, Avn, Balance, Balances, Block, BlockNumber,
+    CurrencyId, EthBridge, Hash, Nonce, Offences, OriginCaller, PalletInfo, Preimage, Runtime,
+    RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
+    Scheduler, SessionKeys, Signature, Summary, System, Timestamp, TokenManager, Tokens,
+    UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, MINUTES, SLOT_DURATION, VERSION,
 };
 use orml_traits::parameter_type_with_key;
+use sp_runtime::traits::{ConvertInto, OpaqueKeys};
+use sp_watchtower::NoopWatchtower;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -193,4 +197,156 @@ impl orml_currencies::Config for Runtime {
         orml_currencies::BasicCurrencyAdapter<Runtime, Balances, Amount, BlockNumber>;
     type GetNativeCurrencyId = GetNativeCurrencyId;
     type WeightInfo = ();
+}
+
+parameter_types! {
+    pub const SessionPeriod: BlockNumber = MINUTES; // 60 blocks
+    pub const SessionOffset: BlockNumber = 0;
+}
+
+impl pallet_session::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type ValidatorId = AccountId;
+    type ValidatorIdOf = ConvertInto;
+    type ShouldEndSession = pallet_session::PeriodicSessions<SessionPeriod, SessionOffset>;
+    type NextSessionRotation = pallet_session::PeriodicSessions<SessionPeriod, SessionOffset>;
+    type SessionManager = AuthorsManager;
+    type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
+    type Keys = SessionKeys;
+    type WeightInfo = ();
+}
+
+impl pallet_session::historical::Config for Runtime {
+    type FullIdentification = AccountId;
+    type FullIdentificationOf = ConvertInto;
+}
+
+impl pallet_avn::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AuthorityId = pallet_avn::sr25519::AuthorityId;
+    type EthereumPublicKeyChecker = AuthorsManager;
+    type NewSessionHandler = AuthorsManager;
+    type DisabledValidatorChecker = ();
+    type WeightInfo = pallet_avn::default_weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+    pub const MinimumAuthorsCount: u32 = 2;
+}
+
+impl pallet_authors_manager::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AccountToBytesConvert = Avn;
+    type ValidatorRegistrationNotifier = ();
+    type WeightInfo = pallet_authors_manager::default_weights::SubstrateWeight<Runtime>;
+    type BridgeInterface = EthBridge;
+    type MinimumAuthorsCount = MinimumAuthorsCount;
+}
+
+parameter_types! {
+    pub const AdvanceSlotGracePeriod: BlockNumber = 5;
+    pub const MinBlockAge: BlockNumber = 5;
+    pub const AutoSubmitSummaries: bool = false;
+    pub const SummaryInstanceId: u8 = 1;
+    pub const ExternalValidationEnabled: bool = false;
+}
+
+impl pallet_summary::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AdvanceSlotGracePeriod = AdvanceSlotGracePeriod;
+    type MinBlockAge = MinBlockAge;
+    type AccountToBytesConvert = Avn;
+    type ReportSummaryOffence = Offences;
+    type WeightInfo = pallet_summary::default_weights::SubstrateWeight<Runtime>;
+    type BridgeInterface = EthBridge;
+    type AutoSubmitSummaries = AutoSubmitSummaries;
+    type InstanceId = SummaryInstanceId;
+    type ExternalValidationEnabled = ExternalValidationEnabled;
+    type ExternalValidator = NoopWatchtower<AccountId>;
+}
+
+impl pallet_offences::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
+    type OnOffenceHandler = ();
+}
+
+parameter_types! {
+    pub const MinEthBlockConfirmation: u64 = 20;
+}
+
+impl pallet_eth_bridge::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type TimeProvider = Timestamp;
+    type MaxQueuedTxRequests = ConstU32<100>;
+    type MinEthBlockConfirmation = MinEthBlockConfirmation;
+    type AccountToBytesConvert = Avn;
+    type BridgeInterfaceNotification = (Summary, AuthorsManager, TokenManager);
+    type ReportCorroborationOffence = Offences;
+    type ProcessedEventsChecker = ();
+    type EthereumEventsMigration = ();
+    type ProcessedEventsHandler = ();
+    type Quorum = Avn;
+    type WeightInfo = pallet_eth_bridge::default_weights::SubstrateWeight<Runtime>;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+    RuntimeCall: From<C>,
+{
+    type Extrinsic = UncheckedExtrinsic;
+    type OverarchingCall = RuntimeCall;
+}
+
+impl pallet_preimage::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_preimage::weights::SubstrateWeight<Runtime>;
+    type Currency = Balances;
+    type ManagerOrigin = frame_system::EnsureRoot<AccountId>;
+    type Consideration = ();
+}
+
+parameter_types! {
+    pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) *
+        RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_scheduler::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeOrigin = RuntimeOrigin;
+    type PalletsOrigin = OriginCaller;
+    type RuntimeCall = RuntimeCall;
+    type MaximumWeight = MaximumSchedulerWeight;
+    type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
+    type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
+    type MaxScheduledPerBlock = ConstU32<50>;
+    type WeightInfo = pallet_scheduler::weights::SubstrateWeight<Runtime>;
+    type Preimages = Preimage;
+}
+
+parameter_types! {
+    pub const AvnTreasuryPotId: frame_support::PalletId = frame_support::PalletId(*b"Treasury");
+    pub const TreasuryGrowthPercentage: Perbill = Perbill::from_percent(75);
+}
+
+impl pallet_token_manager::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type TokenBalance = Balance;
+    type TokenId = sp_core::H160;
+    type ProcessedEventsChecker = ();
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type OnGrowthLiftedHandler = ();
+    type TreasuryGrowthPercentage = TreasuryGrowthPercentage;
+    type AvnTreasuryPotId = AvnTreasuryPotId;
+    type WeightInfo = pallet_token_manager::default_weights::SubstrateWeight<Runtime>;
+    type Scheduler = Scheduler;
+    type Preimages = Preimage;
+    type PalletsOrigin = OriginCaller;
+    type BridgeInterface = EthBridge;
+    type OnIdleHandler = ();
+    type AccountToBytesConvert = Avn;
 }

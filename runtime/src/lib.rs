@@ -22,6 +22,9 @@ use sp_version::RuntimeVersion;
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
+
+/// AvN authority key type, re-exported for convenience (chain spec etc.).
+pub use pallet_avn::sr25519::AuthorityId as AvnId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 
@@ -52,6 +55,7 @@ impl_opaque_keys! {
     pub struct SessionKeys {
         pub aura: Aura,
         pub grandpa: Grandpa,
+        pub avn: Avn,
     }
 }
 
@@ -133,9 +137,9 @@ pub type Amount = i128;
     Ord,
     PartialOrd,
     Debug,
-    codec::Encode,
-    codec::Decode,
-    codec::MaxEncodedLen,
+    parity_scale_codec::Encode,
+    parity_scale_codec::Decode,
+    parity_scale_codec::MaxEncodedLen,
     scale_info::TypeInfo,
     serde::Serialize,
     serde::Deserialize,
@@ -248,10 +252,40 @@ mod runtime {
 
     #[runtime::pallet_index(6)]
     pub type Sudo = pallet_sudo;
-    
+
     #[runtime::pallet_index(8)]
     pub type Tokens = orml_tokens;
 
     #[runtime::pallet_index(9)]
     pub type Currencies = orml_currencies;
+
+    #[runtime::pallet_index(10)]
+    pub type Session = pallet_session;
+
+    #[runtime::pallet_index(11)]
+    pub type Historical = pallet_session::historical;
+
+    #[runtime::pallet_index(12)]
+    pub type Avn = pallet_avn;
+
+    #[runtime::pallet_index(13)]
+    pub type Summary = pallet_summary;
+
+    #[runtime::pallet_index(14)]
+    pub type AuthorsManager = pallet_authors_manager;
+
+    #[runtime::pallet_index(15)]
+    pub type EthBridge = pallet_eth_bridge;
+
+    #[runtime::pallet_index(16)]
+    pub type Offences = pallet_offences;
+
+    #[runtime::pallet_index(17)]
+    pub type Scheduler = pallet_scheduler;
+
+    #[runtime::pallet_index(18)]
+    pub type Preimage = pallet_preimage;
+
+    #[runtime::pallet_index(19)]
+    pub type TokenManager = pallet_token_manager;
 }

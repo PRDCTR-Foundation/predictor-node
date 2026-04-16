@@ -1,4 +1,4 @@
-use predictor_runtime::{AccountId, Signature, WASM_BINARY};
+use predictor_runtime::{AccountId, AvnId, SessionKeys, Signature, WASM_BINARY};
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
@@ -28,9 +28,14 @@ where
     AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Generate an Aura authority key.
-pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
-    (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
+/// Generate the full set of session keys used by the runtime (aura + grandpa + avn).
+pub fn authority_keys_from_seed(s: &str) -> (AccountId, AuraId, GrandpaId, AvnId) {
+    (
+        get_account_id_from_seed::<sr25519::Public>(s),
+        get_from_seed::<AuraId>(s),
+        get_from_seed::<GrandpaId>(s),
+        get_from_seed::<AvnId>(s),
+    )
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
@@ -93,21 +98,29 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    initial_authorities: Vec<(AuraId, GrandpaId)>,
+    initial_authorities: Vec<(AccountId, AuraId, GrandpaId, AvnId)>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
 ) -> serde_json::Value {
+    let session_keys = initial_authorities
+        .iter()
+        .map(|(account, aura, grandpa, avn)| {
+            (
+                account.clone(),
+                account.clone(),
+                SessionKeys { aura: aura.clone(), grandpa: grandpa.clone(), avn: avn.clone() },
+            )
+        })
+        .collect::<Vec<_>>();
+
     serde_json::json!({
         "balances": {
             // Configure endowed accounts with initial balance of 1 << 60.
             "balances": endowed_accounts.iter().cloned().map(|k| (k, 1u64 << 60)).collect::<Vec<_>>(),
         },
-        "aura": {
-            "authorities": initial_authorities.iter().map(|x| (x.0.clone())).collect::<Vec<_>>(),
-        },
-        "grandpa": {
-            "authorities": initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect::<Vec<_>>(),
+        "session": {
+            "keys": session_keys,
         },
         "sudo": {
             // Assign network admin rights.
