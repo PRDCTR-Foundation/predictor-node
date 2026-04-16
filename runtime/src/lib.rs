@@ -120,6 +120,37 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 /// Balance of an account.
 pub type Balance = u128;
 
+/// Signed balance amount used by orml-tokens.
+pub type Amount = i128;
+
+/// Currency identifier used by orml-tokens. `Native` aliases the chain's balances
+/// token; additional variants represent other fungible tokens managed by orml-tokens.
+#[derive(
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Debug,
+    codec::Encode,
+    codec::Decode,
+    codec::MaxEncodedLen,
+    scale_info::TypeInfo,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum CurrencyId {
+    Native,
+    Token(u32),
+}
+
+impl Default for CurrencyId {
+    fn default() -> Self {
+        CurrencyId::Native
+    }
+}
+
 /// Index of a transaction in the chain.
 pub type Nonce = u32;
 
@@ -217,4 +248,10 @@ mod runtime {
 
     #[runtime::pallet_index(6)]
     pub type Sudo = pallet_sudo;
+    
+    #[runtime::pallet_index(8)]
+    pub type Tokens = orml_tokens;
+
+    #[runtime::pallet_index(9)]
+    pub type Currencies = orml_currencies;
 }
