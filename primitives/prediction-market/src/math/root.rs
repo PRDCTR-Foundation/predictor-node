@@ -81,21 +81,21 @@ where
     F: Fn(T) -> Result<T, &'static str>,
 {
     if min >= max {
-        return Err("calc_preimage: Function domain has no volume")
+        return Err("calc_preimage: Function domain has no volume");
     }
     let fmin = f(min)?;
     let mut fmax = f(max)?;
     if fmin == value {
-        return Ok((min, 0))
+        return Ok((min, 0));
     } else if fmax == value {
-        return Ok((max, 0))
+        return Ok((max, 0));
     }
 
     if is_outside_of(value, fmin, fmax) {
         if dist(fmax, value) < dist(fmin, value) {
-            return Ok((max, 0))
+            return Ok((max, 0));
         } else {
-            return Ok((min, 0))
+            return Ok((min, 0));
         }
     }
     // At this point we can assume that there exists a preimage!
@@ -108,12 +108,12 @@ where
         iteration_count = i;
         let size = max.checked_sub(&min).ok_or("Unexpected arithmetic underflow")?;
         if size < tol {
-            break
+            break;
         }
         mid = max.checked_add(&min).ok_or("Arithmetic overflow")? / 2u8.into();
         let fmid = f(mid)?;
         if fmid == value {
-            break
+            break;
         }
 
         // Check on which side of `value` the preimage is located.
@@ -164,8 +164,7 @@ mod tests {
     #![allow(clippy::duplicated_attributes)]
 
     use super::*;
-    use crate::math::fixed::FixedMul;
-    use common_primitives::constants::currency::BASE;
+    use crate::{constants::BASE, math::fixed::FixedMul};
     use test_case::test_case;
 
     const _1: u128 = BASE;
@@ -199,7 +198,7 @@ mod tests {
                     if diff > $precision {
                         panic!("{} is not {}-close to {}", *left_val, *precision_val, *right_val);
                     }
-                },
+                }
             }
         };
     }

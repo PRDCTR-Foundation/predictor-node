@@ -19,18 +19,13 @@
 use crate::traits::CombinatorialTokensBenchmarkHelper;
 pub use crate::{
     asset::*, market::*, max_runtime_usize::*, outcome_report::OutcomeReport, proxy_type::*,
-    serde_wrapper::*, traits::HasEthAddress,
+    serde_wrapper::*,
 };
-use common_primitives::types::Balance;
-
-#[cfg(feature = "arbitrary")]
 use alloc::vec::Vec;
-use arbitrary::{Arbitrary, Result, Unstructured};
 use core::marker::PhantomData;
 use frame_support::{dispatch::PostDispatchInfo, weights::Weight};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_core::sr25519;
 use sp_runtime::{
     generic,
     traits::{BlakeTwo256, IdentifyAccount, Verify},
@@ -41,7 +36,24 @@ use sp_runtime::{
 use arbitrary::{Arbitrary, Result, Unstructured};
 
 /// Signed counter-part of Balance
-pub type OrmlAmount = i128;
+pub type Amount = i128;
+
+/// Some way of identifying an account on the chain. We intentionally make it equivalent
+/// to the public key of our transaction signing scheme.
+pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+
+/// The type for looking up accounts. We don't expect more than 4 billion of them, but you
+/// never know...
+pub type AccountIndex = u64;
+
+/// Balance of an account.
+pub type Balance = u128;
+
+/// Block type.
+pub type Block = generic::Block<Header, OpaqueExtrinsic>;
+
+/// An index to a block.
+pub type BlockNumber = u64;
 
 /// The index of the category for a `CategoricalOutcome` asset.
 pub type CategoryIndex = u16;
@@ -74,16 +86,21 @@ impl<'a> Arbitrary<'a> for MultiHash {
 }
 
 /// ORML adapter
-pub type BasicCurrencyAdapter<R, B> =
-    orml_currencies::BasicCurrencyAdapter<R, B, OrmlAmount, Balance>;
+pub type BasicCurrencyAdapter<R, B> = orml_currencies::BasicCurrencyAdapter<R, B, Amount, Balance>;
 
 pub type CurrencyId = Asset<MarketId>;
 
 /// Index of a transaction in the chain.
-pub type Nonce = u32;
+pub type Nonce = u64;
 
 /// A hash of some data used by the chain.
 pub type Hash = sp_core::H256;
+
+/// Block header type as expected by this runtime.
+pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+
+/// Digest item type.
+pub type DigestItem = generic::DigestItem;
 
 /// The market identifier type.
 pub type MarketId = u128;
@@ -105,13 +122,8 @@ pub mod well_known_relay_keys {
 }
 
 // Tests
-/// A type that represents an Ethereum Address
-pub type EthAddress = sp_core::H160;
 
-// Tests
 pub type AccountIdTest = u128;
-pub type SignatureTest = sr25519::Signature;
-pub type TestAccountIdPK = <SignatureTest as Verify>::Signer;
 
 #[cfg(feature = "std")]
 pub type BlockTest<R> = frame_system::mocking::MockBlock<R>;
@@ -139,28 +151,39 @@ pub struct ResultWithWeightInfo<R> {
     PartialOrd,
     TypeInfo,
 )]
-/// Custom asset metadata
+/// Custom XC asset metadata
 pub struct CustomMetadata {
-    /// The Ethereum address of the asset
-    pub eth_address: EthAddress,
+    /// XCM-related metadata.
+    pub xcm: XcmMetadata,
+
     /// Whether an asset can be used as base_asset in pools.
     pub allow_as_base_asset: bool,
 }
 
-impl HasEthAddress for CustomMetadata {
-    fn eth_address(&self) -> EthAddress {
-        self.eth_address.clone()
-    }
-
-    fn set_eth_address(&mut self, eth_address: EthAddress) {
-        self.eth_address = eth_address;
-    }
-}
-
-#[derive(Encode, Decode, TypeInfo, Clone, Debug, PartialEq)]
-pub enum AdminConfig<T> {
-    MarketAdmin(T),
-    VaultAccount(T),
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Decode,
+    Default,
+    Encode,
+    Eq,
+    MaxEncodedLen,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    TypeInfo,
+)]
+pub struct XcmMetadata {
+    /// The factor used to determine the fee of the foreign asset.
+    ///
+    /// In the fee calculations, the factor is multiplied by the fee that would have been paid in
+    /// native currency, so it represents the ratio between the price of the native currency and the
+    /// foreign asset, or, equivalently, the value of the trading pair (native currency)/(foreign
+    /// asset). The factor is a fixed point decimal number with ten decimals.
+    ///
+    /// Should be updated regularly.
+    pub fee_factor: Option<Balance>,
 }
 
 pub struct NoopCombinatorialTokensBenchmarkHelper<Balance, MarketId>(

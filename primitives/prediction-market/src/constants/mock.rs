@@ -16,16 +16,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
-#![cfg(any(feature = "mock", feature = "runtime-benchmarks"))]
-
 pub use super::*;
-use crate::{asset::Asset, types::CurrencyId};
-pub use common_primitives::{
-    constants::{
-        currency::{BASE, CENT_BASE},
-        MILLISECS_PER_BLOCK,
-    },
-    types::{Balance, Moment},
+use crate::{
+    asset::Asset,
+    types::{Balance, CurrencyId, Moment},
 };
 use frame_support::{parameter_types, traits::LockIdentifier, PalletId};
 use orml_traits::parameter_type_with_key;
@@ -33,7 +27,7 @@ use sp_arithmetic::Perbill;
 
 // Authorized
 parameter_types! {
-    pub const AuthorizedPalletId: PalletId = PalletId(*b"tnf/atzd");
+    pub const AuthorizedPalletId: PalletId = PalletId(*b"zge/atzd");
     pub const CorrectionPeriod: BlockNumber = 4;
 }
 
@@ -47,51 +41,51 @@ parameter_types! {
     pub const AppealBond: Balance = 5 * BASE;
     pub const AppealBondFactor: Balance = 2 * BASE;
     pub const BlocksPerYear: BlockNumber = 10000;
-    pub const CourtPalletId: PalletId = PalletId(*b"tnf/cout");
+    pub const CourtPalletId: PalletId = PalletId(*b"zge/cout");
     pub const RequestInterval: BlockNumber = 15;
     pub const VotePeriod: BlockNumber = 3;
     pub const AggregationPeriod: BlockNumber = 4;
     pub const AppealPeriod: BlockNumber = 5;
-    pub const LockId: LockIdentifier = *b"tnf/cloc";
+    pub const LockId: LockIdentifier = *b"zge/cloc";
     pub const MaxAppeals: u32 = 4;
     pub const MaxDelegations: u32 = 5;
     pub const MaxSelectedDraws: u32 = 510;
     pub const MaxCourtParticipants: u32 = 1_000;
     pub const MaxYearlyInflation: Perbill = Perbill::from_percent(10u32);
-    pub const MinJurorStake: Balance = 50 * CENT_BASE;
+    pub const MinJurorStake: Balance = 50 * CENT;
     pub const InflationPeriod: BlockNumber = 20;
 }
 
 // Global disputes parameters
 parameter_types! {
     pub const AddOutcomePeriod: BlockNumber = 20;
-    pub const GlobalDisputeLockId: LockIdentifier = *b"tnf/vote";
-    pub const GlobalDisputesPalletId: PalletId = PalletId(*b"tnf/gldp");
+    pub const GlobalDisputeLockId: LockIdentifier = *b"zge/vote";
+    pub const GlobalDisputesPalletId: PalletId = PalletId(*b"zge/gldp");
     pub const MaxGlobalDisputeVotes: u32 = 50;
     pub const MaxOwners: u32 = 10;
-    pub const MinOutcomeVoteAmount: Balance = 10 * CENT_BASE;
+    pub const MinOutcomeVoteAmount: Balance = 10 * CENT;
     pub const RemoveKeysLimit: u32 = 250;
     pub const GdVotingPeriod: BlockNumber = 140;
-    pub const VotingOutcomeFee: Balance = 100 * CENT_BASE;
+    pub const VotingOutcomeFee: Balance = 100 * CENT;
 }
 
 // Hybrid Router parameters
 parameter_types! {
-    pub const HybridRouterPalletId: PalletId = PalletId(*b"tnf/hybr");
+    pub const HybridRouterPalletId: PalletId = PalletId(*b"zge/hybr");
     pub const MaxOrders: u32 = 100;
 }
 
 // NeoSwaps
 parameter_types! {
-    pub storage NeoExitFee: Balance = CENT_BASE;
-    pub const NeoMaxSwapFee: Balance = 10 * CENT_BASE;
+    pub storage NeoExitFee: Balance = CENT;
+    pub const NeoMaxSwapFee: Balance = 10 * CENT;
     pub const MaxLiquidityTreeDepth: u32 = 3u32;
-    pub const NeoSwapsPalletId: PalletId = PalletId(*b"tnf/neos");
+    pub const NeoSwapsPalletId: PalletId = PalletId(*b"zge/neos");
 }
 
 // Prediction Market parameters
 parameter_types! {
-    pub const AdvisoryBond: Balance = 25 * CENT_BASE;
+    pub const AdvisoryBond: Balance = 25 * CENT;
     pub const CloseEarlyProtectionTimeFramePeriod: Moment = 3 * MILLISECS_PER_BLOCK as u64;
     pub const CloseEarlyProtectionBlockPeriod: BlockNumber = 3;
     pub const CloseEarlyRequestBond: Balance = 5 * BASE;
@@ -104,18 +98,18 @@ parameter_types! {
     pub const MaxDisputes: u16 = 6;
     pub const MaxEditReasonLen: u32 = 1024;
     pub const MaxGracePeriod: BlockNumber = 20;
-    pub const MaxMarketLifetime: BlockNumber = 1_000_000_000;
+    pub const MaxMarketLifetime: BlockNumber = 100_000_000_000;
     pub const MaxOracleDuration: BlockNumber = 30;
     pub const MaxRejectReasonLen: u32 = 1024;
     pub const MinCategories: u16 = 2;
     pub const MinDisputeDuration: BlockNumber = 2;
     pub const MinOracleDuration: BlockNumber = 2;
-    pub const OracleBond: Balance = 50 * CENT_BASE;
+    pub const OracleBond: Balance = 50 * CENT;
     pub const OutsiderBond: Balance = 2 * OracleBond::get();
-    pub const PmPalletId: PalletId = PalletId(*b"tnf/pred");
+    pub const PmPalletId: PalletId = PalletId(*b"zge/pred");
     pub const CloseEarlyBlockPeriod: BlockNumber = 6;
     pub const CloseEarlyTimeFramePeriod: Moment = 6 * MILLISECS_PER_BLOCK as u64;
-    pub const ValidityBond: Balance = 50 * CENT_BASE;
+    pub const ValidityBond: Balance = 50 * CENT;
 }
 
 // Swaps parameters
@@ -127,17 +121,17 @@ parameter_types! {
     pub const MaxTotalWeight: Balance = 50 * BASE;
     pub const MaxWeight: Balance = 50 * BASE;
     pub const MinWeight: Balance = BASE;
-    pub const SwapsPalletId: PalletId = PalletId(*b"tnf/swap");
+    pub const SwapsPalletId: PalletId = PalletId(*b"zge/swap");
 }
 
 // Orderbook parameters
 parameter_types! {
-    pub const OrderbookPalletId: PalletId = PalletId(*b"tnf/ordb");
+    pub const OrderbookPalletId: PalletId = PalletId(*b"zge/ordb");
 }
 
 // Parimutuel parameters
 parameter_types! {
-    pub const ParimutuelPalletId: PalletId = PalletId(*b"tnf/prmt");
+    pub const ParimutuelPalletId: PalletId = PalletId(*b"zge/prmt");
     pub const MinBetSize: Balance = BASE;
 }
 
@@ -152,19 +146,19 @@ parameter_types! {
 // Treasury
 parameter_types! {
     pub const MaxApprovals: u32 = 1;
-    pub const TreasuryPalletId: PalletId = PalletId(*b"tnf/tsry");
+    pub const TreasuryPalletId: PalletId = PalletId(*b"zge/tsry");
 }
 
 // ORML
 parameter_types! {
     // ORML
-    pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
+    pub const GetNativeCurrencyId: CurrencyId = Asset::Ztg;
 }
 
 parameter_type_with_key! {
     pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
         match currency_id {
-            Asset::Tru => ExistentialDeposit::get(),
+            Asset::Ztg => ExistentialDeposit::get(),
             _ => 10
         }
     };

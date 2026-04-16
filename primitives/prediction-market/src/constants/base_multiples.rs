@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
-use common_primitives::constants::currency::BASE;
+use crate::constants::BASE;
 
 pub const _1: u128 = BASE;
 pub const _2: u128 = 2 * _1;

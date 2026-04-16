@@ -1311,30 +1311,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 
 [[package]]
-name = "common-primitives"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "fixed",
- "frame-support",
- "frame-system",
- "more-asserts",
- "num-traits",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-arithmetic",
- "sp-avn-common",
- "sp-core",
- "sp-runtime",
- "test-case",
- "typenum",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1358,15 +1334,14 @@ dependencies = [
 
 [[package]]
 name = "const-hex"
-version = "1.15.0"
+version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dccd746bf9b1038c0507b7cec21eb2b11222db96a2902c96e8c185d6d20fb9c4"
+checksum = "531185e432bb31db1ecda541e9e7ab21468d4d844ad7505e0546a49b4945d49b"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "hex",
  "proptest",
- "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -3274,9 +3249,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "hex-conservative"
@@ -6512,32 +6484,6 @@ checksum = "41b740d195ed3166cd147c8047ec98db0e22ec019eb8eeb76d343b795304fb13"
 dependencies = [
  "predicates-core",
  "termtree",
-]
-
-[[package]]
-name = "prediction-market-primitives"
-version = "0.1.0"
-dependencies = [
- "arbitrary",
- "common-primitives",
- "fixed",
- "frame-support",
- "frame-system",
- "hex-literal",
- "more-asserts",
- "num-traits",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-arithmetic",
- "sp-avn-common",
- "sp-core",
- "sp-runtime",
- "test-case",
- "typenum",
 ]
 
 [[package]]
@@ -12033,6 +11979,30 @@ dependencies = [
  "quote",
  "syn 2.0.98",
  "synstructure 0.13.1",
+]
+
+[[package]]
+name = "zeitgeist-primitives"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "fixed",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "more-asserts",
+ "num-traits",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-arithmetic",
+ "sp-core",
+ "sp-runtime",
+ "test-case",
+ "typenum",
 ]
 
 [[package]]

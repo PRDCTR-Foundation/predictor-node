@@ -31,9 +31,9 @@ mod hybrid_router_orderbook_api;
 mod market_builder;
 mod market_commons_pallet_api;
 mod market_id;
-mod node_asset;
 mod payout_api;
 mod swaps;
+mod zeitgeist_asset;
 
 pub use combinatorial_tokens_api::*;
 pub use combinatorial_tokens_benchmark_helper::*;
@@ -50,6 +50,6 @@ pub use hybrid_router_orderbook_api::*;
 pub use market_builder::*;
 pub use market_commons_pallet_api::*;
 pub use market_id::*;
-pub use node_asset::*;
 pub use payout_api::*;
 pub use swaps::*;
+pub use zeitgeist_asset::*;
