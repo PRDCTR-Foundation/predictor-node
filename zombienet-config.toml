@@ -1,5 +1,5 @@
 [relaychain]
-default_command = "./target/release/solochain-template-node"
+default_command = "./target/release/predictor-node"
 default_args = ["--validator", "-lruntime=debug"]
 
 chain = "local"
