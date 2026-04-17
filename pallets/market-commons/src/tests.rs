@@ -24,20 +24,20 @@ use crate::{
     AccountIdOf, MarketCounter, Markets,
 };
 use frame_support::{assert_err, assert_noop, assert_ok};
-use sp_runtime::{DispatchError, Perbill};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::{MarketBuilderTrait, MarketCommonsPalletApi},
     types::{
         Asset, Deadlines, MarketBonds, MarketCreation, MarketDisputeMechanism, MarketPeriod,
         MarketStatus, MarketType, ScoringRule,
     },
 };
+use sp_runtime::{DispatchError, Perbill};
 
 // Creates a sample market builder. We use the `oracle` field to tell markets apart from each other.
 fn create_market_builder(oracle: AccountIdOf<Runtime>) -> MarketBuilder<Runtime> {
     let mut market_builder = MarketBuilder::new();
     market_builder
-        .base_asset(Asset::Ztg)
+        .base_asset(Asset::Tru)
         .creation(MarketCreation::Permissionless)
         .creator_fee(Perbill::zero())
         .creator(0)
@@ -47,9 +47,9 @@ fn create_market_builder(oracle: AccountIdOf<Runtime>) -> MarketBuilder<Runtime>
         .oracle(oracle)
         .period(MarketPeriod::Block(0..100))
         .deadlines(Deadlines {
-            grace_period: 1_u64,
-            oracle_duration: 1_u64,
-            dispute_duration: 1_u64,
+            grace_period: 1_u32,
+            oracle_duration: 1_u32,
+            dispute_duration: 1_u32,
         })
         .report(None)
         .resolved_outcome(None)
