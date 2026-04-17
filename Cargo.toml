@@ -10,7 +10,9 @@ version = "0.1.0"
 members = [
     "node",
     "runtime",
+    "macros",
     "primitives/*",
+    "pallets/*",
 ]
 resolver = "2"
 
@@ -68,6 +70,8 @@ frame-try-runtime = { version = "0.44.0", default-features = false }
 pallet-aura = { version = "37.0.0", default-features = false }
 pallet-balances = { version = "39.0.1", default-features = false }
 pallet-grandpa = { version = "38.0.0", default-features = false }
+pallet-insecure-randomness-collective-flip = { version = "26.0.0", default-features = false }
+pallet-treasury = { version = "37.0.0", default-features = false }
 pallet-sudo = { version = "38.0.0", default-features = false }
 pallet-timestamp = { version = "37.0.0", default-features = false }
 pallet-transaction-payment-rpc-runtime-api = { version = "38.0.0", default-features = false }
@@ -83,9 +87,27 @@ sp-session = { version = "36.0.0", default-features = false }
 sp-storage = { version = "21.0.0", default-features = false }
 sp-transaction-pool = { version = "34.0.0", default-features = false }
 sp-version = { version = "37.0.0", default-features = false }
+sp-std = { version = "14.0.0", default-features = false }
+
+# Polkadot / XCM (wasm)
+pallet-xcm = { version = "17.0.5", default-features = false }
+xcm = { version = "14.2.2", package = "staging-xcm", default-features = false }
+xcm-builder = { version = "17.0.5", package = "staging-xcm-builder", default-features = false }
+xcm-executor = { version = "17.0.3", package = "staging-xcm-executor", default-features = false }
 
 predictor-runtime = { path = "./runtime", default-features = false }
-common-primitives = { path = "./primitives/common", default-features = false }
+zeitgeist-macros = { path = "./macros", default-features = false }
+zeitgeist-primitives = { path = "./primitives/prediction-market", default-features = false }
+zrml-market-commons = { path = "./pallets/market-commons", default-features = false }
+zrml-authorized = { path = "./pallets/authorized", default-features = false }
+zrml-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
+zrml-court = { path = "pallets/court", default-features = false }
+zrml-global-disputes = { path = "pallets/global-disputes", default-features = false }
+zrml-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
+zrml-orderbook = { path = "pallets/orderbook", default-features = false }
+zrml-prediction-markets = { path = "pallets/prediction-markets", default-features = false }
+zrml-prediction-markets-runtime-api = { path = "pallets/prediction-markets/runtime-api", default-features = false }
+zrml-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
 
 # ORML (wasm)
 orml-benchmarking = { version = "=1.1.0", default-features = false }
@@ -106,14 +128,39 @@ sp-watchtower = { git = "https://github.com/AventusProtocolFoundation/avn-parach
 
 # Other (wasm)
 arbitrary = { version = "1.3.2", default-features = false }
+ark-bn254 = { version = "0.5.0", default-features = false, features = ["curve"] }
+ark-ff = { version = "0.5.0", default-features = false }
 fixed = { version = "=1.15.0", default-features = false, features = ["num-traits"] }
 hex-literal = { version = "0.4.1", default-features = false }
 num-traits = { version = "0.2.18", default-features = false }
 more-asserts = "0.3.1"
 typenum = { version = "1.17.0", default-features = false }
+arrayvec = { version = "0.7.6", default-features = false }
+log = { version = "0.4.22", default-features = false }
+rand = { version = "0.8.5", default-features = false }
+rand_chacha = { version = "0.3.1", default-features = false }
+cfg-if = { version = "1.0.0" }
 
 # Other (dev-dependencies)
 test-case = "3.3.1"
+env_logger = "0.11.8"
+rstest = "0.25.0"
 
 # HydraDX (wasm)
-# hydra-dx-math = { git = "https://github.com/galacticcouncil/HydraDX-node", package = "hydra-dx-math", tag = "v43.0.0", default-features = false }
+hydra-dx-math = { git = "https://github.com/galacticcouncil/HydraDX-node", package = "hydra-dx-math", tag = "v37.0.0", default-features = false }
+
+[patch."https://github.com/galacticcouncil/HydraDX-node"]
+# Ensure same Substrate dependencies are used everywhere
+sp-arithmetic = { version = "26.0.0" }
+sp-std = { version = "14.0.0" }
+
+# [patch."https://github.com/paritytech/polkadot-sdk"]
+# pallet-asset-tx-payment = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-asset-tx-payment-asset-id-fix" }
+# # Updated `ParachainInherentDataProvider::create_at` parameters to include additional relay keys https://github.com/moonbeam-foundation/polkadot-sdk/compare/moonbeam-polkadot-stable2409...zeitgeistpm:polkadot-sdk:polkadot-stable2409-moonbeam-lazy-migrations
+# cumulus-client-parachain-inherent = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-moonbeam-lazy-migrations" }
+# # Fix Found variants that have duplicate indexes. Both `Consensus` and `RemoteCallResponse` have the index `6`. Use different indexes for each variant.
+# sc-network = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "zeitgeist-polkadot-stable2409-sc-network-fix" }
+# # Benchmarks failed, because of Token(BelowMinimum) for treasury spend, that's why one should at least transfer the existential deposit 
+# pallet-treasury = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-treasury-benchmark-fix" }
+# # Remove deprecation warnings for clippy
+# cumulus-pallet-dmp-queue = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-cumulus-pallet-dmp-queue-deprecation-fix" }
