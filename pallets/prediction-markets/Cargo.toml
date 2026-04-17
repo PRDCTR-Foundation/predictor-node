@@ -1,0 +1,97 @@
+[dependencies]
+frame-benchmarking = { workspace = true, optional = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+log = { workspace = true }
+orml-traits = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+scale-info = { workspace = true, features = ["derive"] }
+serde = { workspace = true, optional = true }
+sp-arithmetic = { workspace = true }
+sp-runtime = { workspace = true }
+zeitgeist-primitives = { workspace = true }
+zrml-authorized = { workspace = true }
+zrml-court = { workspace = true }
+zrml-global-disputes = { workspace = true }
+zrml-market-commons = { workspace = true }
+
+# Mock
+
+cfg-if = { workspace = true, optional = true }
+env_logger = { workspace = true, optional = true }
+orml-asset-registry = { workspace = true, optional = true }
+orml-currencies = { workspace = true, optional = true }
+orml-tokens = { workspace = true, optional = true }
+pallet-balances = { workspace = true, optional = true }
+pallet-insecure-randomness-collective-flip = { workspace = true, optional = true }
+pallet-timestamp = { workspace = true, optional = true }
+pallet-treasury = { workspace = true, optional = true }
+sp-api = { workspace = true, optional = true }
+sp-core = { workspace = true, optional = true }
+sp-io = { workspace = true, optional = true }
+xcm = { workspace = true, optional = true }
+zrml-prediction-markets-runtime-api = { workspace = true, optional = true }
+
+[dev-dependencies]
+more-asserts = { workspace = true }
+test-case = { workspace = true }
+zrml-prediction-markets = { workspace = true, features = ["mock", "default"] }
+
+[features]
+default = ["std"]
+mock = [
+    "cfg-if",
+    "env_logger/default",
+    "orml-asset-registry/default",
+    "orml-currencies/default",
+    "orml-tokens/default",
+    "pallet-balances/default",
+    "pallet-insecure-randomness-collective-flip/default",
+    "pallet-timestamp/default",
+    "pallet-treasury/default",
+    "serde/default",
+    "sp-api/default",
+    "sp-io/default",
+    "sp-core/default",
+    "zeitgeist-primitives/mock",
+    "zrml-prediction-markets-runtime-api/default",
+    "xcm/default",
+    "orml-asset-registry/default",
+    "env_logger/default",
+]
+parachain = []
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+    "orml-asset-registry?/runtime-benchmarks",
+    "pallet-timestamp/runtime-benchmarks",
+    "zeitgeist-primitives/mock",
+]
+std = [
+    "frame-benchmarking?/std",
+    "frame-support/std",
+    "frame-system/std",
+    "orml-asset-registry?/std",
+    "orml-traits/std",
+    "parity-scale-codec/std",
+    'scale-info/std',
+    "serde?/std",
+    "sp-arithmetic/std",
+    "sp-runtime/std",
+    "zeitgeist-primitives/std",
+    "zrml-authorized/std",
+    "zrml-court/std",
+    "zrml-market-commons/std",
+    "zrml-global-disputes/std",
+    "xcm?/std",
+]
+try-runtime = [
+    "frame-support/try-runtime",
+]
+
+[package]
+authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+edition.workspace = true
+name = "zrml-prediction-markets"
+version = "0.6.1"

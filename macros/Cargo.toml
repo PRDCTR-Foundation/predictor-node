@@ -1,0 +1,9 @@
+[features]
+default = ["std"]
+std = []
+
+[package]
+authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+edition.workspace = true
+name = "zeitgeist-macros"
+version = "0.6.1"
