@@ -33,19 +33,19 @@ use alloc::{vec, vec::Vec};
 use frame_benchmarking::{account, benchmarks, whitelisted_caller};
 use frame_support::traits::{Currency, Get, Imbalance, NamedReservableCurrency};
 use frame_system::{pallet_prelude::BlockNumberFor, RawOrigin};
-use sp_arithmetic::Perbill;
-use sp_runtime::{
-    traits::{Bounded, Hash, Saturating, StaticLookup, Zero},
-    SaturatedConversion,
-};
-use zeitgeist_primitives::{
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::{
     traits::{DisputeApi, DisputeResolutionApi},
     types::{
         Asset, Deadlines, Market, MarketBonds, MarketCreation, MarketDisputeMechanism,
         MarketPeriod, MarketStatus, MarketType, OutcomeReport, Report, ScoringRule,
     },
 };
-use zrml_market_commons::MarketCommonsPalletApi;
+use sp_arithmetic::Perbill;
+use sp_runtime::{
+    traits::{Bounded, Hash, Saturating, StaticLookup, Zero},
+    SaturatedConversion,
+};
 
 const ORACLE_REPORT: OutcomeReport = OutcomeReport::Scalar(u128::MAX);
 
@@ -55,7 +55,7 @@ where
 {
     Market {
         market_id: 0u8.into(),
-        base_asset: Asset::Ztg,
+        base_asset: Asset::Tru,
         creation: MarketCreation::Permissionless,
         creator_fee: sp_runtime::Perbill::zero(),
         creator: account("creator", 0, 0),
@@ -64,8 +64,8 @@ where
         metadata: vec![],
         oracle: account("oracle", 0, 0),
         period: MarketPeriod::Block(
-            0u64.saturated_into::<BlockNumberFor<T>>()
-                ..100u64.saturated_into::<BlockNumberFor<T>>(),
+            0u64.saturated_into::<BlockNumberFor<T>>()..
+                100u64.saturated_into::<BlockNumberFor<T>>(),
         ),
         deadlines: Deadlines {
             grace_period: 1_u64.saturated_into::<BlockNumberFor<T>>(),

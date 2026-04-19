@@ -53,6 +53,16 @@ use frame_system::{
     ensure_signed,
     pallet_prelude::{BlockNumberFor, OriginFor},
 };
+use node_macros::unreachable_non_terminating;
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::{
+    math::checked_ops_res::{CheckedAddRes, CheckedRemRes, CheckedSubRes},
+    traits::{DisputeApi, DisputeMaxWeightApi, DisputeResolutionApi},
+    types::{
+        GlobalDisputeItem, Market, MarketDisputeMechanism, MarketStatus, OutcomeReport,
+        ResultWithWeightInfo,
+    },
+};
 use rand::{seq::SliceRandom, Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use sp_arithmetic::{
@@ -63,16 +73,6 @@ use sp_runtime::{
     traits::{AccountIdConversion, CheckedDiv, Hash, Saturating, StaticLookup, Zero},
     DispatchError, Perbill, RuntimeDebug, SaturatedConversion,
 };
-use zeitgeist_macros::unreachable_non_terminating;
-use zeitgeist_primitives::{
-    math::checked_ops_res::{CheckedAddRes, CheckedRemRes, CheckedSubRes},
-    traits::{DisputeApi, DisputeMaxWeightApi, DisputeResolutionApi},
-    types::{
-        GlobalDisputeItem, Market, MarketDisputeMechanism, MarketStatus, OutcomeReport,
-        ResultWithWeightInfo,
-    },
-};
-use zrml_market_commons::MarketCommonsPalletApi;
 
 mod benchmarks;
 mod court_pallet_api;
@@ -208,7 +208,7 @@ mod pallet {
     const INITIAL_DRAWS_NUM: usize = 31;
     /// The current storage version.
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
-    const LOG_TARGET: &str = "runtime::zrml-court";
+    const LOG_TARGET: &str = "runtime::pallet-pm-court";
     /// Weight used to increase the number of jurors for subsequent appeals
     /// of the same court.
     const APPEAL_BASIS: usize = 2;
@@ -356,8 +356,8 @@ mod pallet {
         },
         /// A new token amount was minted for a court participant.
         MintedInCourt { court_participant: T::AccountId, amount: BalanceOf<T> },
-        /// The juror and delegator stakes have been reassigned. The losing jurors have been slashed.
-        /// The winning jurors have been rewarded by the losers.
+        /// The juror and delegator stakes have been reassigned. The losing jurors have been
+        /// slashed. The winning jurors have been rewarded by the losers.
         /// The losing jurors are those, who did not vote,
         /// were denounced or did not reveal their vote.
         StakesReassigned { court_id: CourtId },
@@ -418,8 +418,8 @@ mod pallet {
         MaxCourtIdReached,
         /// The caller has not enough funds to join the court with the specified amount.
         AmountExceedsBalance,
-        /// After the first join of the court the amount has to be equal or higher than the current stake.
-        /// This is to ensure the slashable amount in active court rounds
+        /// After the first join of the court the amount has to be equal or higher than the current
+        /// stake. This is to ensure the slashable amount in active court rounds
         /// is still smaller or equal to the stake.
         /// It is also necessary to calculate the `unconsumed` stake properly.
         /// Otherwise a juror could just reduce the probability to get selected whenever they want.
@@ -610,8 +610,8 @@ mod pallet {
         }
 
         /// Prepare as a court participant (juror or delegator) to exit the court.
-        /// When this is called the court participant is not anymore able to get drawn for new cases.
-        /// The court participant gets removed from the stake-weighted pool.
+        /// When this is called the court participant is not anymore able to get drawn for new
+        /// cases. The court participant gets removed from the stake-weighted pool.
         /// After that the court participant can exit the court.
         ///
         /// # Weight
@@ -748,7 +748,7 @@ mod pallet {
 
                     let vote = Vote::Secret { commitment: commitment_vote };
                     draw.vote = vote;
-                }
+                },
                 Err(_) => return Err(Error::<T>::CallerNotInSelectedDraws.into()),
             }
 
@@ -834,7 +834,7 @@ mod pallet {
                     let raw_vote =
                         Vote::Denounced { commitment, vote_item: vote_item.clone(), salt };
                     draw.vote = raw_vote;
-                }
+                },
                 Err(_) => return Err(Error::<T>::JurorNotDrawn.into()),
             }
 
@@ -917,7 +917,7 @@ mod pallet {
                     draw.vote = raw_vote;
 
                     (draw.slashable, draw.weight)
-                }
+                },
                 Err(_) => return Err(Error::<T>::CallerNotInSelectedDraws.into()),
             };
 
@@ -1044,7 +1044,8 @@ mod pallet {
         ///
         /// # Weight
         ///
-        /// Complexity: O(N + M), with `N` being the number of draws and `M` being the total number of valid winners and losers.
+        /// Complexity: O(N + M), with `N` being the number of draws and `M` being the total number
+        /// of valid winners and losers.
         #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::reassign_court_stakes(T::MaxSelectedDraws::get()))]
         #[transactional]
@@ -1075,20 +1076,21 @@ mod pallet {
                 T::Currency::resolve_creating(&reward_pot, imbalance);
             };
 
-            // map delegated jurors to own_slashable, vote item and Vec<(delegator, delegator_stake)>
+            // map delegated jurors to own_slashable, vote item and Vec<(delegator,
+            // delegator_stake)>
             let mut jurors_to_stakes = BTreeMap::<T::AccountId, JurorVoteWithStakesOf<T>>::new();
 
             let mut handle_vote = |draw: DrawOf<T>| -> DispatchResult {
                 match draw.vote {
-                    Vote::Drawn
-                    | Vote::Secret { commitment: _ }
-                    | Vote::Denounced { commitment: _, vote_item: _, salt: _ } => {
+                    Vote::Drawn |
+                    Vote::Secret { commitment: _ } |
+                    Vote::Denounced { commitment: _, vote_item: _, salt: _ } => {
                         slash_juror(&draw.court_participant, draw.slashable);
-                    }
+                    },
                     Vote::Revealed { commitment: _, vote_item, salt: _ } => {
                         jurors_to_stakes.entry(draw.court_participant).or_default().self_info =
                             Some(SelfInfo { slashable: draw.slashable, vote_item });
-                    }
+                    },
                     Vote::Delegated { delegated_stakes } => {
                         let delegator = draw.court_participant;
                         for (j, delegated_stake) in delegated_stakes {
@@ -1113,15 +1115,15 @@ mod pallet {
                                             UnexpectedError::BinarySearchByKeyFailed,
                                         ))?;
                                     delegations.1 = delegations.1.saturating_add(delegated_stake);
-                                }
+                                },
                                 Err(i) => {
                                     juror_vote_with_stakes
                                         .delegations
                                         .insert(i, (delegator.clone(), delegated_stake));
-                                }
+                                },
                             }
                         }
-                    }
+                    },
                 }
                 Ok(())
             };
@@ -1291,11 +1293,11 @@ mod pallet {
                             Self::handle_existing_participant(who, amount, pool, &prev_p_info)?;
                         pool = pruned_pool;
                         (prev_pool_item_opt, prev_p_info.active_lock, old_consumed_stake)
-                    }
+                    },
                     None => {
                         pool = Self::remove_weakest_if_full(pool, amount)?;
                         (None, BalanceOf::<T>::zero(), BalanceOf::<T>::zero())
-                    }
+                    },
                 };
 
             let inflation_period = T::InflationPeriod::get();
@@ -1319,8 +1321,8 @@ mod pallet {
                         "This should never happen, because we are removing the court participant \
                          above."
                     );
-                    return Err(Error::<T>::CourtParticipantTwiceInPool.into());
-                }
+                    return Err(Error::<T>::CourtParticipantTwiceInPool.into())
+                },
                 Err(i) => pool
                     .try_insert(
                         i,
@@ -1369,7 +1371,7 @@ mod pallet {
 
             let yearly_inflation_rate = <YearlyInflation<T>>::get();
             if yearly_inflation_rate.is_zero() {
-                return T::WeightInfo::handle_inflation(0u32);
+                return T::WeightInfo::handle_inflation(0u32)
             }
             // example: 1049272791644671442
             let total_supply = T::Currency::total_issuance();
@@ -1409,7 +1411,7 @@ mod pallet {
             // safe guard: inflation per period should never exceed the yearly inflation amount
             if inflation_period_mint > yearly_inflation_amount {
                 debug_assert!(false);
-                return T::WeightInfo::handle_inflation(0u32);
+                return T::WeightInfo::handle_inflation(0u32)
             }
 
             let pool = <CourtPool<T>>::get();
@@ -1426,7 +1428,7 @@ mod pallet {
                     eligible_stake(pool_item).saturating_add(acc)
                 });
             if total_eligible_stake.is_zero() {
-                return T::WeightInfo::handle_inflation(0u32);
+                return T::WeightInfo::handle_inflation(0u32)
             }
 
             let mut total_mint = T::Currency::issue(inflation_period_mint);
@@ -1434,7 +1436,7 @@ mod pallet {
             for pool_item in pool {
                 let eligible_stake = eligible_stake(&pool_item);
                 if eligible_stake.is_zero() {
-                    continue;
+                    continue
                 }
                 let share = Perquintill::from_rational(
                     eligible_stake.saturated_into::<u128>(),
@@ -1533,7 +1535,7 @@ mod pallet {
                         .get_mut(index)
                         .ok_or(Error::<T>::Unexpected(UnexpectedError::BinarySearchByKeyFailed))?;
                     delegated_stake.1 = delegated_stake.1.saturating_add(amount);
-                }
+                },
                 Err(index) => {
                     let _ = delegated_stakes
                         .try_insert(index, (delegated_juror.clone(), amount))
@@ -1544,7 +1546,7 @@ mod pallet {
                                  jurors is ensured for delegations."
                             );
                         });
-                }
+                },
             }
 
             Ok(delegated_stakes)
@@ -1567,7 +1569,7 @@ mod pallet {
                     SelectionAdd::SelfStake { lock } => {
                         *weight = weight.saturating_add(1);
                         *slashable = slashable.saturating_add(lock);
-                    }
+                    },
                     SelectionAdd::DelegationStake { delegated_juror, lock } => {
                         *slashable = slashable.saturating_add(lock);
                         *delegated_stakes = Self::add_delegated_juror(
@@ -1575,10 +1577,10 @@ mod pallet {
                             &delegated_juror,
                             lock,
                         )?;
-                    }
+                    },
                     SelectionAdd::DelegationWeight => {
                         *weight = weight.saturating_add(1);
-                    }
+                    },
                 };
             } else {
                 match sel_add {
@@ -1591,7 +1593,7 @@ mod pallet {
                                 delegated_stakes: Default::default(),
                             },
                         );
-                    }
+                    },
                     SelectionAdd::DelegationStake { delegated_juror, lock } => {
                         let delegated_stakes = Self::add_delegated_juror(
                             DelegatedStakesOf::<T>::default(),
@@ -1602,7 +1604,7 @@ mod pallet {
                             court_participant.clone(),
                             SelectionValue { weight: 0, slashable: lock, delegated_stakes },
                         );
-                    }
+                    },
                     SelectionAdd::DelegationWeight => {
                         selections.insert(
                             court_participant.clone(),
@@ -1612,7 +1614,7 @@ mod pallet {
                                 delegated_stakes: Default::default(),
                             },
                         );
-                    }
+                    },
                 };
             }
 
@@ -1631,7 +1633,7 @@ mod pallet {
                 if let Some(delegated_juror_info) = <Participants<T>>::get(delegated_juror) {
                     if delegated_juror_info.delegations.is_some() {
                         // skip if delegated juror is delegator herself
-                        continue;
+                        continue
                     }
                     let pool_item =
                         Self::get_pool_item(&pool, delegated_juror_info.stake, delegated_juror)
@@ -1700,7 +1702,7 @@ mod pallet {
                             SelectionError::BinarySearchByKeyFailed
                         },
                     )?
-                }
+                },
                 None => {
                     let sel_add = SelectionAdd::SelfStake { lock: lock_added };
                     Self::update_selections(selections, court_participant, sel_add).map_err(
@@ -1715,7 +1717,7 @@ mod pallet {
                             SelectionError::BinarySearchByKeyFailed
                         },
                     )?;
-                }
+                },
             }
 
             Ok(())
@@ -1761,20 +1763,19 @@ mod pallet {
                         &pool_item.court_participant,
                         lock_added,
                     ) {
-                        Ok(()) => {}
+                        Ok(()) => {},
                         Err(SelectionError::NoValidDelegatedJuror) => {
                             // it would be pretty expensive to request another selection
                             // so just ignore this missing MinJurorStake
                             // I mean we also miss MinJurorStake in the case
                             // if the juror fails to vote or reveal or gets denounced
                             invalid_juror_indices.push(range_index);
-                        }
-                        Err(SelectionError::BinarySearchByKeyFailed) => {
+                        },
+                        Err(SelectionError::BinarySearchByKeyFailed) =>
                             return Err(Error::<T>::Unexpected(
                                 UnexpectedError::BinarySearchByKeyFailed,
                             )
-                            .into());
-                        }
+                            .into()),
                     }
 
                     Self::add_active_lock(&pool_item.court_participant, lock_added);
@@ -1814,8 +1815,8 @@ mod pallet {
                                     .clone()
                                     .into_iter()
                                     .fold(Zero::zero(), |acc: BalanceOf<T>, (_, stake)| acc
-                                        .saturating_add(stake))
-                                    == slashable
+                                        .saturating_add(stake)) ==
+                                    slashable
                             );
                             Vote::Delegated { delegated_stakes }
                         } else {
@@ -1953,7 +1954,7 @@ mod pallet {
                 let pool_item = pool
                     .get(i)
                     .ok_or(Error::<T>::Unexpected(UnexpectedError::BinarySearchByKeyFailed))?;
-                return Ok(Some((i, pool_item)));
+                return Ok(Some((i, pool_item)))
             }
             // this None case can happen whenever the court participant decided to leave the court
             // or was kicked out of the court pool because of the lowest stake
@@ -2020,13 +2021,13 @@ mod pallet {
                         matches!(vote_item, VoteItem::Outcome(_)),
                         Error::<T>::InvalidVoteItemForOutcomeCourt
                     );
-                }
+                },
                 VoteItemType::Binary => {
                     ensure!(
                         matches!(vote_item, VoteItem::Binary(_)),
                         Error::<T>::InvalidVoteItemForBinaryCourt
                     );
-                }
+                },
             };
 
             Ok(())
@@ -2095,7 +2096,7 @@ mod pallet {
             let mut winners = Vec::<(T::AccountId, BalanceOf<T>)>::new();
             for (juror, JurorVoteWithStakes { self_info, delegations }) in jurors_to_stakes.iter() {
                 match self_info {
-                    Some(SelfInfo { slashable, vote_item }) => {
+                    Some(SelfInfo { slashable, vote_item }) =>
                         if vote_item == winner_vote_item {
                             winners.push((juror.clone(), *slashable));
                             total_winner_stake = total_winner_stake.saturating_add(*slashable);
@@ -2119,14 +2120,13 @@ mod pallet {
 
                             let imb = slash_all_delegators(delegations.as_slice());
                             total_incentives.subsume(imb);
-                        }
-                    }
+                        },
                     None => {
                         // in this case the delegators have delegated their vote
                         // to a tardy or denounced juror
                         let imb = slash_all_delegators(delegations.as_slice());
                         total_incentives.subsume(imb);
-                    }
+                    },
                 }
             }
 
@@ -2185,7 +2185,7 @@ mod pallet {
                     second
                 }
             } else {
-                return Some(best_score.0.clone());
+                return Some(best_score.0.clone())
             };
 
             for el in iter {
@@ -2198,7 +2198,7 @@ mod pallet {
             }
 
             if best_score.1 == second_best_score.1 {
-                return last_winner;
+                return last_winner
             }
 
             Some(best_score.0.clone())
@@ -2252,15 +2252,13 @@ mod pallet {
                 Vote::Secret { commitment } => {
                     Self::compare_commitment(commitment, raw_commitment)?;
                     Ok(commitment)
-                }
+                },
                 Vote::Drawn => Err(Error::<T>::JurorDidNotVote.into()),
                 Vote::Delegated { delegated_stakes: _ } => Err(Error::<T>::JurorDelegated.into()),
-                Vote::Revealed { commitment: _, vote_item: _, salt: _ } => {
-                    Err(Error::<T>::VoteAlreadyRevealed.into())
-                }
-                Vote::Denounced { commitment: _, vote_item: _, salt: _ } => {
-                    Err(Error::<T>::VoteAlreadyDenounced.into())
-                }
+                Vote::Revealed { commitment: _, vote_item: _, salt: _ } =>
+                    Err(Error::<T>::VoteAlreadyRevealed.into()),
+                Vote::Denounced { commitment: _, vote_item: _, salt: _ } =>
+                    Err(Error::<T>::VoteAlreadyDenounced.into()),
             }
         }
     }
@@ -2436,7 +2434,7 @@ mod pallet {
                 ResultWithWeightInfo { result: None, weight: T::WeightInfo::get_auto_resolve() };
 
             if market.dispute_mechanism != Some(MarketDisputeMechanism::Court) {
-                return res;
+                return res
             }
 
             if let Some(court_id) = <MarketIdToCourtId<T>>::get(market_id) {
@@ -2481,12 +2479,12 @@ mod pallet {
                         .saturating_mul(T::MinJurorStake::get().saturated_into::<u128>());
                     let valid_period = Self::check_appealable_market(court_id, &court, now).is_ok();
 
-                    if appeals.is_full()
-                        || (valid_period && (pool_unconsumed_stake < required_stake))
+                    if appeals.is_full() ||
+                        (valid_period && (pool_unconsumed_stake < required_stake))
                     {
                         has_failed = true;
                     }
-                }
+                },
                 None => {
                     let report = market.report.as_ref().ok_or(Error::<T>::MarketReportNotFound)?;
                     let report_block = report.at;
@@ -2501,7 +2499,7 @@ mod pallet {
                     if during_dispute_duration && pool_unconsumed_stake < required_stake {
                         has_failed = true;
                     }
-                }
+                },
             }
 
             let res =
@@ -2551,7 +2549,7 @@ mod pallet {
                                     // initial vote amount
                                     initial_vote_amount: BalanceOf::<T>::zero(),
                                 })
-                            }
+                            },
                             _ => None,
                         }
                     })
