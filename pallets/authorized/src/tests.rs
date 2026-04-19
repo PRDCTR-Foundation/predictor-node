@@ -25,12 +25,12 @@ use crate::{
     AuthorizedOutcomeReports, Error,
 };
 use frame_support::{assert_noop, assert_ok};
-use sp_runtime::DispatchError;
-use zeitgeist_primitives::{
+use pallet_pm_market_commons::Markets;
+use prediction_market_primitives::{
     traits::DisputeApi,
     types::{AuthorityReport, MarketDisputeMechanism, MarketStatus, OutcomeReport},
 };
-use zrml_market_commons::Markets;
+use sp_runtime::DispatchError;
 
 #[test]
 fn authorize_market_outcome_inserts_a_new_outcome() {
@@ -93,7 +93,7 @@ fn authorize_market_outcome_fails_if_market_does_not_exist() {
                 0,
                 OutcomeReport::Scalar(1)
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist
         );
     });
 }

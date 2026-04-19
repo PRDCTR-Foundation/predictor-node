@@ -24,7 +24,7 @@ pub(crate) mod pallet {
     use core::marker::PhantomData;
     use frame_support::pallet_prelude::*;
     use frame_system::pallet_prelude::BlockNumberFor;
-    use zrml_market_commons::MarketCommonsPalletApi;
+    use pallet_pm_market_commons::MarketCommonsPalletApi;
 
     pub(crate) type MarketIdOf<T> =
         <<T as Config>::MarketCommons as MarketCommonsPalletApi>::MarketId;

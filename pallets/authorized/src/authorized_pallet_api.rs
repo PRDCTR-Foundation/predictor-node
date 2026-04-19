@@ -16,6 +16,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
-use zeitgeist_primitives::traits::{DisputeApi, DisputeMaxWeightApi};
+use prediction_market_primitives::traits::{DisputeApi, DisputeMaxWeightApi};
 
 pub trait AuthorizedPalletApi: DisputeApi + DisputeMaxWeightApi {}

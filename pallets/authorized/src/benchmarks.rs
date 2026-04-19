@@ -28,12 +28,12 @@ use crate::{
 };
 use frame_benchmarking::benchmarks;
 use frame_support::traits::{EnsureOrigin, Get, Imbalance, UnfilteredDispatchable};
-use sp_runtime::traits::Saturating;
-use zeitgeist_primitives::{
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::{
     traits::{DisputeApi, DisputeResolutionApi},
     types::{AuthorityReport, OutcomeReport},
 };
-use zrml_market_commons::MarketCommonsPalletApi;
+use sp_runtime::traits::Saturating;
 
 benchmarks! {
     authorize_market_outcome_first_report {
