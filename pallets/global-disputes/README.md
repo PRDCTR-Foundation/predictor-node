@@ -6,7 +6,7 @@ tokens as the canonical outcome.
 ## Overview
 
 This is the default process when a dispute mechanism (e. g. Court) fails to
-resolve. In the zeitgeist ecosystem this grants the ability to lock native
+resolve. In the ecosystem this grants the ability to lock native
 tokens by voting on one of multiple outcomes to determine the canonical outcome
 on which the market finally resolves.
 
