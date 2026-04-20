@@ -18,8 +18,8 @@
 
 use super::*;
 
-use crate::{LastTimeFrame, MarketIdsPerCloseTimeFrame};
-use zeitgeist_primitives::constants::MILLISECS_PER_BLOCK;
+use crate::{LastTimeFrame, MarketIdsPerCloseTimeFrame, WhitelistedMarketCreators};
+use common_primitives::constants::MILLISECS_PER_BLOCK;
 
 // TODO(#1239) MarketDoesNotExist
 // TODO(#1239) MarketPeriodEndNotAlreadyReachedYet
@@ -34,11 +34,12 @@ fn manually_close_market_after_long_stall() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -48,10 +49,10 @@ fn manually_close_market_after_long_stall() {
             ScoringRule::AmmCdaHybrid,
         ));
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -66,7 +67,7 @@ fn manually_close_market_after_long_stall() {
             end + (crate::MAX_RECOVERY_TIME_FRAMES + 1) * MILLISECS_PER_BLOCK as u64,
         );
         run_to_block(2); // Trigger `on_initialize`; must be at least block #2!
-        let new_end = <zrml_market_commons::Pallet<Runtime>>::now();
+        let new_end = <pallet_pm_market_commons::Pallet<Runtime>>::now();
         assert_ne!(end, new_end);
 
         // still active, not closed, because recovery limit reached
@@ -79,13 +80,13 @@ fn manually_close_market_after_long_stall() {
         let range_end_time_frame = crate::Pallet::<Runtime>::calculate_time_frame_of_moment(end);
         assert_eq!(MarketIdsPerCloseTimeFrame::<Runtime>::get(range_end_time_frame), vec![0, 1]);
 
-        assert_ok!(PredictionMarkets::manually_close_market(RuntimeOrigin::signed(ALICE), 0));
+        assert_ok!(PredictionMarkets::manually_close_market(RuntimeOrigin::signed(alice()), 0));
         assert_eq!(MarketIdsPerCloseTimeFrame::<Runtime>::get(range_end_time_frame), vec![1]);
         let market_after_manual_close = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after_manual_close.status, MarketStatus::Closed);
 
         assert_eq!(market_after_manual_close.period, MarketPeriod::Timestamp(0..new_end));
-        assert_ok!(PredictionMarkets::manually_close_market(RuntimeOrigin::signed(ALICE), 1));
+        assert_ok!(PredictionMarkets::manually_close_market(RuntimeOrigin::signed(alice()), 1));
         assert_eq!(MarketIdsPerCloseTimeFrame::<Runtime>::get(range_end_time_frame), vec![]);
         let market_after_manual_close = MarketCommons::market(&1).unwrap();
         assert_eq!(market_after_manual_close.status, MarketStatus::Closed);
@@ -103,11 +104,12 @@ fn manually_close_market_fails_if_market_not_in_close_time_frame_list() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -128,7 +130,7 @@ fn manually_close_market_fails_if_market_not_in_close_time_frame_list() {
         run_to_block(2); // Trigger `on_initialize`; must be at least block #2!
 
         assert_noop!(
-            PredictionMarkets::manually_close_market(RuntimeOrigin::signed(ALICE), 0),
+            PredictionMarkets::manually_close_market(RuntimeOrigin::signed(alice()), 0),
             Error::<Runtime>::MarketNotInCloseTimeFrameList
         );
     });
@@ -144,11 +146,12 @@ fn manually_close_market_fails_if_not_allowed_for_block_based_markets() {
 
         let category_count = 3;
         let end = 5;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -160,12 +163,12 @@ fn manually_close_market_fails_if_not_allowed_for_block_based_markets() {
 
         // This block takes much longer than 12sec, but markets and pools still close correctly.
         set_timestamp_for_on_initialize(
-            end + (crate::MAX_RECOVERY_TIME_FRAMES + 1) * MILLISECS_PER_BLOCK as u64,
+            end as u64 + (crate::MAX_RECOVERY_TIME_FRAMES + 1) * MILLISECS_PER_BLOCK as u64,
         );
         run_to_block(2); // Trigger `on_initialize`; must be at least block #2!
 
         assert_noop!(
-            PredictionMarkets::manually_close_market(RuntimeOrigin::signed(ALICE), 0),
+            PredictionMarkets::manually_close_market(RuntimeOrigin::signed(alice()), 0),
             Error::<Runtime>::NotAllowedForBlockBasedMarkets
         );
     });

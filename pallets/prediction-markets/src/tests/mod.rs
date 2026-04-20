@@ -33,6 +33,7 @@ mod manually_close_market;
 mod on_initialize;
 mod on_market_close;
 mod on_resolution;
+mod pallet_admin_tests;
 mod payout_vector;
 mod redeem_shares;
 mod reject_early_close;
@@ -45,22 +46,22 @@ mod start_global_dispute;
 
 use crate::{
     mock::*, AccountIdOf, AssetOf, BalanceOf, Config, DeadlinesOf, Error, Event,
-    MarketIdsPerDisputeBlock,
+    MarketIdsPerDisputeBlock, WhitelistedMarketCreators,
 };
 use core::ops::Range;
 use frame_support::{assert_noop, assert_ok, traits::NamedReservableCurrency};
 use orml_traits::MultiCurrency;
-use sp_arithmetic::Perbill;
-use sp_runtime::traits::{BlakeTwo256, Hash, Zero};
-use zeitgeist_primitives::{
-    constants::mock::{BASE, CENT},
+use pallet_pm_court::types::VoteItem;
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::{
+    constants::mock::{BASE, CENT_BASE},
     types::{
         Asset, Deadlines, MarketCreation, MarketDisputeMechanism, MarketId, MarketPeriod,
         MarketStatus, MarketType, MultiHash, OutcomeReport, ScoringRule,
     },
 };
-use zrml_court::types::VoteItem;
-use zrml_market_commons::MarketCommonsPalletApi;
+use sp_arithmetic::Perbill;
+use sp_runtime::traits::{BlakeTwo256, Hash, Zero};
 
 const SENTINEL_AMOUNT: u128 = BASE;
 
@@ -82,14 +83,15 @@ fn gen_metadata(byte: u8) -> MultiHash {
 fn simple_create_categorical_market(
     base_asset: AssetOf<Runtime>,
     creation: MarketCreation,
-    period: Range<u64>,
+    period: Range<u32>,
     scoring_rule: ScoringRule,
 ) {
+    WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
     assert_ok!(PredictionMarkets::create_market(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         base_asset,
         Perbill::zero(),
-        BOB,
+        bob(),
         MarketPeriod::Block(period),
         get_deadlines(),
         gen_metadata(2),
@@ -103,14 +105,15 @@ fn simple_create_categorical_market(
 fn simple_create_scalar_market(
     base_asset: AssetOf<Runtime>,
     creation: MarketCreation,
-    period: Range<u64>,
+    period: Range<u32>,
     scoring_rule: ScoringRule,
 ) {
+    WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
     assert_ok!(PredictionMarkets::create_market(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         base_asset,
         Perbill::zero(),
-        BOB,
+        bob(),
         MarketPeriod::Block(period),
         get_deadlines(),
         gen_metadata(2),
@@ -127,26 +130,30 @@ fn check_reserve(account: &AccountIdOf<Runtime>, expected: BalanceOf<Runtime>) {
 
 fn reserve_sentinel_amounts() {
     // Reserve a sentinel amount to check that we don't unreserve too much.
-    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &ALICE, SENTINEL_AMOUNT));
-    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &BOB, SENTINEL_AMOUNT));
     assert_ok!(Balances::reserve_named(
         &PredictionMarkets::reserve_id(),
-        &CHARLIE,
+        &alice(),
         SENTINEL_AMOUNT
     ));
-    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &DAVE, SENTINEL_AMOUNT));
-    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &EVE, SENTINEL_AMOUNT));
-    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &FRED, SENTINEL_AMOUNT));
-    assert_eq!(Balances::reserved_balance(ALICE), SENTINEL_AMOUNT);
-    assert_eq!(Balances::reserved_balance(BOB), SENTINEL_AMOUNT);
-    assert_eq!(Balances::reserved_balance(CHARLIE), SENTINEL_AMOUNT);
-    assert_eq!(Balances::reserved_balance(DAVE), SENTINEL_AMOUNT);
-    assert_eq!(Balances::reserved_balance(EVE), SENTINEL_AMOUNT);
-    assert_eq!(Balances::reserved_balance(FRED), SENTINEL_AMOUNT);
+    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &bob(), SENTINEL_AMOUNT));
+    assert_ok!(Balances::reserve_named(
+        &PredictionMarkets::reserve_id(),
+        &charlie(),
+        SENTINEL_AMOUNT
+    ));
+    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &dave(), SENTINEL_AMOUNT));
+    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &eve(), SENTINEL_AMOUNT));
+    assert_ok!(Balances::reserve_named(&PredictionMarkets::reserve_id(), &fred(), SENTINEL_AMOUNT));
+    assert_eq!(Balances::reserved_balance(alice()), SENTINEL_AMOUNT);
+    assert_eq!(Balances::reserved_balance(bob()), SENTINEL_AMOUNT);
+    assert_eq!(Balances::reserved_balance(charlie()), SENTINEL_AMOUNT);
+    assert_eq!(Balances::reserved_balance(dave()), SENTINEL_AMOUNT);
+    assert_eq!(Balances::reserved_balance(eve()), SENTINEL_AMOUNT);
+    assert_eq!(Balances::reserved_balance(fred()), SENTINEL_AMOUNT);
 }
 
 fn simulate_appeal_cycle(market_id: MarketId) {
-    let court = zrml_court::Courts::<Runtime>::get(market_id).unwrap();
+    let court = pallet_pm_court::Courts::<Runtime>::get(market_id).unwrap();
     let vote_start = court.round_ends.pre_vote + 1;
 
     run_to_block(vote_start);
@@ -156,7 +163,7 @@ fn simulate_appeal_cycle(market_id: MarketId) {
     let wrong_outcome = OutcomeReport::Categorical(1);
     let wrong_vote_item = VoteItem::Outcome(wrong_outcome);
 
-    let draws = zrml_court::SelectedDraws::<Runtime>::get(market_id);
+    let draws = pallet_pm_court::SelectedDraws::<Runtime>::get(market_id);
     for draw in &draws {
         let commitment =
             BlakeTwo256::hash_of(&(draw.court_participant, wrong_vote_item.clone(), salt));

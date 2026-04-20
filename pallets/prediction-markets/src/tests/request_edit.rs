@@ -27,7 +27,7 @@ use sp_runtime::DispatchError;
 fn it_allows_request_edit_origin_to_request_edits_for_markets() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             2..4,
             ScoringRule::AmmCdaHybrid,
@@ -40,7 +40,7 @@ fn it_allows_request_edit_origin_to_request_edits_for_markets() {
         let edit_reason = vec![0_u8; <Runtime as Config>::MaxEditReasonLen::get() as usize];
         // Make sure it fails from the random joe
         assert_noop!(
-            PredictionMarkets::request_edit(RuntimeOrigin::signed(BOB), 0, edit_reason.clone()),
+            PredictionMarkets::request_edit(RuntimeOrigin::signed(bob()), 0, edit_reason.clone()),
             DispatchError::BadOrigin
         );
 
@@ -68,7 +68,7 @@ fn request_edit_fails_on_bad_origin() {
         frame_system::Pallet::<Runtime>::set_block_number(1);
         // Creates an advised market.
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             2..4,
             ScoringRule::AmmCdaHybrid,
@@ -81,7 +81,7 @@ fn request_edit_fails_on_bad_origin() {
         let edit_reason = vec![0_u8; <Runtime as Config>::MaxEditReasonLen::get() as usize];
         // Make sure it fails from the random joe
         assert_noop!(
-            PredictionMarkets::request_edit(RuntimeOrigin::signed(BOB), 0, edit_reason),
+            PredictionMarkets::request_edit(RuntimeOrigin::signed(bob()), 0, edit_reason),
             DispatchError::BadOrigin
         );
     });
@@ -92,7 +92,7 @@ fn edit_request_fails_if_edit_reason_is_too_long() {
     ExtBuilder::default().build().execute_with(|| {
         // Creates an advised market.
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,

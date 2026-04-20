@@ -20,7 +20,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use parity_scale_codec::{Codec, MaxEncodedLen};
-use zeitgeist_primitives::types::Asset;
+use prediction_market_primitives::types::Asset;
 
 sp_api::decl_runtime_apis! {
     pub trait PredictionMarketsApi<MarketId, Hash> where

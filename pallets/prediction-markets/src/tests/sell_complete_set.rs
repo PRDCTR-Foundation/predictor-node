@@ -31,10 +31,10 @@ fn sell_complete_set_works(scoring_rule: ScoringRule) {
             scoring_rule,
         );
         let market_id = 0;
-        let buy_amount = 5 * CENT;
-        let sell_amount = 3 * CENT;
-        let expected_amount = 2 * CENT;
-        let who = BOB;
+        let buy_amount = 5 * CENT_BASE;
+        let sell_amount = 3 * CENT_BASE;
+        let expected_amount = 2 * CENT_BASE;
+        let who = bob();
 
         assert_ok!(PredictionMarkets::buy_complete_set(
             RuntimeOrigin::signed(who),
@@ -61,7 +61,7 @@ fn sell_complete_set_works(scoring_rule: ScoringRule) {
         System::assert_last_event(Event::SoldCompleteSet(market_id, sell_amount, who).into());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -73,13 +73,13 @@ fn sell_complete_set_works(scoring_rule: ScoringRule) {
 fn sell_complete_set_fails_on_zero_amount() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,
         );
         assert_noop!(
-            PredictionMarkets::sell_complete_set(RuntimeOrigin::signed(BOB), 0, 0),
+            PredictionMarkets::sell_complete_set(RuntimeOrigin::signed(bob()), 0, 0),
             Error::<Runtime>::ZeroAmount
         );
     });
@@ -95,8 +95,8 @@ fn sell_complete_set_fails_on_insufficient_share_balance() {
             ScoringRule::AmmCdaHybrid,
         );
         let market_id = 0;
-        let amount = 2 * CENT;
-        let who = BOB;
+        let amount = 2 * CENT_BASE;
+        let who = bob();
         assert_ok!(PredictionMarkets::buy_complete_set(
             RuntimeOrigin::signed(who),
             market_id,
@@ -109,7 +109,7 @@ fn sell_complete_set_fails_on_insufficient_share_balance() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -127,12 +127,12 @@ fn sell_complete_set_fails_if_market_has_wrong_scoring_rule(scoring_rule: Scorin
             scoring_rule,
         );
         assert_noop!(
-            PredictionMarkets::sell_complete_set(RuntimeOrigin::signed(BOB), 0, 2 * CENT),
+            PredictionMarkets::sell_complete_set(RuntimeOrigin::signed(bob()), 0, 2 * CENT_BASE),
             Error::<Runtime>::InvalidScoringRule
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {

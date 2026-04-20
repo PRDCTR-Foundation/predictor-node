@@ -19,12 +19,13 @@
 use super::*;
 use test_case::test_case;
 
-use crate::MarketBondsOf;
-use core::ops::RangeInclusive;
-use zeitgeist_primitives::{
+use crate::{MarketBondsOf, WhitelistedMarketCreators};
+use common_primitives::{
     constants::MILLISECS_PER_BLOCK,
-    types::{BlockNumber, Bond, MarketBonds, Moment},
+    types::{BlockNumber, Moment},
 };
+use core::ops::RangeInclusive;
+use prediction_market_primitives::types::{Bond, MarketBonds};
 
 #[test_case(
     MarketCreation::Advised,
@@ -39,14 +40,15 @@ fn fails_if_user_cannot_afford_bonds_advised(
     balance: BalanceOf<Runtime>,
 ) {
     ExtBuilder::default().build().execute_with(|| {
-        let creator = 999;
-        assert_ok!(AssetManager::deposit(Asset::Ztg, &creator, balance));
+        let creator = get_account(99);
+        assert_ok!(AssetManager::deposit(Asset::Tru, &creator, balance));
+        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(creator),
-                Asset::Ztg,
+                Asset::Tru,
                 <Runtime as Config>::MaxCreatorFee::get(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 get_deadlines(),
                 gen_metadata(2),
@@ -64,12 +66,13 @@ fn fails_if_user_cannot_afford_bonds_advised(
 fn fails_on_fee_too_high() {
     ExtBuilder::default().build().execute_with(|| {
         let one_billionth = Perbill::from_rational(1u128, 1_000_000_000u128);
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 <Runtime as Config>::MaxCreatorFee::get() + one_billionth,
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 get_deadlines(),
                 gen_metadata(2),
@@ -90,12 +93,13 @@ fn fails_on_invalid_multihash() {
         metadata[0] = 0x15;
         metadata[1] = 0x29;
         let multihash = MultiHash::Sha3_384(metadata);
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 <Runtime as Config>::MaxCreatorFee::get(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 get_deadlines(),
                 multihash,
@@ -113,12 +117,13 @@ fn fails_on_invalid_multihash() {
 #[test_case(555..=555; "one element as range")]
 fn create_scalar_market_fails_on_invalid_range(range: RangeInclusive<u128>) {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 get_deadlines(),
                 gen_metadata(2),
@@ -140,12 +145,13 @@ fn create_market_fails_on_min_dispute_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MinDisputeDuration::get() - 1,
         };
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -167,12 +173,13 @@ fn create_market_fails_on_min_oracle_duration() {
             oracle_duration: <Runtime as Config>::MinOracleDuration::get() - 1,
             dispute_duration: <Runtime as Config>::MinDisputeDuration::get(),
         };
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -194,12 +201,13 @@ fn create_market_fails_on_max_dispute_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get() + 1,
         };
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -221,12 +229,13 @@ fn create_market_fails_on_max_grace_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get(),
         };
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -248,12 +257,13 @@ fn create_market_fails_on_max_oracle_duration() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get() + 1,
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get(),
         };
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -277,15 +287,16 @@ fn create_market_with_foreign_assets() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get(),
         };
-
-        // As per Mock asset_registry genesis ForeignAsset(420) has allow_as_base_asset set to false.
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        // As per Mock asset_registry genesis ForeignAsset(420) has allow_as_base_asset set to
+        // false.
 
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 Asset::ForeignAsset(420),
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -299,10 +310,10 @@ fn create_market_with_foreign_assets() {
         // As per Mock asset_registry genesis ForeignAsset(50) is not registered in asset_registry.
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 Asset::ForeignAsset(50),
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(123..456),
                 deadlines,
                 gen_metadata(2),
@@ -315,10 +326,10 @@ fn create_market_with_foreign_assets() {
         );
         // As per Mock asset_registry genesis ForeignAsset(100) has allow_as_base_asset set to true.
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             Asset::ForeignAsset(100),
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(123..456),
             deadlines,
             gen_metadata(2),
@@ -335,12 +346,13 @@ fn create_market_with_foreign_assets() {
 #[test]
 fn it_does_not_create_market_with_too_few_categories() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(0..100),
                 get_deadlines(),
                 gen_metadata(2),
@@ -357,12 +369,13 @@ fn it_does_not_create_market_with_too_few_categories() {
 #[test]
 fn it_does_not_create_market_with_too_many_categories() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(0..100),
                 get_deadlines(),
                 gen_metadata(2),
@@ -386,12 +399,13 @@ fn create_categorical_market_fails_if_market_period_is_invalid(
     period: MarketPeriod<BlockNumber, Moment>,
 ) {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 period,
                 get_deadlines(),
                 gen_metadata(0),
@@ -410,12 +424,13 @@ fn create_categorical_market_fails_if_end_is_not_far_enough_ahead() {
     ExtBuilder::default().build().execute_with(|| {
         let end_block = 33;
         run_to_block(end_block);
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(0..end_block),
                 get_deadlines(),
                 gen_metadata(0),
@@ -430,10 +445,10 @@ fn create_categorical_market_fails_if_end_is_not_far_enough_ahead() {
         let end_time = MILLISECS_PER_BLOCK as u64 / 2;
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Timestamp(0..end_time),
                 get_deadlines(),
                 gen_metadata(0),
@@ -458,11 +473,12 @@ fn create_market_succeeds_if_market_duration_is_maximal_in_blocks() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(start..end),
             get_deadlines(),
             gen_metadata(0),
@@ -477,20 +493,21 @@ fn create_market_succeeds_if_market_duration_is_maximal_in_blocks() {
 #[test]
 fn create_market_suceeds_if_market_duration_is_maximal_in_moments() {
     ExtBuilder::default().build().execute_with(|| {
-        let now = 12_001u64;
-        Timestamp::set_timestamp(now);
+        let now = 12_001u32;
+        Timestamp::set_timestamp(now as u64);
         let start = 5 * MILLISECS_PER_BLOCK as u64;
-        let end =
-            now + <Runtime as Config>::MaxMarketLifetime::get() * (MILLISECS_PER_BLOCK as u64);
+        let end = now as u64 +
+            <Runtime as Config>::MaxMarketLifetime::get() as u64 * MILLISECS_PER_BLOCK as u64;
         assert!(
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(start..end),
             get_deadlines(),
             gen_metadata(0),
@@ -513,12 +530,13 @@ fn create_market_fails_if_market_duration_is_too_long_in_blocks() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(start..end),
                 get_deadlines(),
                 gen_metadata(0),
@@ -535,21 +553,23 @@ fn create_market_fails_if_market_duration_is_too_long_in_blocks() {
 #[test]
 fn create_market_fails_if_market_duration_is_too_long_in_moments() {
     ExtBuilder::default().build().execute_with(|| {
-        let now = 12_001u64;
-        Timestamp::set_timestamp(now);
+        let now = 12_001;
+        Timestamp::set_timestamp(now as u64);
         let start = 5 * MILLISECS_PER_BLOCK as u64;
-        let end = now
-            + (<Runtime as Config>::MaxMarketLifetime::get() + 1) * (MILLISECS_PER_BLOCK as u64);
+        let end = now as u64 +
+            (<Runtime as Config>::MaxMarketLifetime::get() + 1) as u64 *
+                MILLISECS_PER_BLOCK as u64;
         assert!(
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Timestamp(start..end),
                 get_deadlines(),
                 gen_metadata(0),
@@ -568,8 +588,8 @@ fn create_market_fails_if_market_duration_is_too_long_in_moments() {
     ScoringRule::AmmCdaHybrid,
     MarketStatus::Proposed,
     MarketBonds {
-        creation: Some(Bond::new(ALICE, <Runtime as Config>::AdvisoryBond::get())),
-        oracle: Some(Bond::new(ALICE, <Runtime as Config>::OracleBond::get())),
+        creation: Some(Bond::new(alice(), <Runtime as Config>::AdvisoryBond::get())),
+        oracle: Some(Bond::new(alice(), <Runtime as Config>::OracleBond::get())),
         outsider: None,
         dispute: None,
         close_dispute: None,
@@ -581,8 +601,8 @@ fn create_market_fails_if_market_duration_is_too_long_in_moments() {
     ScoringRule::AmmCdaHybrid,
     MarketStatus::Active,
     MarketBonds {
-        creation: Some(Bond::new(ALICE, <Runtime as Config>::ValidityBond::get())),
-        oracle: Some(Bond::new(ALICE, <Runtime as Config>::OracleBond::get())),
+        creation: Some(Bond::new(alice(), <Runtime as Config>::ValidityBond::get())),
+        oracle: Some(Bond::new(alice(), <Runtime as Config>::OracleBond::get())),
         outsider: None,
         dispute: None,
         close_dispute: None,
@@ -596,8 +616,8 @@ fn create_market_sets_the_correct_market_parameters_and_reserves_the_correct_amo
     bonds: MarketBondsOf<Runtime>,
 ) {
     ExtBuilder::default().build().execute_with(|| {
-        let creator = ALICE;
-        let oracle = BOB;
+        let creator = alice();
+        let oracle = bob();
         let period = MarketPeriod::Block(1..2);
         let deadlines = Deadlines {
             grace_period: 1,
@@ -609,9 +629,10 @@ fn create_market_sets_the_correct_market_parameters_and_reserves_the_correct_amo
         let market_type = MarketType::Categorical(7);
         let dispute_mechanism = Some(MarketDisputeMechanism::Authorized);
         let creator_fee = Perbill::from_parts(1);
+        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(creator),
-            Asset::Ztg,
+            Asset::Tru,
             creator_fee,
             oracle,
             period.clone(),
@@ -643,12 +664,13 @@ fn create_market_sets_the_correct_market_parameters_and_reserves_the_correct_amo
 #[test]
 fn create_market_fails_on_trusted_market_with_non_zero_dispute_period() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
-                RuntimeOrigin::signed(ALICE),
-                Asset::Ztg,
+                RuntimeOrigin::signed(alice()),
+                Asset::Tru,
                 Perbill::zero(),
-                BOB,
+                bob(),
                 MarketPeriod::Block(1..2),
                 Deadlines {
                     grace_period: 1,
@@ -670,7 +692,7 @@ fn create_market_fails_on_trusted_market_with_non_zero_dispute_period() {
 fn create_categorical_market_deposits_the_correct_event() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             1..2,
             ScoringRule::AmmCdaHybrid,
@@ -686,7 +708,7 @@ fn create_categorical_market_deposits_the_correct_event() {
 fn create_scalar_market_deposits_the_correct_event() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_scalar_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             1..2,
             ScoringRule::AmmCdaHybrid,

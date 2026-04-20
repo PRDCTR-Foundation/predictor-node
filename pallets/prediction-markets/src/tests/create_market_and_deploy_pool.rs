@@ -17,7 +17,8 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use zeitgeist_primitives::types::{Bond, MarketBonds};
+use crate::WhitelistedMarketCreators;
+use prediction_market_primitives::types::{Bond, MarketBonds};
 
 // TODO(#1239) Issue: Separate integration tests and other; use mocks for unit testing
 // TODO(#1239) do_buy_complete_set failure
@@ -26,9 +27,9 @@ use zeitgeist_primitives::types::{Bond, MarketBonds};
 #[test]
 fn create_market_and_deploy_pool_works() {
     ExtBuilder::default().build().execute_with(|| {
-        let creator = ALICE;
+        let creator = alice();
         let creator_fee = Perbill::from_parts(1);
-        let oracle = BOB;
+        let oracle = bob();
         let period = MarketPeriod::Block(1..2);
         let deadlines = Deadlines {
             grace_period: 1,
@@ -40,12 +41,13 @@ fn create_market_and_deploy_pool_works() {
         let market_type = MarketType::Categorical(7);
         let dispute_mechanism = Some(MarketDisputeMechanism::Authorized);
         let amount = 1234567890;
-        let swap_prices = vec![50 * CENT, 50 * CENT];
-        let swap_fee = CENT;
+        let swap_prices = vec![50 * CENT_BASE, 50 * CENT_BASE];
+        let swap_fee = CENT_BASE;
         let market_id = 0;
+        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
         assert_ok!(PredictionMarkets::create_market_and_deploy_pool(
             RuntimeOrigin::signed(creator),
-            Asset::Ztg,
+            Asset::Tru,
             creator_fee,
             oracle,
             period.clone(),
@@ -59,8 +61,8 @@ fn create_market_and_deploy_pool_works() {
         ));
         let market = MarketCommons::market(&0).unwrap();
         let bonds = MarketBonds {
-            creation: Some(Bond::new(ALICE, <Runtime as Config>::ValidityBond::get())),
-            oracle: Some(Bond::new(ALICE, <Runtime as Config>::OracleBond::get())),
+            creation: Some(Bond::new(alice(), <Runtime as Config>::ValidityBond::get())),
+            oracle: Some(Bond::new(alice(), <Runtime as Config>::OracleBond::get())),
             outsider: None,
             dispute: None,
             close_dispute: None,
@@ -82,7 +84,7 @@ fn create_market_and_deploy_pool_works() {
         assert_eq!(market.bonds, bonds);
         // Check that the correct amount of full sets were bought.
         assert_eq!(
-            AssetManager::free_balance(Asset::CategoricalOutcome(market_id, 0), &ALICE),
+            AssetManager::free_balance(Asset::CategoricalOutcome(market_id, 0), &alice()),
             amount
         );
         assert!(DeployPoolMock::called_once_with(

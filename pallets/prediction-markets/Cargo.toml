@@ -9,16 +9,19 @@ scale-info = { workspace = true, features = ["derive"] }
 serde = { workspace = true, optional = true }
 sp-arithmetic = { workspace = true }
 sp-runtime = { workspace = true }
-zeitgeist-primitives = { workspace = true }
-zrml-authorized = { workspace = true }
-zrml-court = { workspace = true }
-zrml-global-disputes = { workspace = true }
-zrml-market-commons = { workspace = true }
+sp-core = { workspace = true }
+prediction-market-primitives = { workspace = true }
+common-primitives = { workspace = true }
+pallet-pm-authorized = { workspace = true }
+pallet-pm-court = { workspace = true }
+pallet-pm-global-disputes = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
 
 # Mock
 
 cfg-if = { workspace = true, optional = true }
 env_logger = { workspace = true, optional = true }
+pallet-pm-eth-asset-registry = { workspace = true }
 orml-asset-registry = { workspace = true, optional = true }
 orml-currencies = { workspace = true, optional = true }
 orml-tokens = { workspace = true, optional = true }
@@ -27,22 +30,27 @@ pallet-insecure-randomness-collective-flip = { workspace = true, optional = true
 pallet-timestamp = { workspace = true, optional = true }
 pallet-treasury = { workspace = true, optional = true }
 sp-api = { workspace = true, optional = true }
-sp-core = { workspace = true, optional = true }
 sp-io = { workspace = true, optional = true }
 xcm = { workspace = true, optional = true }
-zrml-prediction-markets-runtime-api = { workspace = true, optional = true }
+pallet-prediction-markets-runtime-api = { workspace = true, optional = true }
+
+sp-avn-common = { workspace = true }
+pallet-avn = { workspace = true }
+sp-keystore = { workspace = true , optional = true }
 
 [dev-dependencies]
 more-asserts = { workspace = true }
 test-case = { workspace = true }
-zrml-prediction-markets = { workspace = true, features = ["mock", "default"] }
+pallet-prediction-markets = { workspace = true, features = ["mock", "default"] }
+sp-keystore = { workspace = true, features = ["default"]}
+sp-avn-common = { workspace = true, features=["test-utils"] }
 
 [features]
 default = ["std"]
 mock = [
     "cfg-if",
     "env_logger/default",
-    "orml-asset-registry/default",
+    "pallet-pm-eth-asset-registry/default",
     "orml-currencies/default",
     "orml-tokens/default",
     "pallet-balances/default",
@@ -53,8 +61,9 @@ mock = [
     "sp-api/default",
     "sp-io/default",
     "sp-core/default",
-    "zeitgeist-primitives/mock",
-    "zrml-prediction-markets-runtime-api/default",
+    "sp-keystore/default",
+    "prediction-market-primitives/mock",
+    "pallet-prediction-markets-runtime-api/default",
     "xcm/default",
     "orml-asset-registry/default",
     "env_logger/default",
@@ -64,26 +73,28 @@ runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
-    "orml-asset-registry?/runtime-benchmarks",
+    "pallet-pm-eth-asset-registry/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
-    "zeitgeist-primitives/mock",
+    "prediction-market-primitives/mock",
 ]
 std = [
     "frame-benchmarking?/std",
     "frame-support/std",
     "frame-system/std",
-    "orml-asset-registry?/std",
+    "pallet-pm-eth-asset-registry/std",
     "orml-traits/std",
     "parity-scale-codec/std",
     'scale-info/std',
     "serde?/std",
     "sp-arithmetic/std",
     "sp-runtime/std",
-    "zeitgeist-primitives/std",
-    "zrml-authorized/std",
-    "zrml-court/std",
-    "zrml-market-commons/std",
-    "zrml-global-disputes/std",
+    "prediction-market-primitives/std",
+    "common-primitives/std",
+    "pallet-pm-authorized/std",
+    "pallet-pm-court/std",
+    "pallet-pm-market-commons/std",
+    "pallet-pm-global-disputes/std",
+    "pallet-avn/std",
     "xcm?/std",
 ]
 try-runtime = [
@@ -93,5 +104,6 @@ try-runtime = [
 [package]
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
 edition.workspace = true
-name = "zrml-prediction-markets"
-version = "0.6.1"
+name = "pallet-prediction-markets"
+version = { workspace = true }
+

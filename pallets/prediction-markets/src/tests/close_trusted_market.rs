@@ -19,7 +19,7 @@
 use super::*;
 use test_case::test_case;
 
-use crate::MarketIdsPerCloseBlock;
+use crate::{MarketIdsPerCloseBlock, WhitelistedMarketCreators};
 use sp_runtime::traits::Zero;
 
 // TODO(#1239) Split test
@@ -27,12 +27,13 @@ use sp_runtime::traits::Zero;
 fn close_trusted_market_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
-        let market_creator = ALICE;
+        let market_creator = alice();
+        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
-            Asset::Ztg,
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             Deadlines {
                 grace_period: 0,
@@ -77,12 +78,13 @@ fn close_trusted_market_works() {
 fn fails_if_caller_is_not_market_creator() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
-        let market_creator = ALICE;
+        let market_creator = alice();
+        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
-            Asset::Ztg,
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             Deadlines {
                 grace_period: 0,
@@ -97,7 +99,7 @@ fn fails_if_caller_is_not_market_creator() {
         ));
         run_to_block(end - 1);
         assert_noop!(
-            PredictionMarkets::close_trusted_market(RuntimeOrigin::signed(BOB), 0),
+            PredictionMarkets::close_trusted_market(RuntimeOrigin::signed(bob()), 0),
             Error::<Runtime>::CallerNotMarketCreator
         );
     });
@@ -107,12 +109,13 @@ fn fails_if_caller_is_not_market_creator() {
 fn close_trusted_market_fails_if_not_trusted() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
-        let market_creator = ALICE;
+        let market_creator = alice();
+        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
-            Asset::Ztg,
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             Deadlines {
                 grace_period: 0,
@@ -153,12 +156,13 @@ fn close_trusted_market_fails_if_not_trusted() {
 fn close_trusted_market_fails_if_invalid_market_state(status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
-        let market_creator = ALICE;
+        let market_creator = alice();
+        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
-            Asset::Ztg,
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             Deadlines {
                 grace_period: 0,
@@ -192,8 +196,8 @@ fn close_trusted_market_fails_if_invalid_market_state(status: MarketStatus) {
 fn fails_if_market_is_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         assert_noop!(
-            PredictionMarkets::close_trusted_market(RuntimeOrigin::signed(ALICE), 3),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist
+            PredictionMarkets::close_trusted_market(RuntimeOrigin::signed(alice()), 3),
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist
         );
     });
 }

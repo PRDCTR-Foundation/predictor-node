@@ -17,39 +17,42 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use crate::MarketIdsPerDisputeBlock;
+use crate::{MarketIdsPerDisputeBlock, WhitelistedMarketCreators};
 use alloc::collections::BTreeMap;
+use common_primitives::constants::MILLISECS_PER_BLOCK;
 use orml_traits::MultiReservableCurrency;
-use sp_runtime::Perquintill;
-use zeitgeist_primitives::{
-    constants::MILLISECS_PER_BLOCK,
-    types::{OutcomeReport, ScalarPosition},
-};
-use zrml_court::types::{CourtStatus, Draw, Vote};
-use zrml_global_disputes::{
+use pallet_pm_court::types::{CourtStatus, Draw, Vote};
+use pallet_pm_global_disputes::{
     types::{OutcomeInfo, Possession},
     GlobalDisputesPalletApi, Outcomes, PossessionOf,
 };
+use prediction_market_primitives::{
+    test_helper::get_account_from_seed,
+    types::{OutcomeReport, ScalarPosition},
+};
+use sp_runtime::Perquintill;
 
 #[test]
 fn it_appeals_a_court_market_to_global_dispute() {
     let test = |base_asset: AssetOf<Runtime>| {
         let mut free_before = BTreeMap::new();
-        let jurors =
-            1000..(1000 + <Runtime as zrml_court::Config>::MaxSelectedDraws::get() as u128);
+        let jurors = 1..(1 + <Runtime as pallet_pm_court::Config>::MaxSelectedDraws::get() as u128);
         for j in jurors {
-            let amount = <Runtime as zrml_court::Config>::MinJurorStake::get() + j;
-            assert_ok!(AssetManager::deposit(Asset::Ztg, &j, amount + SENTINEL_AMOUNT));
-            assert_ok!(Court::join_court(RuntimeOrigin::signed(j), amount));
-            free_before.insert(j, Balances::free_balance(j));
+            let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + j;
+            let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&j);
+            let juror = get_account_from_seed(seed.into());
+            assert_ok!(AssetManager::deposit(Asset::Tru, &juror, amount + SENTINEL_AMOUNT));
+            assert_ok!(Court::join_court(RuntimeOrigin::signed(juror), amount));
+            free_before.insert(j, Balances::free_balance(juror));
         }
 
         let end = 2;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -66,41 +69,44 @@ fn it_appeals_a_court_market_to_global_dispute() {
         run_to_block(report_at);
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             market_id,
             OutcomeReport::Categorical(0)
         ));
 
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(CHARLIE), market_id,));
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(charlie()), market_id,));
 
-        for _ in 0..(<Runtime as zrml_court::Config>::MaxAppeals::get() - 1) {
+        for _ in 0..(<Runtime as pallet_pm_court::Config>::MaxAppeals::get() - 1) {
             simulate_appeal_cycle(market_id);
-            assert_ok!(Court::appeal(RuntimeOrigin::signed(BOB), market_id));
+            assert_ok!(Court::appeal(RuntimeOrigin::signed(bob()), market_id));
         }
 
-        let court = zrml_court::Courts::<Runtime>::get(market_id).unwrap();
+        let court = pallet_pm_court::Courts::<Runtime>::get(market_id).unwrap();
         let appeals = court.appeals;
         assert_eq!(
             appeals.len(),
-            (<Runtime as zrml_court::Config>::MaxAppeals::get() - 1) as usize
+            (<Runtime as pallet_pm_court::Config>::MaxAppeals::get() - 1) as usize
         );
 
         assert_noop!(
-            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(BOB), market_id),
+            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(bob()), market_id),
             Error::<Runtime>::MarketDisputeMechanismNotFailed
         );
 
         simulate_appeal_cycle(market_id);
-        assert_ok!(Court::appeal(RuntimeOrigin::signed(BOB), market_id));
+        assert_ok!(Court::appeal(RuntimeOrigin::signed(bob()), market_id));
 
         assert_noop!(
-            Court::appeal(RuntimeOrigin::signed(BOB), market_id),
-            zrml_court::Error::<Runtime>::MaxAppealsReached
+            Court::appeal(RuntimeOrigin::signed(bob()), market_id),
+            pallet_pm_court::Error::<Runtime>::MaxAppealsReached
         );
 
         assert!(!GlobalDisputes::does_exist(&market_id));
 
-        assert_ok!(PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(BOB), market_id));
+        assert_ok!(PredictionMarkets::start_global_dispute(
+            RuntimeOrigin::signed(bob()),
+            market_id
+        ));
 
         let now = <frame_system::Pallet<Runtime>>::block_number();
 
@@ -108,8 +114,9 @@ fn it_appeals_a_court_market_to_global_dispute() {
         System::assert_last_event(Event::GlobalDisputeStarted(market_id).into());
 
         // report check
-        let possession: PossessionOf<Runtime> =
-            Possession::Shared { owners: frame_support::BoundedVec::try_from(vec![BOB]).unwrap() };
+        let possession: PossessionOf<Runtime> = Possession::Shared {
+            owners: frame_support::BoundedVec::try_from(vec![bob()]).unwrap(),
+        };
         let outcome_info = OutcomeInfo { outcome_sum: Zero::zero(), possession };
         assert_eq!(
             Outcomes::<Runtime>::get(market_id, OutcomeReport::Categorical(0)).unwrap(),
@@ -123,12 +130,12 @@ fn it_appeals_a_court_market_to_global_dispute() {
         assert!(GlobalDisputes::is_active(&market_id));
 
         assert_noop!(
-            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(CHARLIE), market_id),
+            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(charlie()), market_id),
             Error::<Runtime>::GlobalDisputeExistsAlready
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -139,12 +146,13 @@ fn it_appeals_a_court_market_to_global_dispute() {
 #[test]
 fn the_entire_market_lifecycle_works_with_timestamps() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         // Creates a permissionless market.
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -155,22 +163,22 @@ fn the_entire_market_lifecycle_works_with_timestamps() {
         ));
 
         // is ok
-        assert_ok!(PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(BOB), 0, CENT));
+        assert_ok!(PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(bob()), 0, CENT_BASE));
         let market = MarketCommons::market(&0).unwrap();
 
         // set the timestamp
         set_timestamp_for_on_initialize(100_000_000);
         run_to_block(2); // Trigger `on_initialize`; must be at least block #2.
-        let grace_period: u64 = market.deadlines.grace_period * MILLISECS_PER_BLOCK as u64;
-        Timestamp::set_timestamp(100_000_000 + grace_period);
+        let grace_period: u32 = market.deadlines.grace_period * MILLISECS_PER_BLOCK;
+        Timestamp::set_timestamp(100_000_000 + grace_period as u64);
 
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(BOB), 0, CENT),
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(bob()), 0, CENT_BASE),
             Error::<Runtime>::MarketIsNotActive,
         );
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(1)
         ));
@@ -180,11 +188,12 @@ fn the_entire_market_lifecycle_works_with_timestamps() {
 #[test]
 fn full_scalar_market_lifecycle() {
     let test = |base_asset: AssetOf<Runtime>| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(3),
@@ -195,7 +204,7 @@ fn full_scalar_market_lifecycle() {
         ));
 
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(CHARLIE),
+            RuntimeOrigin::signed(charlie()),
             0,
             100 * BASE
         ));
@@ -205,7 +214,7 @@ fn full_scalar_market_lifecycle() {
         let assets = market.outcome_assets();
         assert_eq!(assets.len(), 2);
         for asset in assets.iter() {
-            let bal = Tokens::free_balance(*asset, &CHARLIE);
+            let bal = Tokens::free_balance(*asset, &charlie());
             assert_eq!(bal, 100 * BASE);
         }
         let market = MarketCommons::market(&0).unwrap();
@@ -213,12 +222,12 @@ fn full_scalar_market_lifecycle() {
         set_timestamp_for_on_initialize(100_000_000);
         let report_at = 2;
         run_to_block(report_at); // Trigger `on_initialize`; must be at least block #2.
-        let grace_period: u64 = market.deadlines.grace_period * MILLISECS_PER_BLOCK as u64;
-        Timestamp::set_timestamp(100_000_000 + grace_period);
+        let grace_period: u32 = market.deadlines.grace_period * MILLISECS_PER_BLOCK;
+        Timestamp::set_timestamp(100_000_000 + grace_period as u64);
 
         // report
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Scalar(100)
         ));
@@ -227,52 +236,53 @@ fn full_scalar_market_lifecycle() {
         assert!(market_after_report.report.is_some());
         let report = market_after_report.report.unwrap();
         assert_eq!(report.at, report_at);
-        assert_eq!(report.by, BOB);
+        assert_eq!(report.by, bob());
         assert_eq!(report.outcome, OutcomeReport::Scalar(100));
 
         // dispute
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(DAVE), 0));
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(dave()), 0));
         assert_ok!(Authorized::authorize_market_outcome(
             RuntimeOrigin::signed(AuthorizedDisputeResolutionUser::get()),
             0,
             OutcomeReport::Scalar(25)
         ));
-        run_blocks(<Runtime as zrml_authorized::Config>::CorrectionPeriod::get());
+        run_blocks(<Runtime as pallet_pm_authorized::Config>::CorrectionPeriod::get());
 
         let market_after_resolve = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after_resolve.status, MarketStatus::Resolved);
 
-        // give EVE some shares
+        // give eve() some shares
         assert_ok!(Tokens::transfer(
-            RuntimeOrigin::signed(CHARLIE),
-            EVE,
+            RuntimeOrigin::signed(charlie()),
+            eve(),
             Asset::ScalarOutcome(0, ScalarPosition::Short),
             50 * BASE
         ));
 
         assert_eq!(
-            Tokens::free_balance(Asset::ScalarOutcome(0, ScalarPosition::Short), &CHARLIE),
+            Tokens::free_balance(Asset::ScalarOutcome(0, ScalarPosition::Short), &charlie()),
             50 * BASE
         );
 
-        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(CHARLIE), 0));
+        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(charlie()), 0));
         for asset in assets.iter() {
-            let bal = Tokens::free_balance(*asset, &CHARLIE);
+            let bal = Tokens::free_balance(*asset, &charlie());
             assert_eq!(bal, 0);
         }
 
-        // check payouts is right for each CHARLIE and EVE
-        let base_asset_bal_charlie = AssetManager::free_balance(base_asset, &CHARLIE);
-        let base_asset_bal_eve = AssetManager::free_balance(base_asset, &EVE);
-        assert_eq!(base_asset_bal_charlie, 98750 * CENT); // 75 (LONG) + 12.5 (SHORT) + 900 (balance)
+        // check payouts is right for each charlie() and eve()
+        let base_asset_bal_charlie = AssetManager::free_balance(base_asset, &charlie());
+        let base_asset_bal_eve = AssetManager::free_balance(base_asset, &eve());
+
+        assert_eq!(base_asset_bal_charlie, 9831250000000); // (75 (LONG) + 12.5 (SHORT))-5% winning fee + 900 (balance)
         assert_eq!(base_asset_bal_eve, 1000 * BASE);
         System::assert_has_event(
             Event::TokensRedeemed(
                 0,
                 Asset::ScalarOutcome(0, ScalarPosition::Long),
                 100 * BASE,
-                75 * BASE,
-                CHARLIE,
+                712500000000, //75 - 5%
+                charlie(),
             )
             .into(),
         );
@@ -281,28 +291,28 @@ fn full_scalar_market_lifecycle() {
                 0,
                 Asset::ScalarOutcome(0, ScalarPosition::Short),
                 50 * BASE,
-                1250 * CENT, // 12.5
-                CHARLIE,
+                118750000000, // 12.5 - 5%
+                charlie(),
             )
             .into(),
         );
 
-        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(EVE), 0));
-        let base_asset_bal_eve_after = AssetManager::free_balance(base_asset, &EVE);
-        assert_eq!(base_asset_bal_eve_after, 101250 * CENT); // 12.5 (SHORT) + 1000 (balance)
+        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(eve()), 0));
+        let base_asset_bal_eve_after = AssetManager::free_balance(base_asset, &eve());
+        assert_eq!(base_asset_bal_eve_after, 10118750000000); // (12.5 (SHORT) -5% )+ 1000 (balance)
         System::assert_last_event(
             Event::TokensRedeemed(
                 0,
                 Asset::ScalarOutcome(0, ScalarPosition::Short),
                 50 * BASE,
-                1250 * CENT, // 12.5
-                EVE,
+                118750000000, // 12.5 - 5%
+                eve(),
             )
             .into(),
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -312,14 +322,16 @@ fn full_scalar_market_lifecycle() {
 
 #[test]
 fn authorized_correctly_resolves_disputed_market() {
-    // NOTE: Bonds are always in ZTG, irrespective of base_asset.
+    // NOTE: Bonds are always in TRUU, irrespective of base_asset.
     let test = |base_asset: AssetOf<Runtime>| {
         let end = 2;
+        let winning_fee = <Runtime as Config>::WinnerFeePercentage::get() * CENT_BASE;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -328,35 +340,39 @@ fn authorized_correctly_resolves_disputed_market() {
             Some(MarketDisputeMechanism::Authorized),
             ScoringRule::AmmCdaHybrid,
         ));
-        assert_ok!(PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(CHARLIE), 0, CENT));
+        assert_ok!(PredictionMarkets::buy_complete_set(
+            RuntimeOrigin::signed(charlie()),
+            0,
+            CENT_BASE
+        ));
 
         let market = MarketCommons::market(&0).unwrap();
         let grace_period = end + market.deadlines.grace_period;
         run_to_block(grace_period + 1);
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(0)
         ));
 
-        let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
-        assert_eq!(charlie_balance, 1_000 * BASE - CENT);
+        let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
+        assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
 
         let dispute_at = grace_period + 1 + 1;
         run_to_block(dispute_at);
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(CHARLIE), 0,));
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(charlie()), 0,));
 
-        if base_asset == Asset::Ztg {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+        if base_asset == Asset::Tru {
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(
                 charlie_balance,
-                1_000 * BASE - CENT - <Runtime as Config>::DisputeBond::get()
+                1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
-            let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
-            assert_eq!(charlie_balance, 1_000 * BASE - CENT);
+            let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
+            assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
         }
 
         // Fred authorizses an outcome, but fat-fingers it on the first try.
@@ -375,90 +391,93 @@ fn authorized_correctly_resolves_disputed_market() {
         assert_eq!(market.status, MarketStatus::Disputed);
 
         // check everyone's deposits
-        let charlie_reserved = Balances::reserved_balance(CHARLIE);
+        let charlie_reserved = Balances::reserved_balance(charlie());
         assert_eq!(charlie_reserved, <Runtime as Config>::DisputeBond::get());
 
         let market_ids_1 = MarketIdsPerDisputeBlock::<Runtime>::get(
-            dispute_at + <Runtime as zrml_authorized::Config>::CorrectionPeriod::get(),
+            dispute_at + <Runtime as pallet_pm_authorized::Config>::CorrectionPeriod::get(),
         );
         assert_eq!(market_ids_1.len(), 1);
 
-        if base_asset == Asset::Ztg {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+        if base_asset == Asset::Tru {
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(
                 charlie_balance,
-                1_000 * BASE - CENT - <Runtime as Config>::DisputeBond::get()
+                1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
-            let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
-            assert_eq!(charlie_balance, 1_000 * BASE - CENT);
+            let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
+            assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
         }
 
-        run_blocks(<Runtime as zrml_authorized::Config>::CorrectionPeriod::get() - 1);
+        run_blocks(<Runtime as pallet_pm_authorized::Config>::CorrectionPeriod::get() - 1);
 
         let market_after = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after.status, MarketStatus::Disputed);
 
-        if base_asset == Asset::Ztg {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+        if base_asset == Asset::Tru {
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(
                 charlie_balance,
-                1_000 * BASE - CENT - <Runtime as Config>::DisputeBond::get()
+                1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
-            let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
-            assert_eq!(charlie_balance, 1_000 * BASE - CENT);
+            let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
+            assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
         }
 
         run_blocks(1);
 
-        if base_asset == Asset::Ztg {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+        if base_asset == Asset::Tru {
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(
                 charlie_balance,
-                1_000 * BASE - CENT + <Runtime as Config>::OracleBond::get()
+                1_000 * BASE - CENT_BASE + <Runtime as Config>::OracleBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE + <Runtime as Config>::OracleBond::get());
-            let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
-            assert_eq!(charlie_balance, 1_000 * BASE - CENT);
+            let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
+            assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
         }
 
         let market_after = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after.status, MarketStatus::Resolved);
 
-        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(CHARLIE), 0));
+        assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(charlie()), 0));
 
-        if base_asset == Asset::Ztg {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
-            assert_eq!(charlie_balance, 1_000 * BASE + <Runtime as Config>::OracleBond::get());
+        if base_asset == Asset::Tru {
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            assert_eq!(
+                charlie_balance,
+                1_000 * BASE + <Runtime as Config>::OracleBond::get() - winning_fee
+            );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Ztg, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE + <Runtime as Config>::OracleBond::get());
-            let charlie_balance = AssetManager::free_balance(base_asset, &CHARLIE);
+            let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE);
         }
-        let charlie_reserved_2 = AssetManager::reserved_balance(Asset::Ztg, &CHARLIE);
+        let charlie_reserved_2 = AssetManager::reserved_balance(Asset::Tru, &charlie());
         assert_eq!(charlie_reserved_2, 0);
 
-        let alice_balance = AssetManager::free_balance(Asset::Ztg, &ALICE);
+        let alice_balance = AssetManager::free_balance(Asset::Tru, &alice());
         assert_eq!(alice_balance, 1_000 * BASE - <Runtime as Config>::OracleBond::get());
 
         // bob kinda gets away scot-free since Alice is held responsible
         // for her designated reporter
-        let bob_balance = AssetManager::free_balance(Asset::Ztg, &BOB);
+        let bob_balance = AssetManager::free_balance(Asset::Tru, &bob());
         assert_eq!(bob_balance, 1_000 * BASE);
 
         assert!(market_after.bonds.creation.unwrap().is_settled);
         assert!(market_after.bonds.oracle.unwrap().is_settled);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -469,33 +488,37 @@ fn authorized_correctly_resolves_disputed_market() {
 #[test]
 fn it_resolves_a_disputed_court_market() {
     let test = |base_asset: AssetOf<Runtime>| {
-        let juror_0 = 1000;
-        let juror_1 = 1001;
-        let juror_2 = 1002;
-        let juror_3 = 1003;
-        let juror_4 = 1004;
-        let juror_5 = 1005;
+        let juror_0 = get_account(10);
+        let juror_1 = get_account(11);
+        let juror_2 = get_account(12);
+        let juror_3 = get_account(13);
+        let juror_4 = get_account(14);
+        let juror_5 = get_account(15);
 
+        let mut counter = 1000;
         for j in &[juror_0, juror_1, juror_2, juror_3, juror_4, juror_5] {
-            let amount = <Runtime as zrml_court::Config>::MinJurorStake::get() + *j;
-            assert_ok!(AssetManager::deposit(Asset::Ztg, j, amount + SENTINEL_AMOUNT));
+            let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + counter;
+            assert_ok!(AssetManager::deposit(Asset::Tru, j, amount + SENTINEL_AMOUNT));
             assert_ok!(Court::join_court(RuntimeOrigin::signed(*j), amount));
+            counter += 1;
         }
 
         // just to have enough jurors for the dispute
-        for j in 1006..(1006 + Court::necessary_draws_weight(0usize) as u32) {
-            let juror = j as u128;
-            let amount = <Runtime as zrml_court::Config>::MinJurorStake::get() + juror;
-            assert_ok!(AssetManager::deposit(Asset::Ztg, &juror, amount + SENTINEL_AMOUNT));
+        for j in 16..(16 + Court::necessary_draws_weight(0usize) as u32) {
+            let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&j);
+            let juror = get_account_from_seed(seed.into());
+            let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + j as u128;
+            assert_ok!(AssetManager::deposit(Asset::Tru, &juror, amount + SENTINEL_AMOUNT));
             assert_ok!(Court::join_court(RuntimeOrigin::signed(juror), amount));
         }
 
         let end = 2;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -512,27 +535,27 @@ fn it_resolves_a_disputed_court_market() {
         run_to_block(report_at);
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             market_id,
             OutcomeReport::Categorical(0)
         ));
 
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(CHARLIE), market_id,));
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(charlie()), market_id,));
 
-        let court = zrml_court::Courts::<Runtime>::get(market_id).unwrap();
+        let court = pallet_pm_court::Courts::<Runtime>::get(market_id).unwrap();
         let vote_start = court.round_ends.pre_vote + 1;
 
         run_to_block(vote_start);
 
         // overwrite draws to disregard randomness
-        zrml_court::SelectedDraws::<Runtime>::remove(market_id);
-        let mut draws = zrml_court::SelectedDraws::<Runtime>::get(market_id);
+        pallet_pm_court::SelectedDraws::<Runtime>::remove(market_id);
+        let mut draws = pallet_pm_court::SelectedDraws::<Runtime>::get(market_id);
         for juror in &[juror_0, juror_1, juror_2, juror_3, juror_4, juror_5] {
             let draw = Draw {
                 court_participant: *juror,
                 weight: 1,
                 vote: Vote::Drawn,
-                slashable: <Runtime as zrml_court::Config>::MinJurorStake::get(),
+                slashable: <Runtime as pallet_pm_court::Config>::MinJurorStake::get(),
             };
             let index = draws
                 .binary_search_by_key(juror, |draw| draw.court_participant)
@@ -540,7 +563,7 @@ fn it_resolves_a_disputed_court_market() {
             draws.try_insert(index, draw).unwrap();
         }
         let old_draws = draws.clone();
-        zrml_court::SelectedDraws::<Runtime>::insert(market_id, draws);
+        pallet_pm_court::SelectedDraws::<Runtime>::insert(market_id, draws);
 
         let salt = <Runtime as frame_system::Config>::Hash::default();
 
@@ -602,7 +625,7 @@ fn it_resolves_a_disputed_court_market() {
                 vote_item_0.clone(),
                 wrong_salt
             ),
-            zrml_court::Error::<Runtime>::CommitmentHashMismatch
+            pallet_pm_court::Error::<Runtime>::CommitmentHashMismatch
         );
         assert_ok!(Court::reveal_vote(
             RuntimeOrigin::signed(juror_2),
@@ -618,7 +641,7 @@ fn it_resolves_a_disputed_court_market() {
                 vote_item_0.clone(),
                 salt
             ),
-            zrml_court::Error::<Runtime>::VoteAlreadyDenounced
+            pallet_pm_court::Error::<Runtime>::VoteAlreadyDenounced
         );
 
         assert_noop!(
@@ -628,7 +651,7 @@ fn it_resolves_a_disputed_court_market() {
                 vote_item_0.clone(),
                 salt
             ),
-            zrml_court::Error::<Runtime>::JurorDidNotVote
+            pallet_pm_court::Error::<Runtime>::JurorDidNotVote
         );
 
         // juror_5 fails to reveal in time
@@ -642,7 +665,7 @@ fn it_resolves_a_disputed_court_market() {
         let market_after = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after.status, MarketStatus::Resolved);
         assert_eq!(market_after.resolved_outcome, Some(outcome_0));
-        let court_after = zrml_court::Courts::<Runtime>::get(market_id).unwrap();
+        let court_after = pallet_pm_court::Courts::<Runtime>::get(market_id).unwrap();
         assert_eq!(court_after.status, CourtStatus::Closed { winner: vote_item_0 });
 
         let free_juror_0_before = Balances::free_balance(juror_0);
@@ -655,23 +678,41 @@ fn it_resolves_a_disputed_court_market() {
         assert_ok!(Court::reassign_court_stakes(RuntimeOrigin::signed(juror_0), market_id));
 
         let free_juror_0_after = Balances::free_balance(juror_0);
-        let slashable_juror_0 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_0).unwrap().slashable;
+        let slashable_juror_0 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_0)
+            .unwrap()
+            .slashable;
         let free_juror_1_after = Balances::free_balance(juror_1);
-        let slashable_juror_1 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_1).unwrap().slashable;
+        let slashable_juror_1 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_1)
+            .unwrap()
+            .slashable;
         let free_juror_2_after = Balances::free_balance(juror_2);
-        let slashable_juror_2 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_2).unwrap().slashable;
+        let slashable_juror_2 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_2)
+            .unwrap()
+            .slashable;
         let free_juror_3_after = Balances::free_balance(juror_3);
-        let slashable_juror_3 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_3).unwrap().slashable;
+        let slashable_juror_3 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_3)
+            .unwrap()
+            .slashable;
         let free_juror_4_after = Balances::free_balance(juror_4);
-        let slashable_juror_4 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_4).unwrap().slashable;
+        let slashable_juror_4 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_4)
+            .unwrap()
+            .slashable;
         let free_juror_5_after = Balances::free_balance(juror_5);
-        let slashable_juror_5 =
-            old_draws.iter().find(|draw| draw.court_participant == juror_5).unwrap().slashable;
+        let slashable_juror_5 = old_draws
+            .iter()
+            .find(|draw| draw.court_participant == juror_5)
+            .unwrap()
+            .slashable;
 
         let mut total_slashed = 0;
         // juror_1 voted for the wrong outcome => slashed
@@ -694,7 +735,7 @@ fn it_resolves_a_disputed_court_market() {
         assert_eq!(free_juror_2_after, free_juror_2_before + juror_2_share * total_slashed);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -704,17 +745,18 @@ fn it_resolves_a_disputed_court_market() {
 
 #[test]
 fn outsider_reports_wrong_outcome() {
-    // NOTE: Bonds are always in ZTG, irrespective of base_asset.
+    // NOTE: Bonds are always in TRUU, irrespective of base_asset.
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
 
         let end = 100;
-        let alice_balance_before = Balances::free_balance(ALICE);
+        let alice_balance_before = Balances::free_balance(alice());
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -724,7 +766,7 @@ fn outsider_reports_wrong_outcome() {
             ScoringRule::AmmCdaHybrid,
         ));
 
-        let outsider = CHARLIE;
+        let outsider = charlie();
 
         let market = MarketCommons::market(&0).unwrap();
         let grace_period = end + market.deadlines.grace_period;
@@ -741,8 +783,8 @@ fn outsider_reports_wrong_outcome() {
 
         let dispute_at_0 = report_at + 1;
         run_to_block(dispute_at_0);
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(EVE), 0,));
-        check_reserve(&EVE, <Runtime as Config>::DisputeBond::get());
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(eve()), 0,));
+        check_reserve(&eve(), <Runtime as Config>::DisputeBond::get());
 
         assert_ok!(Authorized::authorize_market_outcome(
             RuntimeOrigin::signed(AuthorizedDisputeResolutionUser::get()),
@@ -750,33 +792,33 @@ fn outsider_reports_wrong_outcome() {
             OutcomeReport::Categorical(0)
         ));
 
-        let eve_balance_before = Balances::free_balance(EVE);
-        let dave_balance_before = Balances::free_balance(DAVE);
+        let eve_balance_before = Balances::free_balance(eve());
+        let dave_balance_before = Balances::free_balance(dave());
 
         // on_resolution called
-        run_blocks(<Runtime as zrml_authorized::Config>::CorrectionPeriod::get());
+        run_blocks(<Runtime as pallet_pm_authorized::Config>::CorrectionPeriod::get());
 
         assert_eq!(
-            Balances::free_balance(ALICE),
+            Balances::free_balance(alice()),
             alice_balance_before - <Runtime as Config>::OracleBond::get()
         );
 
         check_reserve(&outsider, 0);
         assert_eq!(Balances::free_balance(outsider), outsider_balance_before);
 
-        // disputor EVE gets the OracleBond and <Runtime as Config>::OutsiderBond and DisputeBond
+        // disputor eve() gets the OracleBond and <Runtime as Config>::OutsiderBond and DisputeBond
         assert_eq!(
-            Balances::free_balance(EVE),
-            eve_balance_before
-                + <Runtime as Config>::DisputeBond::get()
-                + <Runtime as Config>::OutsiderBond::get()
-                + <Runtime as Config>::OracleBond::get()
+            Balances::free_balance(eve()),
+            eve_balance_before +
+                <Runtime as Config>::DisputeBond::get() +
+                <Runtime as Config>::OutsiderBond::get() +
+                <Runtime as Config>::OracleBond::get()
         );
-        // DAVE gets his outcome bond back
-        assert_eq!(Balances::free_balance(DAVE), dave_balance_before);
+        // dave() gets his outcome bond back
+        assert_eq!(Balances::free_balance(dave()), dave_balance_before);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {

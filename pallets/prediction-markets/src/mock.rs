@@ -23,6 +23,12 @@
 #![cfg(feature = "mock")]
 
 use crate as prediction_markets;
+use crate::{AssetOf, BalanceOf, EthEvent, MarketIdOf, TokenInterface};
+use common_primitives::{
+    constants::MILLISECS_PER_BLOCK,
+    types::{Balance, BlockNumber, Hash, Moment},
+};
+use core::marker::PhantomData;
 use frame_support::{
     construct_runtime, ord_parameter_types, parameter_types,
     traits::{
@@ -30,18 +36,13 @@ use frame_support::{
         Everything, NeverEnsureOrigin, OnFinalize, OnInitialize,
     },
 };
-use frame_system::{mocking::MockBlock, EnsureRoot, EnsureSignedBy};
+use frame_system::{mocking::MockBlockU32, EnsureRoot, EnsureSignedBy};
+use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
-use sp_arithmetic::per_things::Percent;
-#[cfg(feature = "runtime-benchmarks")]
-use sp_core::{H160, H256};
-use sp_runtime::{
-    traits::{BlakeTwo256, ConstU32, IdentityLookup},
-    BuildStorage, DispatchError, DispatchResult,
-};
-use std::cell::RefCell;
-use zeitgeist_primitives::{
+use parity_scale_codec::{alloc::sync::Arc, Encode};
+pub use prediction_market_primitives::test_helper::get_account;
+use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
         BlockHashCount, BlocksPerYear, CloseEarlyBlockPeriod, CloseEarlyDisputeBond,
@@ -55,34 +56,72 @@ use zeitgeist_primitives::{
         MaxSelectedDraws, MaxYearlyInflation, MinCategories, MinDisputeDuration, MinJurorStake,
         MinOracleDuration, MinOutcomeVoteAmount, MinimumPeriod, OutsiderBond, PmPalletId,
         RemoveKeysLimit, RequestInterval, TreasuryPalletId, VotePeriod, VotingOutcomeFee, BASE,
-        CENT, MILLISECS_PER_BLOCK,
+        CENT_BASE,
     },
-    traits::DeployPoolApi,
+    traits::{DeployPoolApi, DistributeFees},
     types::{
-        AccountIdTest, Amount, Asset, Balance, BasicCurrencyAdapter, BlockNumber, BlockTest,
-        CurrencyId, Hash, MarketId, Moment,
+        Asset, BasicCurrencyAdapter, BlockTest, CurrencyId, CustomMetadata, MarketId, OrmlAmount,
+        SignatureTest, TestAccountIdPK,
     },
 };
-#[cfg(feature = "parachain")]
-use {
-    orml_traits::asset_registry::AssetProcessor, parity_scale_codec::Encode,
-    zeitgeist_primitives::types::CustomMetadata,
+use sp_arithmetic::{per_things::Percent, Perbill};
+#[cfg(feature = "runtime-benchmarks")]
+use sp_core::H256;
+use sp_core::{Get, H160};
+use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+use sp_runtime::{
+    traits::{BlakeTwo256, ConstU32, IdentityLookup, Zero},
+    BuildStorage, DispatchError, DispatchResult, SaturatedConversion,
 };
+use std::cell::RefCell;
 
-pub const ALICE: AccountIdTest = 0;
-pub const BOB: AccountIdTest = 1;
-pub const CHARLIE: AccountIdTest = 2;
-pub const DAVE: AccountIdTest = 3;
-pub const EVE: AccountIdTest = 4;
-pub const FRED: AccountIdTest = 5;
-pub const SUDO: AccountIdTest = 69;
-pub const APPROVE_ORIGIN: AccountIdTest = 70;
-pub const REJECT_ORIGIN: AccountIdTest = 71;
-pub const CLOSE_MARKET_EARLY_ORIGIN: AccountIdTest = 72;
-pub const CLOSE_ORIGIN: AccountIdTest = 73;
-pub const REQUEST_EDIT_ORIGIN: AccountIdTest = 74;
-pub const RESOLVE_ORIGIN: AccountIdTest = 75;
+use pallet_pm_eth_asset_registry;
 
+pub fn alice() -> TestAccountIdPK {
+    get_account(0u8)
+}
+pub fn bob() -> TestAccountIdPK {
+    get_account(1u8)
+}
+pub fn charlie() -> TestAccountIdPK {
+    get_account(2u8)
+}
+pub fn dave() -> TestAccountIdPK {
+    get_account(3u8)
+}
+pub fn eve() -> TestAccountIdPK {
+    get_account(4u8)
+}
+pub fn fred() -> TestAccountIdPK {
+    get_account(5u8)
+}
+pub fn sudo() -> TestAccountIdPK {
+    get_account(69u8)
+}
+pub fn approve_origin() -> TestAccountIdPK {
+    get_account(70u8)
+}
+pub fn reject_origin() -> TestAccountIdPK {
+    get_account(71u8)
+}
+pub fn close_market_early_origin() -> TestAccountIdPK {
+    get_account(72u8)
+}
+pub fn close_origin() -> TestAccountIdPK {
+    get_account(73u8)
+}
+pub fn request_edit_origin() -> TestAccountIdPK {
+    get_account(74u8)
+}
+pub fn resolve_origin() -> TestAccountIdPK {
+    get_account(75u8)
+}
+pub fn winning_fee_account() -> TestAccountIdPK {
+    get_account(95u8)
+}
+pub fn market_admin() -> TestAccountIdPK {
+    get_account(17u8)
+}
 pub const INITIAL_BALANCE: u128 = 1_000 * BASE;
 
 #[allow(unused)]
@@ -91,7 +130,7 @@ pub struct DeployPoolMock;
 #[allow(unused)]
 #[derive(Clone)]
 pub struct DeployPoolArgs {
-    who: AccountIdTest,
+    who: TestAccountIdPK,
     market_id: MarketId,
     amount: Balance,
     swap_prices: Vec<Balance>,
@@ -105,7 +144,7 @@ thread_local! {
 
 #[allow(unused)]
 impl DeployPoolApi for DeployPoolMock {
-    type AccountId = AccountIdTest;
+    type AccountId = TestAccountIdPK;
     type Balance = Balance;
     type MarketId = MarketId;
 
@@ -132,21 +171,21 @@ impl DeployPoolApi for DeployPoolMock {
 #[allow(unused)]
 impl DeployPoolMock {
     pub fn called_once_with(
-        who: AccountIdTest,
+        who: TestAccountIdPK,
         market_id: MarketId,
         amount: Balance,
         swap_prices: Vec<Balance>,
         swap_fee: Balance,
     ) -> bool {
         if DEPLOY_POOL_CALL_DATA.with(|value| value.borrow().len()) != 1 {
-            return false;
+            return false
         }
         let args = DEPLOY_POOL_CALL_DATA.with(|value| value.borrow()[0].clone());
-        args.who == who
-            && args.market_id == market_id
-            && args.amount == amount
-            && args.swap_prices == swap_prices
-            && args.swap_fee == swap_fee
+        args.who == who &&
+            args.market_id == market_id &&
+            args.amount == amount &&
+            args.swap_prices == swap_prices &&
+            args.swap_fee == swap_fee
     }
 
     pub fn return_error() {
@@ -156,55 +195,115 @@ impl DeployPoolMock {
 }
 
 ord_parameter_types! {
-    pub const Sudo: AccountIdTest = SUDO;
-    pub const ApproveOrigin: AccountIdTest = APPROVE_ORIGIN;
-    pub const RejectOrigin: AccountIdTest = REJECT_ORIGIN;
-    pub const CloseMarketEarlyOrigin: AccountIdTest = CLOSE_MARKET_EARLY_ORIGIN;
-    pub const CloseOrigin: AccountIdTest = CLOSE_ORIGIN;
-    pub const RequestEditOrigin: AccountIdTest = REQUEST_EDIT_ORIGIN;
-    pub const ResolveOrigin: AccountIdTest = RESOLVE_ORIGIN;
+    pub const Sudo: TestAccountIdPK = sudo();
+    pub const ApproveOrigin: TestAccountIdPK = approve_origin();
+    pub const RejectOrigin: TestAccountIdPK = reject_origin();
+    pub const CloseMarketEarlyOrigin: TestAccountIdPK = close_market_early_origin();
+    pub const CloseOrigin: TestAccountIdPK = close_origin();
+    pub const RequestEditOrigin: TestAccountIdPK = request_edit_origin();
+    pub const ResolveOrigin: TestAccountIdPK = resolve_origin();
 }
+
 parameter_types! {
-    pub const AdvisoryBond: Balance = 11 * CENT;
+    pub const AdvisoryBond: Balance = 11 * CENT_BASE;
     pub const AdvisoryBondSlashPercentage: Percent = Percent::from_percent(10);
-    pub const OracleBond: Balance = 25 * CENT;
-    pub const ValidityBond: Balance = 53 * CENT;
-    pub const DisputeBond: Balance = 109 * CENT;
-    pub TreasuryAccount: AccountIdTest = Treasury::account_id();
+    pub const OracleBond: Balance = 25 * CENT_BASE;
+    pub const ValidityBond: Balance = 53 * CENT_BASE;
+    pub const DisputeBond: Balance = 109 * CENT_BASE;
+    // TODO review this value
+    pub TreasuryAccount: TestAccountIdPK = Treasury::account_id();
+    pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
+    pub FeeAccount: TestAccountIdPK = winning_fee_account();
 }
 
 construct_runtime!(
     pub enum Runtime {
-        #[cfg(feature = "parachain")]
-        AssetRegistry: orml_asset_registry::module,
-        Authorized: zrml_authorized,
+        Authorized: pallet_pm_authorized,
         Balances: pallet_balances,
-        Court: zrml_court,
+        Court: pallet_pm_court,
         AssetManager: orml_currencies,
-        MarketCommons: zrml_market_commons,
+        MarketCommons: pallet_pm_market_commons,
         PredictionMarkets: prediction_markets,
         RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
-        GlobalDisputes: zrml_global_disputes,
+        GlobalDisputes: pallet_pm_global_disputes,
         System: frame_system,
         Timestamp: pallet_timestamp,
         Tokens: orml_tokens,
         Treasury: pallet_treasury,
+        AssetRegistry: pallet_pm_eth_asset_registry,
+        AVN: pallet_avn,
     }
 );
+
+impl pallet_avn::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AuthorityId = pallet_avn::sr25519::AuthorityId;
+    type EthereumPublicKeyChecker = ();
+    type NewSessionHandler = ();
+    type DisabledValidatorChecker = ();
+    type WeightInfo = ();
+}
+
+pub struct NoopTokenInterface {}
+impl TokenInterface<H160, TestAccountIdPK> for NoopTokenInterface {
+    fn process_lift(_event: &EthEvent) -> DispatchResult {
+        Ok(())
+    }
+
+    fn deposit_tokens(
+        _token_id: H160,
+        _recipient_account_id: TestAccountIdPK,
+        _raw_amount: u128,
+    ) -> DispatchResult {
+        Ok(())
+    }
+}
+
+pub fn fee_percentage<T: crate::Config>() -> Perbill {
+    WinnerFeePercentage::get()
+}
+
+pub fn calculate_fee<T: crate::Config>(amount: BalanceOf<T>) -> BalanceOf<T> {
+    fee_percentage::<T>().mul_floor(amount.saturated_into::<BalanceOf<T>>())
+}
+
+pub struct WinningFees<T, F>(PhantomData<T>, PhantomData<F>);
+
+impl<T: crate::Config, F> DistributeFees for WinningFees<T, F>
+where
+    F: Get<T::AccountId>,
+{
+    type Asset = AssetOf<T>;
+    type AccountId = T::AccountId;
+    type Balance = BalanceOf<T>;
+    type MarketId = MarketIdOf<T>;
+
+    fn distribute(
+        _market_id: Self::MarketId,
+        asset: Self::Asset,
+        account: &Self::AccountId,
+        amount: Self::Balance,
+    ) -> Self::Balance {
+        let fees = calculate_fee::<T>(amount);
+        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
+            Ok(_) => fees,
+            Err(_) => Zero::zero(),
+        }
+    }
+}
 
 impl crate::Config for Runtime {
     type AdvisoryBond = AdvisoryBond;
     type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
-    type ApproveOrigin = EnsureSignedBy<ApproveOrigin, AccountIdTest>;
-    #[cfg(feature = "parachain")]
+    type ApproveOrigin = EnsureSignedBy<ApproveOrigin, TestAccountIdPK>;
     type AssetRegistry = AssetRegistry;
     type Authorized = Authorized;
     type CloseEarlyDisputeBond = CloseEarlyDisputeBond;
-    type CloseMarketEarlyOrigin = EnsureSignedBy<CloseMarketEarlyOrigin, AccountIdTest>;
+    type CloseMarketEarlyOrigin = EnsureSignedBy<CloseMarketEarlyOrigin, TestAccountIdPK>;
     type CloseEarlyProtectionTimeFramePeriod = CloseEarlyProtectionTimeFramePeriod;
     type CloseEarlyProtectionBlockPeriod = CloseEarlyProtectionBlockPeriod;
     type CloseEarlyRequestBond = CloseEarlyRequestBond;
-    type CloseOrigin = EnsureSignedBy<CloseOrigin, AccountIdTest>;
+    type CloseOrigin = EnsureSignedBy<CloseOrigin, TestAccountIdPK>;
     type Currency = Balances;
     type MaxCreatorFee = MaxCreatorFee;
     type Court = Court;
@@ -228,20 +327,26 @@ impl crate::Config for Runtime {
     type PalletId = PmPalletId;
     type CloseEarlyBlockPeriod = CloseEarlyBlockPeriod;
     type CloseEarlyTimeFramePeriod = CloseEarlyTimeFramePeriod;
-    type RejectOrigin = EnsureSignedBy<RejectOrigin, AccountIdTest>;
-    type RequestEditOrigin = EnsureSignedBy<RequestEditOrigin, AccountIdTest>;
-    type ResolveOrigin = EnsureSignedBy<ResolveOrigin, AccountIdTest>;
+    type RejectOrigin = EnsureSignedBy<RejectOrigin, TestAccountIdPK>;
+    type RequestEditOrigin = EnsureSignedBy<RequestEditOrigin, TestAccountIdPK>;
+    type ResolveOrigin = EnsureSignedBy<ResolveOrigin, TestAccountIdPK>;
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
     type WeightInfo = prediction_markets::weights::WeightInfo<Runtime>;
+    type RuntimeCall = RuntimeCall;
+    type Public = TestAccountIdPK;
+    type Signature = SignatureTest;
+    type TokenInterface = NoopTokenInterface;
+    type WinnerFeePercentage = WinnerFeePercentage;
+    type WinnerFeeHandler = WinningFees<Runtime, FeeAccount>;
 }
 
 impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
-    type AccountId = AccountIdTest;
+    type AccountId = TestAccountIdPK;
     type BaseCallFilter = Everything;
-    type Block = MockBlock<Runtime>;
+    type Block = Block;
     type BlockHashCount = BlockHashCount;
     type BlockLength = ();
     type BlockWeights = ();
@@ -252,7 +357,7 @@ impl frame_system::Config for Runtime {
     type Hash = Hash;
     type Hashing = BlakeTwo256;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Nonce = u64;
+    type Nonce = u32;
     type MaxConsumers = ConstU32<16>;
     type MultiBlockMigrator = ();
     type OnKilledAccount = ();
@@ -276,37 +381,33 @@ impl orml_currencies::Config for Runtime {
     type WeightInfo = ();
 }
 
-cfg_if::cfg_if!(
-    if #[cfg(feature = "parachain")] {
-        type AssetMetadata = orml_traits::asset_registry::AssetMetadata<
-            Balance,
-            CustomMetadata,
-            ConstU32<1024>
-        >;
-        pub struct NoopAssetProcessor {}
+type AssetMetadata =
+    orml_traits::asset_registry::AssetMetadata<Balance, CustomMetadata, ConstU32<1024>>;
 
-        impl AssetProcessor<CurrencyId, AssetMetadata> for NoopAssetProcessor {
-            fn pre_register(id: Option<CurrencyId>, asset_metadata: AssetMetadata)
-             -> Result<(CurrencyId, AssetMetadata), DispatchError> {
-                Ok((id.unwrap(), asset_metadata))
-            }
-        }
+pub struct NoopAssetProcessor {}
 
-        impl orml_asset_registry::module::Config for Runtime {
-            type RuntimeEvent = RuntimeEvent;
-            type CustomMetadata = CustomMetadata;
-            type AssetId = CurrencyId;
-            type AuthorityOrigin = EnsureRoot<AccountIdTest>;
-            type AssetProcessor = NoopAssetProcessor;
-            type Balance = Balance;
-            type StringLimit = ConstU32<1024>;
-            type WeightInfo = ();
-        }
+impl AssetProcessor<CurrencyId, AssetMetadata> for NoopAssetProcessor {
+    fn pre_register(
+        id: Option<CurrencyId>,
+        asset_metadata: AssetMetadata,
+    ) -> Result<(CurrencyId, AssetMetadata), DispatchError> {
+        Ok((id.unwrap(), asset_metadata))
     }
-);
+}
+
+impl pallet_pm_eth_asset_registry::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type CustomMetadata = CustomMetadata;
+    type AssetId = CurrencyId;
+    type AuthorityOrigin = EnsureRoot<TestAccountIdPK>;
+    type Balance = Balance;
+    type StringLimit = ConstU32<1024>;
+    type AssetProcessor = NoopAssetProcessor;
+    type WeightInfo = ();
+}
 
 impl orml_tokens::Config for Runtime {
-    type Amount = Amount;
+    type Amount = OrmlAmount;
     type Balance = Balance;
     type CurrencyId = CurrencyId;
     type DustRemovalWhitelist = Everything;
@@ -318,14 +419,6 @@ impl orml_tokens::Config for Runtime {
     type ReserveIdentifier = [u8; 8];
     type WeightInfo = ();
 }
-
-// #[cfg(feature = "parachain")]
-// crate::orml_asset_registry::impl_mock_registry! {
-//     MockRegistry,
-//     CurrencyId,
-//     Balance,
-//     zeitgeist_primitives::types::CustomMetadata
-// }
 
 impl pallet_balances::Config for Runtime {
     type AccountStore = System;
@@ -353,22 +446,22 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 ord_parameter_types! {
-    pub const AuthorizedDisputeResolutionUser: AccountIdTest = ALICE;
+    pub const AuthorizedDisputeResolutionUser: TestAccountIdPK = alice();
 }
 
-impl zrml_authorized::Config for Runtime {
+impl pallet_pm_authorized::Config for Runtime {
     type AuthorizedDisputeResolutionOrigin =
-        EnsureSignedBy<AuthorizedDisputeResolutionUser, AccountIdTest>;
+        EnsureSignedBy<AuthorizedDisputeResolutionUser, TestAccountIdPK>;
     type CorrectionPeriod = CorrectionPeriod;
     type Currency = Balances;
     type RuntimeEvent = RuntimeEvent;
     type DisputeResolution = prediction_markets::Pallet<Runtime>;
     type MarketCommons = MarketCommons;
     type PalletId = AuthorizedPalletId;
-    type WeightInfo = zrml_authorized::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_authorized::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_court::Config for Runtime {
+impl pallet_pm_court::Config for Runtime {
     type AppealBond = AppealBond;
     type BlocksPerYear = BlocksPerYear;
     type DisputeResolution = prediction_markets::Pallet<Runtime>;
@@ -386,22 +479,22 @@ impl zrml_court::Config for Runtime {
     type MaxCourtParticipants = MaxCourtParticipants;
     type MaxYearlyInflation = MaxYearlyInflation;
     type MinJurorStake = MinJurorStake;
-    type MonetaryGovernanceOrigin = EnsureRoot<AccountIdTest>;
+    type MonetaryGovernanceOrigin = EnsureRoot<TestAccountIdPK>;
     type PalletId = CourtPalletId;
     type Random = RandomnessCollectiveFlip;
     type RequestInterval = RequestInterval;
     type Slash = Treasury;
     type TreasuryPalletId = TreasuryPalletId;
-    type WeightInfo = zrml_court::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_court::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_market_commons::Config for Runtime {
+impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
     type Timestamp = Timestamp;
 }
 
-impl zrml_global_disputes::Config for Runtime {
+impl pallet_pm_global_disputes::Config for Runtime {
     type AddOutcomePeriod = AddOutcomePeriod;
     type RuntimeEvent = RuntimeEvent;
     type DisputeResolution = prediction_markets::Pallet<Runtime>;
@@ -415,29 +508,29 @@ impl zrml_global_disputes::Config for Runtime {
     type RemoveKeysLimit = RemoveKeysLimit;
     type GdVotingPeriod = GdVotingPeriod;
     type VotingOutcomeFee = VotingOutcomeFee;
-    type WeightInfo = zrml_global_disputes::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_global_disputes::weights::WeightInfo<Runtime>;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
 pub struct BenchmarkHelper;
 #[cfg(feature = "runtime-benchmarks")]
-impl ArgumentsFactory<(), AccountIdTest> for BenchmarkHelper {
+impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
     fn create_asset_kind(_seed: u32) {
         // No-op
     }
 
-    fn create_beneficiary(seed: [u8; 32]) -> AccountIdTest {
+    fn create_beneficiary(seed: [u8; 32]) -> TestAccountIdPK {
         let h160 = H160::from(H256::from(seed));
         let lower_128: u128 = u128::from_le_bytes(h160.as_bytes()[..16].try_into().unwrap());
-        AccountIdTest::from(lower_128)
+        TestAccountIdPK::from(lower_128)
     }
 }
 
 impl pallet_treasury::Config for Runtime {
     type AssetKind = ();
     type BalanceConverter = UnityAssetBalanceConversion;
-    type Beneficiary = AccountIdTest;
-    type BeneficiaryLookup = IdentityLookup<AccountIdTest>;
+    type Beneficiary = TestAccountIdPK;
+    type BeneficiaryLookup = IdentityLookup<TestAccountIdPK>;
     type Burn = ();
     type BurnDestination = ();
     type Currency = Balances;
@@ -446,7 +539,7 @@ impl pallet_treasury::Config for Runtime {
     type PalletId = TreasuryPalletId;
     type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
     type PayoutPeriod = ();
-    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
     type SpendFunds = ();
     type SpendOrigin = NeverEnsureOrigin<Balance>;
     type SpendPeriod = ();
@@ -456,7 +549,7 @@ impl pallet_treasury::Config for Runtime {
 }
 
 pub struct ExtBuilder {
-    balances: Vec<(AccountIdTest, Balance)>,
+    balances: Vec<(TestAccountIdPK, Balance)>,
 }
 
 impl Default for ExtBuilder {
@@ -464,13 +557,13 @@ impl Default for ExtBuilder {
         DEPLOY_POOL_CALL_DATA.with(|value| value.borrow_mut().clear());
         Self {
             balances: vec![
-                (ALICE, INITIAL_BALANCE),
-                (BOB, INITIAL_BALANCE),
-                (CHARLIE, INITIAL_BALANCE),
-                (DAVE, INITIAL_BALANCE),
-                (EVE, INITIAL_BALANCE),
-                (FRED, INITIAL_BALANCE),
-                (SUDO, INITIAL_BALANCE),
+                (alice(), INITIAL_BALANCE),
+                (bob(), INITIAL_BALANCE),
+                (charlie(), INITIAL_BALANCE),
+                (dave(), INITIAL_BALANCE),
+                (eve(), INITIAL_BALANCE),
+                (fred(), INITIAL_BALANCE),
+                (sudo(), INITIAL_BALANCE),
             ],
         }
     }
@@ -478,6 +571,7 @@ impl Default for ExtBuilder {
 
 impl ExtBuilder {
     pub fn build(self) -> sp_io::TestExternalities {
+        let keystore = MemoryKeystore::new();
         let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
@@ -487,55 +581,62 @@ impl ExtBuilder {
             .assimilate_storage(&mut t)
             .unwrap();
 
-        #[cfg(feature = "parachain")]
-        {
-            orml_tokens::GenesisConfig::<Runtime> {
-                balances: (0..69)
-                    .map(|idx| (idx, Asset::ForeignAsset(100), INITIAL_BALANCE))
-                    .collect(),
-            }
-            .assimilate_storage(&mut t)
-            .unwrap();
-
-            let custom_metadata = zeitgeist_primitives::types::CustomMetadata {
-                allow_as_base_asset: true,
-                ..Default::default()
-            };
-
-            orml_asset_registry::module::GenesisConfig::<Runtime> {
-                assets: vec![
-                    (
-                        Asset::ForeignAsset(100),
-                        AssetMetadata {
-                            decimals: 18,
-                            name: "ACALA USD".as_bytes().to_vec().try_into().unwrap(),
-                            symbol: "AUSD".as_bytes().to_vec().try_into().unwrap(),
-                            existential_deposit: 0,
-                            location: None,
-                            additional: custom_metadata,
-                        }
-                        .encode(),
-                    ),
-                    (
-                        Asset::ForeignAsset(420),
-                        AssetMetadata {
-                            decimals: 18,
-                            name: "FANCY_TOKEN".as_bytes().to_vec().try_into().unwrap(),
-                            symbol: "FTK".as_bytes().to_vec().try_into().unwrap(),
-                            existential_deposit: 0,
-                            location: None,
-                            additional: zeitgeist_primitives::types::CustomMetadata::default(),
-                        }
-                        .encode(),
-                    ),
-                ],
-                last_asset_id: Asset::ForeignAsset(420),
-            }
-            .assimilate_storage(&mut t)
-            .unwrap();
+        orml_tokens::GenesisConfig::<Runtime> {
+            balances: (0..69)
+                .map(|idx| (get_account(idx), Asset::ForeignAsset(100), INITIAL_BALANCE))
+                .collect(),
         }
+        .assimilate_storage(&mut t)
+        .unwrap();
+
+        let custom_metadata = prediction_market_primitives::types::CustomMetadata {
+            allow_as_base_asset: true,
+            ..Default::default()
+        };
+
+        pallet_pm_eth_asset_registry::GenesisConfig::<Runtime> {
+            assets: vec![
+                (
+                    H160::from([1; 20]),
+                    Asset::ForeignAsset(100),
+                    AssetMetadata {
+                        decimals: 18,
+                        name: "ACALA USD".as_bytes().to_vec().try_into().unwrap(),
+                        symbol: "AUSD".as_bytes().to_vec().try_into().unwrap(),
+                        existential_deposit: 0,
+                        location: None,
+                        additional: custom_metadata,
+                    }
+                    .encode(),
+                ),
+                (
+                    H160::from([2; 20]),
+                    Asset::ForeignAsset(420),
+                    AssetMetadata {
+                        decimals: 18,
+                        name: "FANCY_TOKEN".as_bytes().to_vec().try_into().unwrap(),
+                        symbol: "FTK".as_bytes().to_vec().try_into().unwrap(),
+                        existential_deposit: 0,
+                        location: None,
+                        additional: prediction_market_primitives::types::CustomMetadata::default(),
+                    }
+                    .encode(),
+                ),
+            ],
+            last_asset_id: Asset::ForeignAsset(420),
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
+
+        prediction_markets::GenesisConfig::<Runtime> {
+            vault_account: Some(sudo()),
+            market_admin: Some(market_admin()),
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
 
         let mut test_ext: sp_io::TestExternalities = t.into();
+        test_ext.register_extension(KeystoreExt(Arc::new(keystore)));
         test_ext.execute_with(|| System::set_block_number(1));
         test_ext
     }
@@ -566,10 +667,10 @@ pub fn set_timestamp_for_on_initialize(time: Moment) {
     Timestamp::set_timestamp(time - MILLISECS_PER_BLOCK as u64);
 }
 
-type Block = MockBlock<Runtime>;
+type Block = MockBlockU32<Runtime>;
 
 sp_api::mock_impl_runtime_apis! {
-    impl zrml_prediction_markets_runtime_api::PredictionMarketsApi<BlockTest<Runtime>, MarketId, Hash> for Runtime {
+    impl pallet_prediction_markets_runtime_api::PredictionMarketsApi<BlockTest<Runtime>, MarketId, Hash> for Runtime {
         fn market_outcome_share_id(_: MarketId, _: u16) -> Asset<MarketId> {
             Asset::PoolShare(1)
         }

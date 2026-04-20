@@ -17,8 +17,9 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-
-use zeitgeist_primitives::{constants::MILLISECS_PER_BLOCK, types::OutcomeReport};
+use crate::WhitelistedMarketCreators;
+use common_primitives::constants::MILLISECS_PER_BLOCK;
+use prediction_market_primitives::types::OutcomeReport;
 
 // TODO(#1239) MarketDoesNotExist
 // TODO(#1239) MarketAlreadyReported
@@ -32,7 +33,7 @@ fn it_allows_to_report_the_outcome_of_a_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -47,7 +48,7 @@ fn it_allows_to_report_the_outcome_of_a_market() {
         assert!(market.report.is_none());
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(1)
         ));
@@ -65,7 +66,7 @@ fn report_fails_before_grace_period_is_over() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -78,20 +79,24 @@ fn report_fails_before_grace_period_is_over() {
         assert!(market.report.is_none());
 
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::NotAllowedToReportYet
         );
     });
 }
 
-// TODO(#1239) This test is misnamed - this does NOT ensure that reports outside of the oracle duration are
-// not allowed.
+// TODO(#1239) This test is misnamed - this does NOT ensure that reports outside of the oracle
+// duration are not allowed.
 #[test]
 fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duration_blocks() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -107,7 +112,7 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
 
         assert_noop!(
             PredictionMarkets::report(
-                RuntimeOrigin::signed(CHARLIE),
+                RuntimeOrigin::signed(charlie()),
                 0,
                 OutcomeReport::Categorical(1)
             ),
@@ -115,7 +120,7 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
         );
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(1)
         ));
@@ -131,11 +136,12 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
 #[test]
 fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duration_moment() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -145,7 +151,7 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
             ScoringRule::AmmCdaHybrid
         ));
 
-        assert_ok!(PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(BOB), 0, CENT));
+        assert_ok!(PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(bob()), 0, CENT_BASE));
 
         // set the timestamp
         let market = MarketCommons::market(&0).unwrap();
@@ -153,15 +159,19 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
 
         set_timestamp_for_on_initialize(100_000_000);
         run_to_block(2); // Trigger `on_initialize`; must be at least block #2.
-        let grace_period: u64 = market.deadlines.grace_period * MILLISECS_PER_BLOCK as u64;
+        let grace_period: u64 = market.deadlines.grace_period as u64 * MILLISECS_PER_BLOCK as u64;
         Timestamp::set_timestamp(100_000_000 + grace_period);
 
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(EVE), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(eve()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::ReporterNotOracle
         );
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(1)
         ));
@@ -174,7 +184,7 @@ fn report_fails_on_mismatched_outcome_for_categorical_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -183,7 +193,7 @@ fn report_fails_on_mismatched_outcome_for_categorical_market() {
         let grace_period = end + market.deadlines.grace_period;
         run_to_block(grace_period + 1);
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Scalar(123)),
+            PredictionMarkets::report(RuntimeOrigin::signed(bob()), 0, OutcomeReport::Scalar(123)),
             Error::<Runtime>::OutcomeMismatch,
         );
         let market = MarketCommons::market(&0).unwrap();
@@ -197,7 +207,7 @@ fn report_fails_on_out_of_range_outcome_for_categorical_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -206,7 +216,11 @@ fn report_fails_on_out_of_range_outcome_for_categorical_market() {
         let grace_period = end + market.deadlines.grace_period;
         run_to_block(grace_period + 1);
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(2)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(2)
+            ),
             Error::<Runtime>::OutcomeMismatch,
         );
         let market = MarketCommons::market(&0).unwrap();
@@ -220,7 +234,7 @@ fn report_fails_on_mismatched_outcome_for_scalar_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_scalar_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -229,7 +243,11 @@ fn report_fails_on_mismatched_outcome_for_scalar_market() {
         let grace_period = end + market.deadlines.grace_period;
         run_to_block(grace_period + 1);
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(0)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(0)
+            ),
             Error::<Runtime>::OutcomeMismatch,
         );
         let market = MarketCommons::market(&0).unwrap();
@@ -243,7 +261,7 @@ fn it_allows_anyone_to_report_an_unreported_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -254,16 +272,16 @@ fn it_allows_anyone_to_report_an_unreported_market() {
         run_to_block(end + market.deadlines.grace_period + market.deadlines.oracle_duration + 1);
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(ALICE), // alice reports her own market now
+            RuntimeOrigin::signed(alice()), // alice reports her own market now
             0,
             OutcomeReport::Categorical(1),
         ));
 
         let market = MarketCommons::market(&0).unwrap();
         assert_eq!(market.status, MarketStatus::Reported);
-        assert_eq!(market.report.unwrap().by, ALICE);
+        assert_eq!(market.report.unwrap().by, alice());
         // but oracle was bob
-        assert_eq!(market.oracle, BOB);
+        assert_eq!(market.oracle, bob());
 
         // make sure it still resolves
         run_to_block(
@@ -279,11 +297,12 @@ fn it_allows_anyone_to_report_an_unreported_market() {
 #[test]
 fn report_fails_on_market_state_proposed() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -293,7 +312,11 @@ fn report_fails_on_market_state_proposed() {
             ScoringRule::AmmCdaHybrid
         ));
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::MarketIsNotClosed,
         );
     });
@@ -302,11 +325,12 @@ fn report_fails_on_market_state_proposed() {
 #[test]
 fn report_fails_on_market_state_closed_for_advised_market() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -316,7 +340,11 @@ fn report_fails_on_market_state_closed_for_advised_market() {
             ScoringRule::AmmCdaHybrid
         ));
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::MarketIsNotClosed,
         );
     });
@@ -325,11 +353,12 @@ fn report_fails_on_market_state_closed_for_advised_market() {
 #[test]
 fn report_fails_on_market_state_active() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -339,7 +368,11 @@ fn report_fails_on_market_state_active() {
             ScoringRule::AmmCdaHybrid
         ));
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::MarketIsNotClosed,
         );
     });
@@ -348,11 +381,12 @@ fn report_fails_on_market_state_active() {
 #[test]
 fn report_fails_on_market_state_resolved() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -366,7 +400,11 @@ fn report_fails_on_market_state_resolved() {
             Ok(())
         });
         assert_noop!(
-            PredictionMarkets::report(RuntimeOrigin::signed(BOB), 0, OutcomeReport::Categorical(1)),
+            PredictionMarkets::report(
+                RuntimeOrigin::signed(bob()),
+                0,
+                OutcomeReport::Categorical(1)
+            ),
             Error::<Runtime>::MarketIsNotClosed,
         );
     });
@@ -375,11 +413,12 @@ fn report_fails_on_market_state_resolved() {
 #[test]
 fn report_fails_if_reporter_is_not_the_oracle() {
     ExtBuilder::default().build().execute_with(|| {
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(0..100_000_000),
             get_deadlines(),
             gen_metadata(2),
@@ -392,11 +431,11 @@ fn report_fails_if_reporter_is_not_the_oracle() {
         set_timestamp_for_on_initialize(100_000_000);
         // Trigger hooks which close the market.
         run_to_block(2);
-        let grace_period: u64 = market.deadlines.grace_period * MILLISECS_PER_BLOCK as u64;
+        let grace_period: u64 = market.deadlines.grace_period as u64 * MILLISECS_PER_BLOCK as u64;
         set_timestamp_for_on_initialize(100_000_000 + grace_period + MILLISECS_PER_BLOCK as u64);
         assert_noop!(
             PredictionMarkets::report(
-                RuntimeOrigin::signed(CHARLIE),
+                RuntimeOrigin::signed(charlie()),
                 0,
                 OutcomeReport::Categorical(1)
             ),

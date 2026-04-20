@@ -18,9 +18,9 @@
 
 use super::*;
 
-use crate::LastTimeFrame;
+use crate::{LastTimeFrame, WhitelistedMarketCreators};
+use common_primitives::constants::MILLISECS_PER_BLOCK;
 use frame_support::traits::Hooks;
-use zeitgeist_primitives::constants::MILLISECS_PER_BLOCK;
 
 #[test]
 fn on_initialize_skips_the_genesis_block() {
@@ -29,11 +29,12 @@ fn on_initialize_skips_the_genesis_block() {
     let end = (blocks * MILLISECS_PER_BLOCK) as u64;
     ExtBuilder::default().build().execute_with(|| {
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),

@@ -17,9 +17,9 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use crate::{MarketIdsPerCloseBlock, MomentOf};
+use crate::{MarketIdsPerCloseBlock, MomentOf, WhitelistedMarketCreators};
+use common_primitives::constants::MILLISECS_PER_BLOCK;
 use test_case::test_case;
-use zeitgeist_primitives::constants::MILLISECS_PER_BLOCK;
 
 #[test]
 fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_blocknumber() {
@@ -28,7 +28,7 @@ fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_blocknumb
         let now = frame_system::Pallet::<Runtime>::block_number();
         let end = 42;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             now..end,
             ScoringRule::AmmCdaHybrid,
@@ -51,17 +51,20 @@ fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_blocknumb
 #[test]
 fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_timestamp() {
     ExtBuilder::default().build().execute_with(|| {
-        let start_block = 7;
-        set_timestamp_for_on_initialize(start_block * MILLISECS_PER_BLOCK as MomentOf<Runtime>);
+        let start_block = 7u32;
+        set_timestamp_for_on_initialize(
+            start_block as u64 * MILLISECS_PER_BLOCK as MomentOf<Runtime>,
+        );
         run_blocks(start_block);
-        let start = <zrml_market_commons::Pallet<Runtime>>::now();
+        let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
 
-        let end = start + 42u64 * (MILLISECS_PER_BLOCK as u64);
+        let end = start + 42 * MILLISECS_PER_BLOCK as MomentOf<Runtime>;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(start..end),
             get_deadlines(),
             gen_metadata(2),
@@ -74,8 +77,8 @@ fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_timestamp
         let market = MarketCommons::market(&market_id).unwrap();
         assert_eq!(market.period, MarketPeriod::Timestamp(start..end));
 
-        let shift_blocks = 3;
-        let shift = shift_blocks * MILLISECS_PER_BLOCK as u64;
+        let shift_blocks = 3u32;
+        let shift = shift_blocks as u64 * MILLISECS_PER_BLOCK as u64;
         // millisecs per block is substracted inside the function
         set_timestamp_for_on_initialize(start + shift + MILLISECS_PER_BLOCK as u64);
         run_blocks(shift_blocks);
@@ -101,7 +104,7 @@ fn admin_move_market_to_closed_fails_if_market_does_not_exist() {
                 RuntimeOrigin::signed(CloseOrigin::get()),
                 0
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist
         );
     });
 }
@@ -114,7 +117,7 @@ fn admin_move_market_to_closed_fails_if_market_does_not_exist() {
 fn admin_move_market_to_closed_fails_if_market_is_not_active(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -138,11 +141,12 @@ fn admin_move_market_to_closed_fails_if_market_is_not_active(market_status: Mark
 fn admin_move_market_to_closed_correctly_clears_auto_close_blocks() {
     ExtBuilder::default().build().execute_with(|| {
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Block(22..66),
             get_deadlines(),
             gen_metadata(50),
@@ -152,10 +156,10 @@ fn admin_move_market_to_closed_correctly_clears_auto_close_blocks() {
             ScoringRule::AmmCdaHybrid,
         ));
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Block(33..66),
             get_deadlines(),
             gen_metadata(50),
