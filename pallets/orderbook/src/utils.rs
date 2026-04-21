@@ -19,11 +19,11 @@
 
 use crate::*;
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_runtime::traits::AccountIdConversion;
-use zeitgeist_primitives::types::{
+use prediction_market_primitives::types::{
     Asset, Deadlines, Market, MarketCreation, MarketDisputeMechanism, MarketPeriod, MarketStatus,
     MarketType, ScoringRule,
 };
+use sp_runtime::traits::AccountIdConversion;
 
 type MarketOf<T> = Market<
     <T as frame_system::Config>::AccountId,
@@ -39,7 +39,7 @@ where
 {
     Market {
         market_id: Default::default(),
-        base_asset: Asset::Ztg,
+        base_asset: Asset::Tru,
         creation: MarketCreation::Permissionless,
         creator_fee: sp_runtime::Perbill::zero(),
         creator: T::PalletId::get().into_account_truncating(),
