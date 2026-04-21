@@ -1,15 +1,32 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use external_service::node_integration::{self, NodeDeps};
 use futures::FutureExt;
+use parity_scale_codec::Encode;
 use predictor_runtime::{self, apis::RuntimeApi, opaque::Block};
 use sc_client_api::{Backend, BlockBackend};
 use sc_consensus_aura::{ImportQueueParams, SlotProportion, StartAuraParams};
 use sc_consensus_grandpa::SharedVoterState;
-use sc_service::{error::Error as ServiceError, Configuration, TaskManager, WarpSyncConfig};
+use sc_service::{
+    config::KeystoreConfig, error::Error as ServiceError, Configuration, TaskManager,
+    WarpSyncConfig,
+};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
+use sp_avn_common::{DEFAULT_EXTERNAL_SERVICE_PORT_NUMBER, EXTERNAL_SERVICE_PORT_NUMBER_KEY};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
+use sp_core::offchain::{OffchainStorage, STORAGE_PREFIX};
 use std::{sync::Arc, time::Duration};
+
+/// Configuration for the AvN external-service (Ethereum bridge HTTP server + events handler).
+#[derive(Clone, Debug, Default)]
+pub struct ExternalServiceConfig {
+    /// Port for the external-service HTTP listener. Defaults to 2020 when `None`.
+    pub avn_port: Option<String>,
+    /// Ethereum JSON-RPC URLs. When empty, the service starts without an Ethereum connection
+    /// (HTTP endpoints that require chain access return errors, events handler is a no-op).
+    pub eth_node_urls: Vec<String>,
+}
 
 pub(crate) type FullClient = sc_service::TFullClient<
     Block,
@@ -128,6 +145,7 @@ pub fn new_full<
     N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 >(
     config: Configuration,
+    external_service_config: ExternalServiceConfig,
 ) -> Result<TaskManager, ServiceError> {
     let sc_service::PartialComponents {
         client,
@@ -181,6 +199,17 @@ pub fn new_full<
         })?;
 
     if config.offchain_worker.enabled {
+        // AvN offchain workers (pallet-avn, pallet-summary, pallet-eth-bridge) call the
+        // external-service HTTP endpoints. They read the port from offchain storage; if we
+        // don't populate it they fall back to 2020 and miss the configured --avn-port.
+        if let Some(mut local_db) = backend.offchain_storage() {
+            let port = external_service_config
+                .avn_port
+                .clone()
+                .unwrap_or_else(|| DEFAULT_EXTERNAL_SERVICE_PORT_NUMBER.to_string());
+            local_db.set(STORAGE_PREFIX, EXTERNAL_SERVICE_PORT_NUMBER_KEY, &port.encode());
+        }
+
         task_manager.spawn_handle().spawn(
             "offchain-workers-runner",
             "offchain-worker",
@@ -207,6 +236,8 @@ pub fn new_full<
     let name = config.network.node_name.clone();
     let enable_grandpa = !config.disable_grandpa;
     let prometheus_registry = config.prometheus_registry().cloned();
+    let offchain_worker_enabled = config.offchain_worker.enabled;
+    let keystore_config_snapshot = config.keystore.clone();
 
     let rpc_extensions_builder = {
         let client = client.clone();
@@ -247,7 +278,7 @@ pub fn new_full<
         let aura = sc_consensus_aura::start_aura::<AuraPair, _, _, _, _, _, _, _, _, _, _>(
             StartAuraParams {
                 slot_duration,
-                client,
+                client: client.clone(),
                 select_chain,
                 block_import,
                 proposer_factory,
@@ -314,7 +345,7 @@ pub fn new_full<
             prometheus_registry,
             shared_voter_state: SharedVoterState::empty(),
             telemetry: telemetry.as_ref().map(|x| x.handle()),
-            offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool),
+            offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool.clone()),
         };
 
         // the GRANDPA voter task is considered infallible, i.e.
@@ -324,6 +355,48 @@ pub fn new_full<
             None,
             sc_consensus_grandpa::run_grandpa_voter(grandpa_config)?,
         );
+    }
+
+    // Spawn the AvN external-service (HTTP server + Ethereum events handler) for authority
+    // nodes and offchain-worker-enabled nodes. Requires a local (file-based) keystore.
+    if role.is_authority() || offchain_worker_enabled {
+        let keystore_path = match keystore_config_snapshot {
+            KeystoreConfig::Path { path, .. } => path,
+            KeystoreConfig::InMemory => {
+                return Err(ServiceError::Other(
+                    "external-service requires a file-based keystore (KeystoreConfig::Path)".into(),
+                ))
+            },
+        };
+
+        let node_deps = NodeDeps::<Block, _> {
+            keystore: keystore_container.local_keystore(),
+            keystore_path,
+            avn_port: external_service_config.avn_port.clone(),
+            eth_node_urls: external_service_config.eth_node_urls.clone(),
+            client: client.clone(),
+            offchain_transaction_pool_factory: OffchainTransactionPoolFactory::new(
+                transaction_pool.clone(),
+            ),
+        };
+
+        let app_state = node_integration::build_app_state(&node_deps)
+            .map_err(|e| ServiceError::Other(format!("external-service init failed: {e:?}")))?;
+
+        task_manager.spawn_essential_handle().spawn(
+            "external-service",
+            None,
+            external_service::server::start(app_state),
+        );
+
+        if role.is_authority() {
+            let handler_config = node_integration::build_eth_event_handler_config(node_deps);
+            task_manager.spawn_essential_handle().spawn(
+                "eth-events-handler",
+                None,
+                external_service::ethereum_events_handler::start_eth_event_handler(handler_config),
+            );
+        }
     }
 
     network_starter.start_network();

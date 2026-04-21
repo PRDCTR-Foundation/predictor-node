@@ -58,6 +58,7 @@ pallet-summary.workspace = true
 pallet-avn.workspace = true
 pallet-authors-manager.workspace = true
 pallet-eth-bridge.workspace = true
+pallet-eth-bridge-runtime-api.workspace = true
 sp-avn-common.workspace = true
 sp-watchtower.workspace = true
 pallet-session.workspace = true
@@ -105,6 +106,7 @@ std = [
 	"pallet-avn/std",
 	"pallet-authors-manager/std",
 	"pallet-eth-bridge/std",
+	"pallet-eth-bridge-runtime-api/std",
 	"sp-avn-common/std",
 	"sp-watchtower/std",
 	"pallet-session/std",
