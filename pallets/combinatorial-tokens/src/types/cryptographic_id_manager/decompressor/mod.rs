@@ -30,8 +30,8 @@ use crate::types::{cryptographic_id_manager::Fuel, CollectionIdError};
 use ark_bn254::{g1::G1Affine, Fq};
 use ark_ff::{BigInteger, PrimeField};
 use core::ops::Neg;
+use prediction_market_primitives::{traits::CombinatorialTokensFuel, types::CombinatorialId};
 use sp_runtime::traits::{One, Zero};
-use zeitgeist_primitives::{traits::CombinatorialTokensFuel, types::CombinatorialId};
 
 /// Returns a valid collection ID from an `hash` and an optional `parent_collection_id`.
 ///
@@ -108,7 +108,7 @@ fn decompress_hash(hash: CombinatorialId, fuel: Fuel) -> Result<G1Affine, Collec
                 y_opt = matching_y;
 
                 if !fuel.consume_all() {
-                    break;
+                    break
                 }
             }
         }
@@ -136,7 +136,7 @@ fn decompress_collection_id(collection_id: CombinatorialId) -> Result<G1Affine, 
     // Ensure that the big-endian integer represented by `collection_id` was less than the field
     // modulus. Otherwise, we consider `collection_id` an invalid ID.
     if x.into_bigint().to_bytes_be() != chopped_collection_id {
-        return Err(CollectionIdError::InvalidParentCollectionId);
+        return Err(CollectionIdError::InvalidParentCollectionId)
     }
 
     // Fails if `collection_id` is not a collection ID.

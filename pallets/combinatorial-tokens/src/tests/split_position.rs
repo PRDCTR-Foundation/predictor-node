@@ -20,11 +20,11 @@ use super::*;
 #[test]
 fn split_position_works_vertical_no_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         let pallet = Account::new(Pallet::<Runtime>::account_id());
 
         let parent_collection_id = None;
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B0, B0, B1], vec![B1, B1, B0]];
 
         let amount = _1;
@@ -48,8 +48,8 @@ fn split_position_works_vertical_no_parent() {
 
         assert_eq!(alice.free_balance(ct_001), amount);
         assert_eq!(alice.free_balance(ct_110), amount);
-        assert_eq!(alice.free_balance(Asset::Ztg), _100 - amount);
-        assert_eq!(pallet.free_balance(Asset::Ztg), amount);
+        assert_eq!(alice.free_balance(Asset::Tru), _100 - amount);
+        assert_eq!(pallet.free_balance(Asset::Tru), amount);
 
         System::assert_last_event(
             Event::<Runtime>::TokenSplit {
@@ -57,7 +57,7 @@ fn split_position_works_vertical_no_parent() {
                 parent_collection_id,
                 market_id,
                 partition,
-                asset_in: Asset::Ztg,
+                asset_in: Asset::Tru,
                 assets_out: vec![ct_001, ct_110],
                 collection_ids: vec![
                     [
@@ -79,10 +79,10 @@ fn split_position_works_vertical_no_parent() {
 #[test]
 fn split_position_works_vertical_with_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         let pallet = Account::new(Pallet::<Runtime>::account_id());
 
-        let parent_market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let parent_market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let parent_amount = _3;
         assert_ok!(CombinatorialTokens::split_position(
             alice.signed(),
@@ -93,7 +93,7 @@ fn split_position_works_vertical_with_parent() {
             Fuel::new(16, false),
         ));
 
-        let child_market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let child_market_id = create_market(Asset::Tru, MarketType::Categorical(4));
         let child_amount = _1;
         // Collection ID of [0, 0, 1].
         let parent_collection_id = [
@@ -129,12 +129,12 @@ fn split_position_works_vertical_with_parent() {
             184, 75, 79, 107, 73, 89, 19, 22, 124, 15, 58, 110, 100,
         ]);
 
-        assert_eq!(alice.free_balance(Asset::Ztg), _100 - parent_amount);
+        assert_eq!(alice.free_balance(Asset::Tru), _100 - parent_amount);
         assert_eq!(alice.free_balance(ct_001), parent_amount - child_amount);
         assert_eq!(alice.free_balance(ct_110), parent_amount);
         assert_eq!(alice.free_balance(ct_001_0101), child_amount);
         assert_eq!(alice.free_balance(ct_001_1010), child_amount);
-        assert_eq!(pallet.free_balance(Asset::Ztg), parent_amount);
+        assert_eq!(pallet.free_balance(Asset::Tru), parent_amount);
         assert_eq!(pallet.free_balance(ct_001), 0); // Combinatorial tokens are destroyed when split.
 
         System::assert_last_event(
@@ -175,7 +175,7 @@ fn split_position_works_vertical_with_parent() {
 #[test]
 fn split_position_fails_if_market_not_found() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         assert_noop!(
             CombinatorialTokens::split_position(
                 alice.signed(),
@@ -185,7 +185,7 @@ fn split_position_fails_if_market_not_found() {
                 1,
                 Fuel::new(16, false),
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
     });
 }
@@ -193,10 +193,10 @@ fn split_position_fails_if_market_not_found() {
 #[test]
 fn split_position_fails_on_invalid_partition_length() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
         // Market has three outcomes, but there's an element in the partition of size two.
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B1]];
 
         assert_noop!(
@@ -216,10 +216,10 @@ fn split_position_fails_on_invalid_partition_length() {
 #[test]
 fn split_position_fails_on_empty_partition_member() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
         // Second element is empty.
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B0, B0]];
 
         assert_noop!(
@@ -239,10 +239,10 @@ fn split_position_fails_on_empty_partition_member() {
 #[test]
 fn split_position_fails_on_overlapping_partition_members() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
         // Last elements overlap.
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B0, B1]];
 
         assert_noop!(
@@ -262,9 +262,9 @@ fn split_position_fails_on_overlapping_partition_members() {
 #[test]
 fn split_position_fails_on_trivial_partition() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B1, B1]];
 
         assert_noop!(
@@ -284,9 +284,9 @@ fn split_position_fails_on_trivial_partition() {
 #[test]
 fn split_position_fails_on_insufficient_funds_native_token_no_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _99).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _99).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_noop!(
             CombinatorialTokens::split_position(
@@ -307,7 +307,7 @@ fn split_position_fails_on_insufficient_funds_foreign_token_no_parent() {
     ExtBuilder::build().execute_with(|| {
         let alice = Account::new(0).deposit(Asset::ForeignAsset(1), _99).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_noop!(
             CombinatorialTokens::split_position(
@@ -339,8 +339,8 @@ fn split_position_vertical_fails_on_insufficient_funds_combinatorial_token() {
             133, 165, 48, 231, 189, 87, 123, 131, 18, 190, 5, 110, 93,
         ];
 
-        let _ = create_market(Asset::Ztg, MarketType::Categorical(3));
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let _ = create_market(Asset::Tru, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(4));
 
         assert_noop!(
             CombinatorialTokens::split_position(
@@ -377,7 +377,7 @@ fn split_position_horizontal_fails_on_insufficient_funds_combinatorial_token() {
         let alice = Account::new(0).deposit(ct_110, _99).unwrap();
 
         // Market has three outcomes, but there's an element in the partition of size two.
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_noop!(
             CombinatorialTokens::split_position(

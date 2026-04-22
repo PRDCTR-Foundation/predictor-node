@@ -21,7 +21,7 @@ pub use crate::{
     asset::*, market::*, max_runtime_usize::*, outcome_report::OutcomeReport, proxy_type::*,
     serde_wrapper::*, traits::HasEthAddress,
 };
-use common_primitives::types::Balance;
+pub use common_primitives::types::Balance;
 
 #[cfg(feature = "arbitrary")]
 use alloc::vec::Vec;

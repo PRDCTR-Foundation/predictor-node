@@ -15,28 +15,36 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
-use crate as zrml_combinatorial_tokens;
+use crate as pallet_pm_combinatorial_tokens;
 use crate::{
     mock::types::MockPayout,
     types::{cryptographic_id_manager::Fuel, CryptographicIdManager},
     weights::WeightInfo,
 };
+use common_primitives::types::{Amount, Balance};
 use frame_support::{construct_runtime, traits::Everything, Blake2_256};
 use frame_system::mocking::MockBlock;
-use sp_runtime::traits::{BlakeTwo256, ConstU32, IdentityLookup};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     constants::mock::{
         BlockHashCount, CombinatorialTokensPalletId, ExistentialDeposit, ExistentialDeposits,
         GetNativeCurrencyId, MaxLocks, MaxReserves, MinimumPeriod,
     },
     types::{
-        AccountIdTest, Amount, Balance, BasicCurrencyAdapter, CurrencyId, Hash, MarketId, Moment,
+        // AccountIdTest, Amount, Balance, BasicCurrencyAdapter, CurrencyId, Hash, MarketId,
+        // Moment,
+        AccountIdTest,
+        BasicCurrencyAdapter,
+        CurrencyId,
+        Hash,
+        MarketId,
+        Moment,
     },
 };
+use sp_runtime::traits::{BlakeTwo256, ConstU32, IdentityLookup};
 #[cfg(feature = "parachain")]
 use {
     frame_system::EnsureRoot, orml_traits::asset_registry::AssetProcessor,
-    sp_runtime::DispatchError, zeitgeist_primitives::types::CustomMetadata,
+    prediction_market_primitives::types::CustomMetadata, sp_runtime::DispatchError,
 };
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -46,17 +54,17 @@ construct_runtime! {
     pub enum Runtime {
         #[cfg(feature = "parachain")]
         AssetRegistry: orml_asset_registry::module,
-        CombinatorialTokens: zrml_combinatorial_tokens,
+        CombinatorialTokens: pallet_pm_combinatorial_tokens,
         Balances: pallet_balances,
         Currencies: orml_currencies,
-        MarketCommons: zrml_market_commons,
+        MarketCommons: pallet_pm_market_commons,
         System: frame_system,
         Timestamp: pallet_timestamp,
         Tokens: orml_tokens,
     }
 }
 
-impl zrml_combinatorial_tokens::Config for Runtime {
+impl pallet_pm_combinatorial_tokens::Config for Runtime {
     #[cfg(feature = "runtime-benchmarks")]
     type BenchmarkHelper = BenchmarkHelper;
     type CombinatorialIdManager = CryptographicIdManager<MarketId, Blake2_256>;
@@ -92,7 +100,7 @@ impl pallet_balances::Config for Runtime {
     type WeightInfo = ();
 }
 
-impl zrml_market_commons::Config for Runtime {
+impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
     type Timestamp = Timestamp;

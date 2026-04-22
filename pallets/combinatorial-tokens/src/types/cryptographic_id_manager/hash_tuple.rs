@@ -20,7 +20,7 @@ use alloc::{vec, vec::Vec};
 
 use frame_support::{Blake2_256, StorageHasher};
 use parity_scale_codec::Encode;
-use zeitgeist_primitives::types::Asset;
+use prediction_market_primitives::types::Asset;
 
 pub trait ToBytes {
     fn to_bytes(&self) -> Vec<u8>;
@@ -90,8 +90,9 @@ where
     }
 }
 
-/// Beware! All changes to this implementation need to be backwards compatible. Failure to follow this
-/// restriction will result in assets changing hashes between versions, causing unreachable funds.
+/// Beware! All changes to this implementation need to be backwards compatible. Failure to follow
+/// this restriction will result in assets changing hashes between versions, causing unreachable
+/// funds.
 ///
 /// Of course, this is true of any modification of the collection ID manager, but this is the place
 /// where it's most likely to happen. We're using tests below to ensure that unintentional changes
@@ -114,7 +115,7 @@ mod tests {
 
     // Beware! If you have to modify these tests, that means that you broke encoding of assets in a
     // way that's not backwards compatible.
-    #[test_case(Asset::Ztg, vec![4])]
+    #[test_case(Asset::Tru, vec![4])]
     #[test_case(Asset::ForeignAsset(0), vec![5, 0, 0, 0, 0])]
     #[test_case(Asset::ForeignAsset(1), vec![5, 1, 0, 0, 0])]
     #[test_case(Asset::ForeignAsset(2), vec![5, 2, 0, 0, 0])]

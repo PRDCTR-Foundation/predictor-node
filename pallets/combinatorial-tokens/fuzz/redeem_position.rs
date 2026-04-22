@@ -22,12 +22,12 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     constants::base_multiples::*,
     traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
     types::{Asset, MarketType},
 };
-use zrml_combinatorial_tokens::{
+use pallet_pm_combinatorial_tokens::{
     mock::{
         ext_builder::ExtBuilder,
         runtime::{CombinatorialTokens, Runtime, RuntimeOrigin},
@@ -91,7 +91,7 @@ fuzz_target!(|params: RedeemPositionFuzzParams| {
         // We create a market and equip the user with the tokens they require to make the
         // `redeem_position` call meaningful. We also provide the pallet account with collateral in
         // case it's required.
-        let collateral = Asset::Ztg;
+        let collateral = Asset::Tru;
         let asset_count = params.index_set.len() as u16;
         let market = common::market::<Runtime>(
             params.market_id,
@@ -107,7 +107,7 @@ fuzz_target!(|params: RedeemPositionFuzzParams| {
 
             Asset::CombinatorialToken(position_id)
         } else {
-            Asset::Ztg
+            Asset::Tru
         };
         <<Runtime as Config>::MultiCurrency>::deposit(position, &params.account_id, params.amount)
             .unwrap();

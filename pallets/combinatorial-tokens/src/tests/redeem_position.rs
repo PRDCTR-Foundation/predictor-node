@@ -21,7 +21,7 @@ use test_case::test_case;
 #[test]
 fn redeem_position_fails_on_no_payout_vector() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         let market_id = 0;
         MockPayout::set_return_value(None);
         assert_noop!(
@@ -41,7 +41,7 @@ fn redeem_position_fails_on_no_payout_vector() {
 #[test]
 fn redeem_position_fails_on_market_not_found() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         MockPayout::set_return_value(Some(vec![_1_2, _1_2]));
         assert_noop!(
             CombinatorialTokens::redeem_position(
@@ -51,7 +51,7 @@ fn redeem_position_fails_on_market_not_found() {
                 vec![],
                 Fuel::new(16, false)
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist
         );
     });
 }
@@ -61,9 +61,9 @@ fn redeem_position_fails_on_market_not_found() {
 #[test_case(vec![B1, B1, B1]; "all_one")]
 fn redeem_position_fails_on_incorrect_index_set(index_set: Vec<bool>) {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         MockPayout::set_return_value(Some(vec![_1_3, _1_3, _1_3]));
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         assert_noop!(
             CombinatorialTokens::redeem_position(
                 alice.signed(),
@@ -80,9 +80,9 @@ fn redeem_position_fails_on_incorrect_index_set(index_set: Vec<bool>) {
 #[test]
 fn redeem_position_fails_if_tokens_have_no_value() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         MockPayout::set_return_value(Some(vec![0, _1_2, _1_2, 0]));
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(4));
         let index_set = vec![B1, B0, B0, B1];
         assert_noop!(
             CombinatorialTokens::redeem_position(
@@ -100,9 +100,9 @@ fn redeem_position_fails_if_tokens_have_no_value() {
 #[test]
 fn redeem_position_fails_if_user_holds_no_winning_tokens() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
         MockPayout::set_return_value(Some(vec![0, _1_2, _1_2, 0]));
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(4));
         let index_set = vec![B0, B1, B0, B1];
         assert_noop!(
             CombinatorialTokens::redeem_position(
@@ -126,13 +126,14 @@ fn redeem_position_works_sans_parent() {
         ]);
         let alice = Account::new(0).deposit(ct_110, _3).unwrap();
         let amount_in = _3;
-        let pallet =
-            Account::new(Pallet::<Runtime>::account_id()).deposit(Asset::Ztg, amount_in).unwrap();
+        let pallet = Account::new(Pallet::<Runtime>::account_id())
+            .deposit(Asset::Tru, amount_in)
+            .unwrap();
 
         MockPayout::set_return_value(Some(vec![_1_4, _1_2, _1_4]));
 
         let parent_collection_id = None;
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let index_set = vec![B1, B1, B0];
         assert_ok!(CombinatorialTokens::redeem_position(
             alice.signed(),
@@ -144,8 +145,8 @@ fn redeem_position_works_sans_parent() {
 
         assert_eq!(alice.free_balance(ct_110), 0);
         let amount_out = _2 + _1_4;
-        assert_eq!(alice.free_balance(Asset::Ztg), amount_out);
-        assert_eq!(pallet.free_balance(Asset::Ztg), _3_4);
+        assert_eq!(alice.free_balance(Asset::Tru), amount_out);
+        assert_eq!(pallet.free_balance(Asset::Tru), _3_4);
 
         System::assert_last_event(
             Event::<Runtime>::TokenRedeemed {
@@ -155,7 +156,7 @@ fn redeem_position_works_sans_parent() {
                 index_set,
                 asset_in: ct_110,
                 amount_in,
-                asset_out: Asset::Ztg,
+                asset_out: Asset::Tru,
                 amount_out,
             }
             .into(),
@@ -182,8 +183,8 @@ fn redeem_position_works_with_parent() {
 
         MockPayout::set_return_value(Some(vec![_1_4, 0, _1_2, _1_4]));
 
-        let _ = create_market(Asset::Ztg, MarketType::Categorical(3));
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let _ = create_market(Asset::Tru, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(4));
 
         // Collection ID of [0, 0, 1].
         let parent_collection_id = Some([

@@ -31,11 +31,11 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use hash_tuple::{HashTuple, ToBytes};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
-use scale_info::TypeInfo;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::CombinatorialTokensFuel,
     types::{Asset, CombinatorialId},
 };
+use scale_info::TypeInfo;
 
 #[derive(Clone, Debug, Decode, Encode, Eq, MaxEncodedLen, PartialEq, TypeInfo)]
 pub struct Fuel {

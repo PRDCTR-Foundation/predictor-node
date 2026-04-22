@@ -20,8 +20,8 @@ use crate::{
     BalanceOf, MarketIdOf,
 };
 use alloc::vec::Vec;
+use prediction_market_primitives::traits::CombinatorialTokensBenchmarkHelper;
 use sp_runtime::DispatchResult;
-use zeitgeist_primitives::traits::CombinatorialTokensBenchmarkHelper;
 
 pub struct BenchmarkHelper;
 
