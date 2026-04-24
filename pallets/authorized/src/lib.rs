@@ -45,15 +45,15 @@ mod pallet {
         PalletId, Twox64Concat,
     };
     use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
-    use sp_runtime::{traits::Saturating, DispatchError, DispatchResult};
-    use zeitgeist_primitives::{
+    use pallet_pm_market_commons::MarketCommonsPalletApi;
+    use prediction_market_primitives::{
         traits::{DisputeApi, DisputeMaxWeightApi, DisputeResolutionApi},
         types::{
             AuthorityReport, GlobalDisputeItem, Market, MarketDisputeMechanism, MarketStatus,
             OutcomeReport, ResultWithWeightInfo,
         },
     };
-    use zrml_market_commons::MarketCommonsPalletApi;
+    use sp_runtime::{traits::Saturating, DispatchError, DispatchResult};
 
     /// The current storage version.
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
@@ -108,7 +108,7 @@ mod pallet {
                     let resolve_at = now.saturating_add(T::CorrectionPeriod::get());
                     let ids_len = T::DisputeResolution::add_auto_resolve(&market_id, resolve_at)?;
                     (AuthorityReport { resolve_at, outcome: outcome.clone() }, ids_len)
-                }
+                },
             };
 
             AuthorizedOutcomeReports::<T>::insert(market_id, report);
@@ -303,7 +303,7 @@ mod pallet {
             };
 
             if market.dispute_mechanism != Some(MarketDisputeMechanism::Authorized) {
-                return res;
+                return res
             }
 
             res.result = Self::get_auto_resolve(market_id);
@@ -356,7 +356,7 @@ mod pallet {
 
     impl<T> AuthorizedPalletApi for Pallet<T> where T: Config {}
 
-    /// Maps the market id to the outcome reported by the authorized account.    
+    /// Maps the market id to the outcome reported by the authorized account.
     #[pallet::storage]
     #[pallet::getter(fn outcomes)]
     pub type AuthorizedOutcomeReports<T: Config> =
@@ -369,14 +369,14 @@ where
     T: crate::Config,
 {
     use frame_support::traits::Get;
-    use sp_runtime::{traits::AccountIdConversion, Perbill};
-    use zeitgeist_primitives::types::{
+    use prediction_market_primitives::types::{
         Asset, Deadlines, Market, MarketBonds, MarketCreation, MarketDisputeMechanism,
         MarketPeriod, MarketStatus, MarketType, ScoringRule,
     };
+    use sp_runtime::{traits::AccountIdConversion, Perbill};
 
     Market {
-        base_asset: Asset::Ztg,
+        base_asset: Asset::Tru,
         market_id: Default::default(),
         creation: MarketCreation::Permissionless,
         creator_fee: Perbill::zero(),
