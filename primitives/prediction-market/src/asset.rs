@@ -17,7 +17,7 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 #[cfg(feature = "runtime-benchmarks")]
-use crate::traits::ZeitgeistAssetEnumerator;
+use crate::traits::NodeAssetEnumerator;
 use crate::{
     traits::PoolSharesId,
     types::{CategoryIndex, CombinatorialId, PoolId},
@@ -51,14 +51,14 @@ pub enum Asset<MarketId> {
     CombinatorialOutcomeLegacy, // Here to avoid having to migrate all holdings on the chain.
     PoolShare(PoolId),
     #[default]
-    Ztg,
+    Tru,
     ForeignAsset(u32),
     ParimutuelShare(MarketId, CategoryIndex),
     CombinatorialToken(CombinatorialId),
 }
 
 #[cfg(feature = "runtime-benchmarks")]
-impl<MarketId: MaxEncodedLen> ZeitgeistAssetEnumerator<MarketId> for Asset<MarketId> {
+impl<MarketId: MaxEncodedLen> NodeAssetEnumerator<MarketId> for Asset<MarketId> {
     fn create_asset_id(t: MarketId) -> Self {
         Asset::CategoricalOutcome(t, 0)
     }

@@ -97,10 +97,10 @@ where
                 } else {
                     false
                 }
-            }
+            },
             OutcomeReport::Scalar(_) => {
                 matches!(&self.market_type, MarketType::Scalar(_))
-            }
+            },
         }
     }
 
@@ -112,23 +112,21 @@ where
 
                 for i in 0..categories {
                     match self.scoring_rule {
-                        ScoringRule::AmmCdaHybrid => {
-                            assets.push(Asset::<MarketId>::CategoricalOutcome(self.market_id, i))
-                        }
-                        ScoringRule::Parimutuel => {
-                            assets.push(Asset::<MarketId>::ParimutuelShare(self.market_id, i))
-                        }
+                        ScoringRule::AmmCdaHybrid =>
+                            assets.push(Asset::<MarketId>::CategoricalOutcome(self.market_id, i)),
+                        ScoringRule::Parimutuel =>
+                            assets.push(Asset::<MarketId>::ParimutuelShare(self.market_id, i)),
                     };
                 }
 
                 assets
-            }
+            },
             MarketType::Scalar(_) => {
                 vec![
                     Asset::<MarketId>::ScalarOutcome(self.market_id, ScalarPosition::Long),
                     Asset::<MarketId>::ScalarOutcome(self.market_id, ScalarPosition::Short),
                 ]
-            }
+            },
         }
     }
 
@@ -157,12 +155,10 @@ where
     fn outcome_report_into_asset(&self, outcome_report: &OutcomeReport) -> Option<Asset<MarketId>> {
         match outcome_report {
             OutcomeReport::Categorical(idx) => match self.scoring_rule {
-                ScoringRule::AmmCdaHybrid => {
-                    Some(Asset::<MarketId>::CategoricalOutcome(self.market_id, *idx))
-                }
-                ScoringRule::Parimutuel => {
-                    Some(Asset::<MarketId>::ParimutuelShare(self.market_id, *idx))
-                }
+                ScoringRule::AmmCdaHybrid =>
+                    Some(Asset::<MarketId>::CategoricalOutcome(self.market_id, *idx)),
+                ScoringRule::Parimutuel =>
+                    Some(Asset::<MarketId>::ParimutuelShare(self.market_id, *idx)),
             },
             OutcomeReport::Scalar(_) => None,
         }
@@ -302,8 +298,8 @@ pub enum MarketDisputeMechanism {
 ///
 /// Must be an exclusive range because:
 ///
-/// 1. `zrml_predition_markets::Pallet::admin_move_market_to_closed` uses the current block as the
-///    end period.
+/// 1. `pallets_predition_markets::Pallet::admin_move_market_to_closed` uses the current block as
+///    the end period.
 /// 2. The liquidity mining pallet takes into consideration the different between the two blocks.
 ///    So 1..5 correctly outputs 4 (`5 - 1`) while 1..=5 would incorrectly output the same 4.
 /// 3. With inclusive ranges it is not possible to express empty ranges and this feature
@@ -472,7 +468,7 @@ mod tests {
     ) {
         let market = Market {
             market_id: 9,
-            base_asset: Asset::Ztg,
+            base_asset: Asset::Tru,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),
@@ -524,7 +520,7 @@ mod tests {
     ) {
         let market = Market {
             market_id: 0,
-            base_asset: Asset::Ztg,
+            base_asset: Asset::Tru,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),
@@ -583,7 +579,7 @@ mod tests {
 
         let market = Market {
             market_id: 0,
-            base_asset: Asset::Ztg,
+            base_asset: Asset::Tru,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),
