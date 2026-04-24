@@ -27,7 +27,7 @@ mod tests;
 pub mod types;
 
 pub use pallet::*;
-pub use zeitgeist_primitives::traits::MarketCommonsPalletApi;
+pub use prediction_market_primitives::traits::MarketCommonsPalletApi;
 
 #[frame_support::pallet]
 mod pallet {
@@ -44,16 +44,16 @@ mod pallet {
     };
     use frame_system::pallet_prelude::BlockNumberFor;
     use parity_scale_codec::{FullCodec, MaxEncodedLen};
+    use prediction_market_primitives::{
+        math::checked_ops_res::CheckedAddRes,
+        traits::MarketBuilderTrait,
+        types::{Asset, Deadlines, EarlyClose, Market, MarketBonds, MarketPeriod, PoolId, Report},
+    };
     use sp_runtime::{
         traits::{
             AtLeast32Bit, AtLeast32BitUnsigned, MaybeSerializeDeserialize, Member, Saturating,
         },
         DispatchError,
-    };
-    use zeitgeist_primitives::{
-        math::checked_ops_res::CheckedAddRes,
-        traits::MarketBuilderTrait,
-        types::{Asset, Deadlines, EarlyClose, Market, MarketBonds, MarketPeriod, PoolId, Report},
     };
 
     /// The current storage version.
@@ -158,7 +158,7 @@ mod pallet {
             match <MarketCounter<T>>::try_get() {
                 Ok(market_id) => {
                     Ok(market_id.saturating_sub(1u8.into())) // Note: market_id > 0!
-                }
+                },
                 _ => Err(Error::<T>::NoMarketHasBeenCreated.into()),
             }
         }
@@ -178,7 +178,7 @@ mod pallet {
             <Markets<T>>::try_mutate(market_id, |opt| {
                 if let Some(market) = opt {
                     cb(market)?;
-                    return Ok(());
+                    return Ok(())
                 }
                 Err(Error::<T>::MarketDoesNotExist.into())
             })
@@ -212,7 +212,7 @@ mod pallet {
 
         fn remove_market(market_id: &Self::MarketId) -> DispatchResult {
             if !<Markets<T>>::contains_key(market_id) {
-                return Err(Error::<T>::MarketDoesNotExist.into());
+                return Err(Error::<T>::MarketDoesNotExist.into())
             }
             <Markets<T>>::remove(market_id);
             Ok(())
@@ -229,7 +229,7 @@ mod pallet {
 
         fn remove_market_pool(market_id: &Self::MarketId) -> DispatchResult {
             if !<MarketPool<T>>::contains_key(market_id) {
-                return Err(Error::<T>::MarketPoolDoesNotExist.into());
+                return Err(Error::<T>::MarketPoolDoesNotExist.into())
             }
             <MarketPool<T>>::remove(market_id);
             Ok(())

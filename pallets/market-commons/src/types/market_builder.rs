@@ -21,14 +21,14 @@ use crate::{
 };
 use alloc::vec::Vec;
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_runtime::{DispatchError, Perbill};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::MarketBuilderTrait,
     types::{
         Market, MarketCreation, MarketDisputeMechanism, MarketStatus, MarketType, OutcomeReport,
         ScoringRule,
     },
 };
+use sp_runtime::{DispatchError, Perbill};
 
 /// Fully-fledged mutably referenced builder struct for `Market`.
 #[derive(Clone)]

@@ -6,7 +6,7 @@ parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"
 scale-info = { workspace = true, features = ["derive"] }
 sp-arithmetic = { workspace = true }
 sp-runtime = { workspace = true }
-zeitgeist-primitives = { workspace = true }
+prediction-market-primitives = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
@@ -14,7 +14,8 @@ pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 test-case = { workspace = true }
-zeitgeist-primitives = { workspace = true, features = ["mock", "default"] }
+prediction-market-primitives = { workspace = true, features = ["mock", "default"] }
+common-primitives = { workspace = true }
 
 [features]
 default = ["std"]
@@ -24,7 +25,7 @@ std = [
     "parity-scale-codec/std",
     "sp-arithmetic/std",
     "sp-runtime/std",
-    "zeitgeist-primitives/std",
+    "prediction-market-primitives/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
@@ -33,5 +34,5 @@ try-runtime = [
 [package]
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
 edition.workspace = true
-name = "zrml-market-commons"
-version = "0.6.1"
+name = "pallet-pm-market-commons"
+version = { workspace = true }

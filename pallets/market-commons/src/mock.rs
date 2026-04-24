@@ -18,22 +18,23 @@
 
 #![cfg(test)]
 
-use crate::{self as zrml_market_commons};
+use crate::{self as pallet_pm_market_commons};
+use common_primitives::types::{Balance, Hash, Moment};
 use frame_support::{construct_runtime, traits::Everything};
-use frame_system::mocking::MockBlock;
+use frame_system::mocking::MockBlockU32;
+use prediction_market_primitives::{
+    constants::mock::{BlockHashCount, ExistentialDeposit, MaxLocks, MaxReserves, MinimumPeriod},
+    types::{AccountIdTest, MarketId},
+};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
-};
-use zeitgeist_primitives::{
-    constants::mock::{BlockHashCount, ExistentialDeposit, MaxLocks, MaxReserves, MinimumPeriod},
-    types::{AccountIdTest, Balance, Hash, MarketId, Moment},
 };
 
 construct_runtime!(
     pub enum Runtime {
         Balances: pallet_balances,
-        MarketCommons: zrml_market_commons,
+        MarketCommons: pallet_pm_market_commons,
         System: frame_system,
         Timestamp: pallet_timestamp,
     }
@@ -49,7 +50,7 @@ impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
     type AccountId = AccountIdTest;
     type BaseCallFilter = Everything;
-    type Block = MockBlock<Runtime>;
+    type Block = MockBlockU32<Runtime>;
     type BlockHashCount = BlockHashCount;
     type BlockLength = ();
     type BlockWeights = ();
