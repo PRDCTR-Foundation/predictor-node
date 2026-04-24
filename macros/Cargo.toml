@@ -3,7 +3,8 @@ default = ["std"]
 std = []
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors = ["Zeitgeist PM <contact@zeitgeist.pm>", "Aventus systems team"]
 edition.workspace = true
-name = "zeitgeist-macros"
-version = "0.6.1"
+name = "node-macros"
+
+version = { workspace = true }
