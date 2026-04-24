@@ -82,6 +82,12 @@ frame-benchmarking-cli.workspace = true
 frame-benchmarking-cli.default-features = true
 predictor-runtime.workspace = true
 
+external-service = { workspace = true, default-features = true }
+sc-keystore.workspace = true
+sc-keystore.default-features = true
+parity-scale-codec = { workspace = true, default-features = true }
+sp-avn-common = { workspace = true, default-features = true }
+
 [build-dependencies]
 substrate-build-script-utils.workspace = true
 substrate-build-script-utils.default-features = true

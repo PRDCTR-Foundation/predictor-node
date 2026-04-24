@@ -7,6 +7,14 @@ pub struct Cli {
 
     #[clap(flatten)]
     pub run: RunCmd,
+
+    /// Port the external-service HTTP server listens on (defaults to 2020 when unset).
+    #[arg(long = "avn-port", value_name = "AVN_PORT")]
+    pub avn_port: Option<String>,
+
+    /// Ethereum JSON-RPC URL(s) for the external-service. Repeat to provide failover endpoints.
+    #[arg(long = "ethereum-node-url", value_name = "ETH_URL", num_args = 0..=32)]
+    pub eth_node_urls: Vec<String>,
 }
 
 #[derive(Debug, clap::Subcommand)]

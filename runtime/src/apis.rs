@@ -24,15 +24,21 @@
 // For more information, please refer to <http://unlicense.org>
 
 // External crates imports
-use alloc::{vec, vec::Vec};
+use alloc::{collections::BTreeMap, vec, vec::Vec};
 use frame_support::{
     genesis_builder_helper::{build_state, get_preset},
     weights::Weight,
 };
+use pallet_eth_bridge_runtime_api::InstanceId;
 use pallet_grandpa::AuthorityId as GrandpaId;
+use parity_scale_codec::Encode;
 use sp_api::impl_runtime_apis;
+use sp_avn_common::{
+    eth::EthBridgeInstance,
+    event_discovery::{AdditionalEvents, EthBlockRange, EthereumEventsPartition},
+};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use sp_core::{crypto::KeyTypeId, ByteArray, OpaqueMetadata};
 use sp_runtime::{
     traits::{Block as BlockT, NumberFor},
     transaction_validity::{TransactionSource, TransactionValidity},
@@ -42,9 +48,11 @@ use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Aura, Balance, Block, Executive, Grandpa, InherentDataExt, Nonce, Runtime,
-    RuntimeCall, RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, VERSION,
+    AccountId, Aura, Avn, Balance, Block, EthBridge, Executive, Grandpa, InherentDataExt, Nonce,
+    Runtime, RuntimeCall, RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, VERSION,
 };
+
+const MAIN_ETH_BRIDGE_ID: InstanceId = 0u8;
 
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
@@ -290,6 +298,59 @@ impl_runtime_apis! {
 
         fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
             vec![]
+        }
+    }
+
+    impl pallet_eth_bridge_runtime_api::EthEventHandlerApi<Block, AccountId> for Runtime {
+        fn query_authors() -> Vec<([u8; 32], [u8; 32])> {
+            Avn::validators().to_vec().iter().map(|validator| {
+                let mut address: [u8; 32] = Default::default();
+                address.copy_from_slice(&validator.account_id.encode()[0..32]);
+
+                let mut key: [u8; 32] = Default::default();
+                key.copy_from_slice(&validator.key.to_raw_vec()[0..32]);
+
+                (address, key)
+            }).collect()
+        }
+
+        fn query_active_block_range(_instance_id: InstanceId) -> Option<(EthBlockRange, u16)> {
+            EthBridge::active_ethereum_range().map(|r| (r.range, r.partition))
+        }
+
+        fn query_has_author_casted_vote(_instance_id: InstanceId, account_id: AccountId) -> bool {
+            EthBridge::author_has_cast_event_vote(&account_id) ||
+                EthBridge::author_has_submitted_latest_block(&account_id)
+        }
+
+        fn query_signatures(_instance_id: InstanceId) -> Vec<sp_core::H256> {
+            EthBridge::signatures()
+        }
+
+        fn submit_vote(
+            _instance_id: InstanceId,
+            author: AccountId,
+            events_partition: EthereumEventsPartition,
+            signature: sp_core::sr25519::Signature,
+        ) -> Option<()> {
+            EthBridge::submit_vote(author, events_partition, signature.into()).ok()
+        }
+
+        fn submit_latest_ethereum_block(
+            _instance_id: InstanceId,
+            author: AccountId,
+            latest_seen_block: u32,
+            signature: sp_core::sr25519::Signature,
+        ) -> Option<()> {
+            EthBridge::submit_latest_ethereum_block_vote(author, latest_seen_block, signature.into()).ok()
+        }
+
+        fn additional_transactions(_instance_id: InstanceId) -> Option<AdditionalEvents> {
+            EthBridge::active_ethereum_range().map(|r| r.additional_transactions)
+        }
+
+        fn instances() -> BTreeMap<InstanceId, EthBridgeInstance> {
+            BTreeMap::from([(MAIN_ETH_BRIDGE_ID, EthBridge::instance())])
         }
     }
 }
