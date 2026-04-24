@@ -113,16 +113,17 @@ impl<
 
 #[cfg(test)]
 mod tests {
+    use common_primitives::{
+        constants::currency::{BASE, CENT_BASE},
+        types::AccountId,
+    };
     use sp_runtime::ArithmeticError;
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        constants::{BASE, CENT},
-        types::{AccountId, Asset, MarketId},
-    };
+    use crate::types::{Asset, MarketId};
 
-    pub const BASE_ASSET: Asset<MarketId> = Asset::Ztg;
+    pub const BASE_ASSET: Asset<MarketId> = Asset::Tru;
 
     #[test]
     fn price_calculation_works() {
@@ -143,7 +144,7 @@ mod tests {
         assert_eq!(price, 2 * BASE);
 
         let price = order.price(taker_asset).unwrap();
-        assert_eq!(price, 50 * CENT);
+        assert_eq!(price, 50 * CENT_BASE);
     }
 
     #[test]

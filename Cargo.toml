@@ -106,6 +106,9 @@ xcm-executor = { version = "17.0.3", package = "staging-xcm-executor", default-f
 
 predictor-runtime = { path = "./runtime", default-features = false }
 zeitgeist-macros = { path = "./macros", default-features = false }
+
+common-primitives = { path = "./primitives/common", default-features = false }
+prediction-market-primitives = { path = "./primitives/prediction-market", default-features = false }
 zeitgeist-primitives = { path = "./primitives/prediction-market", default-features = false }
 zrml-market-commons = { path = "./pallets/market-commons", default-features = false }
 zrml-authorized = { path = "./pallets/authorized", default-features = false }
