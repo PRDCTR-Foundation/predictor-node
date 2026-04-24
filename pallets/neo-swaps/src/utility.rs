@@ -30,7 +30,7 @@ impl LogCeil for u16 {
         let x = *self;
 
         if x.is_zero() {
-            return One::one();
+            return One::one()
         }
 
         let bits_minus_one: u16 = u16::BITS.saturating_sub(1).saturated_into();

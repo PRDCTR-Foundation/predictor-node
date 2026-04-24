@@ -31,7 +31,7 @@ fn join_in_place_works_root() {
     nodes[0].lazy_fees = Zero::zero();
     nodes[1].lazy_fees += 300_000_000_000; // 30
     nodes[2].lazy_fees += 45_000_000_000; // 4.5
-    tree.join(&3, amount).unwrap();
+    tree.join(&get_account(3), amount).unwrap();
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }
 
@@ -53,7 +53,7 @@ fn join_in_place_works_leaf() {
     nodes[4].lazy_fees += _1;
     nodes[7].fees += 78_000_000_000; // 7.8 (4.8 propagated and 3 lazy fees in place)
     nodes[7].lazy_fees = Zero::zero();
-    tree.join(&6, amount).unwrap();
+    tree.join(&get_account(6), amount).unwrap();
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }
 
@@ -73,7 +73,7 @@ fn join_in_place_works_middle() {
     nodes[3].lazy_fees = 0;
     nodes[4].lazy_fees += _1;
     nodes[7].lazy_fees += 48_000_000_000; // 4.8
-    tree.join(&5, amount).unwrap();
+    tree.join(&get_account(5), amount).unwrap();
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }
 
@@ -84,7 +84,7 @@ fn join_reassigned_works_middle() {
     tree.abandoned_nodes[0] = 8;
     tree.abandoned_nodes[3] = 1;
     let mut nodes = tree.nodes.clone().into_inner();
-    let account = 99;
+    let account = get_account(99);
     let amount = _2;
 
     // Add new account.
@@ -115,11 +115,11 @@ fn join_reassigned_works_root() {
     tree.nodes[0].fees = Zero::zero();
     tree.nodes[0].lazy_fees = 345_000_000_000; // 34.5
     tree.abandoned_nodes.try_push(0).unwrap();
-    tree.account_to_index.remove(&3);
+    tree.account_to_index.remove(&get_account(3));
 
     // Prepare expected data. The only things that have changed are that the 34.5 units of
     // collateral are propagated to the nodes of depth 1; and the root.
-    let account = 99;
+    let account = get_account(99);
     let amount = _3;
     nodes[0].account = Some(account);
     nodes[0].stake = amount;
@@ -140,7 +140,7 @@ fn join_reassigned_works_root() {
 fn join_reassigned_works_leaf() {
     let mut tree = utility::create_test_tree();
     let mut nodes = tree.nodes.clone().into_inner();
-    let account = 99;
+    let account = get_account(99);
     let amount = _3;
     nodes[0].descendant_stake += amount;
     nodes[1].descendant_stake += amount;
@@ -170,10 +170,10 @@ fn join_in_place_works_if_tree_is_full() {
     tree.nodes[0].descendant_stake -= tree.nodes[2].stake;
     tree.nodes[2].account = None;
     tree.nodes[2].stake = Zero::zero();
-    tree.account_to_index.remove(&2);
+    tree.account_to_index.remove(&get_account(2));
     tree.abandoned_nodes.try_push(2).unwrap();
     let mut nodes = tree.nodes.clone().into_inner();
-    let account = 99;
+    let account = get_account(99);
     let stake = 2;
     nodes[2].account = Some(account);
     nodes[2].stake = stake;
@@ -190,7 +190,7 @@ fn join_in_place_works_if_tree_is_full() {
 fn join_new_fails_if_tree_is_full() {
     let mut tree = utility::create_full_tree();
     assert_err!(
-        tree.join(&99, _1),
+        tree.join(&get_account(99), _1),
         LiquidityTreeError::TreeIsFull.into_dispatch_error::<Runtime>()
     );
 }

@@ -22,6 +22,7 @@
 
 extern crate alloc;
 
+#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 mod consts;
 mod helpers;
@@ -39,8 +40,13 @@ pub mod weights;
 
 pub use pallet::*;
 
+pub const WITHDRAW_FEES_CONTEXT: &[u8] = b"neo_swap::withdraw_fees_context";
+pub const EXIT_CONTEXT: &[u8] = b"neo_swap::exit_context";
+pub const JOIN_CONTEXT: &[u8] = b"neo_swap::join_context";
+
 #[frame_support::pallet]
 mod pallet {
+    use super::{EXIT_CONTEXT, JOIN_CONTEXT, WITHDRAW_FEES_CONTEXT};
     use crate::{
         consts::LN_NUMERICAL_LIMIT,
         liquidity_tree::types::{BenchmarkInfo, LiquidityTree, LiquidityTreeError},
@@ -55,13 +61,14 @@ mod pallet {
         vec,
         vec::Vec,
     };
+    use common_primitives::constants::currency::{BASE, CENT_BASE};
     use core::marker::PhantomData;
     use frame_support::{
         dispatch::DispatchResultWithPostInfo,
         ensure,
-        pallet_prelude::{StorageMap, StorageValue, ValueQuery},
+        pallet_prelude::{BuildGenesisConfig, OptionQuery, StorageMap, StorageValue, ValueQuery},
         require_transactional,
-        traits::{Get, IsType, StorageVersion},
+        traits::{Get, IsSubType, IsType, StorageVersion},
         transactional, PalletError, PalletId, Parameter, Twox64Concat,
     };
     use frame_system::{
@@ -69,45 +76,46 @@ mod pallet {
         pallet_prelude::{BlockNumberFor, OriginFor},
     };
     use orml_traits::MultiCurrency;
+    use pallet_pm_market_commons::MarketCommonsPalletApi;
     use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
-    use scale_info::TypeInfo;
-    use sp_runtime::{
-        traits::{
-            AccountIdConversion, AtLeast32Bit, CheckedSub, MaybeSerializeDeserialize, Member,
-            Saturating, Zero,
-        },
-        DispatchError, DispatchResult, Perbill, RuntimeDebug, SaturatedConversion,
-    };
-    use zeitgeist_primitives::{
-        constants::{BASE, CENT},
+    use prediction_market_primitives::{
         hybrid_router_api_types::{AmmSoftFail, AmmTrade, ApiError},
         math::{
             checked_ops_res::{CheckedAddRes, CheckedMulRes, CheckedSubRes},
-            fixed::{BaseProvider, FixedDiv, FixedMul, ZeitgeistBase},
+            fixed::{BaseProvider, FixedDiv, FixedMul, PredictionMarketBase},
         },
         traits::{
             CombinatorialTokensApi, CombinatorialTokensFuel, CombinatorialTokensUnsafeApi,
             CompleteSetOperationsApi, DeployPoolApi, DistributeFees, HybridRouterAmmApi,
+            OnLiquidityProvided, PalletAdminGetter,
         },
         types::{Asset, MarketStatus, ScoringRule},
     };
-    use zrml_market_commons::MarketCommonsPalletApi;
+    use scale_info::{prelude::boxed::Box, TypeInfo};
+    use sp_avn_common::{verify_signature, InnerCallValidator, Proof};
+    use sp_runtime::{
+        traits::{
+            AccountIdConversion, AtLeast32Bit, CheckedSub, Dispatchable, IdentifyAccount,
+            MaybeSerializeDeserialize, Member, Saturating, Verify, Zero,
+        },
+        DispatchError, DispatchResult, RuntimeDebug, SaturatedConversion,
+    };
 
     pub(crate) const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
     // These should not be config parameters to avoid misconfigurations.
-    pub(crate) const EXIT_FEE: u128 = CENT / 10;
+    pub(crate) const EXIT_FEE: u128 = CENT_BASE / 10; // 0.1%
     /// The minimum allowed swap fee. Hardcoded to avoid misconfigurations which may lead to
     /// exploits.
     pub const MIN_SWAP_FEE: u128 = BASE / 1_000; // 0.1%.
     /// The maximum allowed spot price when creating a pool.
-    pub const MAX_SPOT_PRICE: u128 = BASE - CENT / 2;
+    pub const MAX_SPOT_PRICE: u128 = BASE - CENT_BASE / 2;
     /// The minimum allowed spot price when creating a pool.
-    pub const MIN_SPOT_PRICE: u128 = CENT / 2;
+    pub const MIN_SPOT_PRICE: u128 = CENT_BASE / 2;
     /// The maximum value the spot price is allowed to take in a combinatorial market.
-    pub const COMBO_MAX_SPOT_PRICE: u128 = BASE - CENT / 10;
+    pub const COMBO_MAX_SPOT_PRICE: u128 = BASE - CENT_BASE / 10;
     /// The minimum value the spot price is allowed to take in a combinatorial market.
-    pub const COMBO_MIN_SPOT_PRICE: u128 = CENT / 10;
+    pub const COMBO_MIN_SPOT_PRICE: u128 = CENT_BASE / 10;
     /// The minimum vallowed value of a pool's liquidity parameter.
     pub(crate) const MIN_LIQUIDITY: u128 = BASE;
     /// The minimum percentage each new LP position must increase the liquidity by, represented as
@@ -179,6 +187,12 @@ mod pallet {
 
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
+        /// The overarching call type.
+        type RuntimeCall: Parameter
+            + Dispatchable<RuntimeOrigin = <Self as frame_system::Config>::RuntimeOrigin>
+            + IsSubType<Call<Self>>
+            + From<Call<Self>>;
+
         type WeightInfo: WeightInfoZeitgeist;
 
         /// The maximum allowed liquidity tree depth per pool. Each pool can support
@@ -195,6 +209,29 @@ mod pallet {
 
         #[pallet::constant]
         type PalletId: Get<PalletId>;
+
+        #[pallet::constant]
+        type SignedTxLifetime: Get<u32>;
+
+        type Public: IdentifyAccount<AccountId = Self::AccountId>;
+
+        #[cfg(not(feature = "runtime-benchmarks"))]
+        type Signature: Verify<Signer = Self::Public> + Member + Decode + Encode + TypeInfo;
+
+        #[cfg(feature = "runtime-benchmarks")]
+        type Signature: Verify<Signer = Self::Public>
+            + Member
+            + Decode
+            + Encode
+            + TypeInfo
+            + From<sp_core::sr25519::Signature>;
+
+        type PalletAdminGetter: PalletAdminGetter<AccountId = Self::AccountId>;
+
+        type OnLiquidityProvided: OnLiquidityProvided<
+            AccountId = Self::AccountId,
+            MarketId = MarketIdOf<Self>,
+        >;
     }
 
     #[pallet::pallet]
@@ -210,6 +247,32 @@ mod pallet {
     #[pallet::storage]
     pub(crate) type MarketIdToPoolId<T: Config> =
         StorageMap<_, Twox64Concat, MarketIdOf<T>, T::PoolId>;
+
+    /// The account that receives the early exit fee
+    #[pallet::storage]
+    pub type EarlyExitFeeAccount<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
+
+    /// The amount of additional swap fee to be paid
+    #[pallet::storage]
+    pub type AdditionalSwapFee<T: Config> = StorageValue<_, BalanceOf<T>, OptionQuery>;
+
+    #[pallet::genesis_config]
+    pub struct GenesisConfig<T: Config> {
+        pub additional_swap_fee: BalanceOf<T>,
+    }
+
+    impl<T: Config> Default for GenesisConfig<T> {
+        fn default() -> Self {
+            Self { additional_swap_fee: 0u128.saturated_into() }
+        }
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            AdditionalSwapFee::<T>::set(Some(self.additional_swap_fee.clone()));
+        }
+    }
 
     #[pallet::event]
     #[pallet::generate_deposit(fn deposit_event)]
@@ -307,6 +370,10 @@ mod pallet {
             pool_shares_amount: BalanceOf<T>,
             swap_fee: BalanceOf<T>,
         },
+        /// A fee for the additional swap fee was set.
+        AdditionalSwapFeeSet { new_fee: BalanceOf<T> },
+        /// The account that receives the early exit fee was set.
+        EarlyExitFeeAccountSet { new_account: T::AccountId },
     }
 
     #[pallet::error]
@@ -367,8 +434,8 @@ mod pallet {
         /// Narrowing type conversion occurred.
         NarrowingConversion,
 
-        /// The buy/sell/keep partition specified is empty, or contains overlaps or assets that don't
-        /// belong to the market.
+        /// The buy/sell/keep partition specified is empty, or contains overlaps or assets that
+        /// don't belong to the market.
         InvalidPartition,
 
         /// The `amount_keep` parameter must be zero if `keep` is empty and less than `amount_buy`
@@ -387,6 +454,18 @@ mod pallet {
 
         /// This function is not allowed to be called for this type of pool.
         InvalidPoolType,
+        /// The sender is not the signer of the transaction
+        SenderIsNotSigner,
+        /// Signed transaction has failed validation
+        UnauthorizedSignedTransaction,
+        /// The signed transaction has expired
+        SignedTransactionExpired,
+        /// Early exit fee account must be set before using it
+        EarlyExitFeeAccountNotSet,
+        /// Additional swap fee must be set before using it
+        AdditionalSwapFeeNotSet,
+        /// The user is not the pallet admin
+        SenderNotMarketAdmin,
     }
 
     #[derive(Decode, Encode, Eq, PartialEq, PalletError, RuntimeDebug, TypeInfo)]
@@ -458,9 +537,9 @@ mod pallet {
 
         /// Sell outcome tokens to the specified market.
         ///
-        /// The `amount_in` is paid in outcome tokens. The transaction fails if the amount of outcome
-        /// tokens received is smaller than `min_amount_out`. The user must correctly specify the
-        /// number of outcomes for benchmarking reasons.
+        /// The `amount_in` is paid in outcome tokens. The transaction fails if the amount of
+        /// outcome tokens received is smaller than `min_amount_out`. The user must
+        /// correctly specify the number of outcomes for benchmarking reasons.
         ///
         /// The `amount_in` parameter must also satisfy lower and upper limits due to numerical
         /// constraints. In fact, the following must hold:
@@ -509,9 +588,9 @@ mod pallet {
         /// Join the liquidity pool for the specified market.
         ///
         /// The LP receives pool shares in exchange for staking outcome tokens into the pool. The
-        /// `max_amounts_in` vector specifies the maximum number of each outcome token that the LP is
-        /// willing to deposit. These amounts are used to adjust the outcome balances in the pool
-        /// according to the new proportion of pool shares owned by the LP.
+        /// `max_amounts_in` vector specifies the maximum number of each outcome token that the LP
+        /// is willing to deposit. These amounts are used to adjust the outcome balances in
+        /// the pool according to the new proportion of pool shares owned by the LP.
         ///
         /// Note that the user must acquire the outcome tokens in a separate transaction, either by
         /// buying from the pool or by using complete set operations.
@@ -870,6 +949,158 @@ mod pallet {
 
             Self::do_deploy_combinatorial_pool(who, market_ids, amount, spot_prices, swap_fee, fuel)
         }
+
+        // Additional extrinsics for signed transactions
+        // TODO update weight
+        #[pallet::call_index(30)]
+        #[pallet::weight(T::WeightInfo::signed_join(max_amounts_in.len().saturated_into()))]
+        #[transactional]
+        pub fn signed_join(
+            origin: OriginFor<T>,
+            proof: Proof<T::Signature, T::AccountId>,
+            #[pallet::compact] market_id: MarketIdOf<T>,
+            #[pallet::compact] pool_shares_amount: BalanceOf<T>,
+            max_amounts_in: Vec<BalanceOf<T>>,
+            block_number: BlockNumberFor<T>,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
+            ensure!(
+                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
+                    frame_system::Pallet::<T>::block_number(),
+                Error::<T>::SignedTransactionExpired
+            );
+
+            let encoded_payload = Self::encode_signed_join_params(
+                &proof.relayer,
+                &market_id,
+                &pool_shares_amount,
+                &max_amounts_in,
+                &block_number,
+            );
+
+            ensure!(
+                verify_signature::<T::Signature, T::AccountId>(&proof, &encoded_payload).is_ok(),
+                Error::<T>::UnauthorizedSignedTransaction
+            );
+
+            let asset_count = T::MarketCommons::market(&market_id)?.outcomes();
+            let asset_count_usize: usize = asset_count.into();
+            // Ensure that the conversion in the weight calculation doesn't saturate.
+            let _: u32 =
+                max_amounts_in.len().try_into().map_err(|_| Error::<T>::NarrowingConversion)?;
+            ensure!(max_amounts_in.len() == asset_count_usize, Error::<T>::IncorrectVecLen);
+
+            Self::do_join(who.clone(), market_id, pool_shares_amount, max_amounts_in)?;
+
+            Ok(().into())
+        }
+
+        // TODO update weight
+        #[pallet::call_index(31)]
+        #[pallet::weight(T::WeightInfo::signed_withdraw_fees())]
+        #[transactional]
+        pub fn signed_withdraw_fees(
+            origin: OriginFor<T>,
+            proof: Proof<T::Signature, T::AccountId>,
+            #[pallet::compact] market_id: MarketIdOf<T>,
+            block_number: BlockNumberFor<T>,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
+            ensure!(
+                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
+                    frame_system::Pallet::<T>::block_number(),
+                Error::<T>::SignedTransactionExpired
+            );
+
+            let encoded_payload =
+                Self::encode_signed_withdraw_fees_params(&proof.relayer, &market_id, &block_number);
+
+            ensure!(
+                verify_signature::<T::Signature, T::AccountId>(&proof, &encoded_payload).is_ok(),
+                Error::<T>::UnauthorizedSignedTransaction
+            );
+
+            Self::do_withdraw_fees(who, market_id)?;
+
+            // TODO return weight
+            Ok(().into())
+        }
+
+        // TODO update weight
+        #[pallet::call_index(32)]
+        #[pallet::weight(T::WeightInfo::signed_exit(min_amounts_out.len().saturated_into()))]
+        #[transactional]
+        pub fn signed_exit(
+            origin: OriginFor<T>,
+            proof: Proof<T::Signature, T::AccountId>,
+            #[pallet::compact] market_id: MarketIdOf<T>,
+            #[pallet::compact] pool_shares_amount_out: BalanceOf<T>,
+            min_amounts_out: Vec<BalanceOf<T>>,
+            block_number: BlockNumberFor<T>,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
+
+            ensure!(
+                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
+                    frame_system::Pallet::<T>::block_number(),
+                Error::<T>::SignedTransactionExpired
+            );
+
+            let encoded_payload = Self::encode_signed_exit_params(
+                &proof.relayer,
+                &market_id,
+                &pool_shares_amount_out,
+                &min_amounts_out,
+                &block_number,
+            );
+
+            ensure!(
+                verify_signature::<T::Signature, T::AccountId>(&proof, &encoded_payload).is_ok(),
+                Error::<T>::UnauthorizedSignedTransaction
+            );
+
+            let asset_count = T::MarketCommons::market(&market_id)?.outcomes();
+            let asset_count_u32: u32 = asset_count.into();
+            let min_amounts_out_len: u32 =
+                min_amounts_out.len().try_into().map_err(|_| Error::<T>::NarrowingConversion)?;
+            ensure!(min_amounts_out_len == asset_count_u32, Error::<T>::IncorrectVecLen);
+            Self::do_exit(who, market_id, pool_shares_amount_out, min_amounts_out)?;
+
+            // TODO return weight
+            Ok(().into())
+        }
+
+        #[pallet::call_index(33)]
+        #[pallet::weight(T::WeightInfo::set_early_exit_fee_account())]
+        #[transactional]
+        pub fn set_early_exit_fee_account(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(who == T::PalletAdminGetter::get_admin()?, Error::<T>::SenderNotMarketAdmin);
+
+            <EarlyExitFeeAccount<T>>::mutate(|a| *a = Some(account.clone()));
+            Self::deposit_event(Event::EarlyExitFeeAccountSet { new_account: account });
+
+            Ok(())
+        }
+
+        #[pallet::call_index(10)]
+        #[pallet::weight(T::WeightInfo::set_additional_swap_fee())]
+        #[transactional]
+        pub fn set_additional_swap_fee(origin: OriginFor<T>, fee: BalanceOf<T>) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(who == T::PalletAdminGetter::get_admin()?, Error::<T>::SenderNotMarketAdmin);
+
+            <AdditionalSwapFee<T>>::mutate(|f| *f = Some(fee));
+            Self::deposit_event(Event::AdditionalSwapFeeSet { new_fee: fee });
+
+            Ok(())
+        }
     }
 
     impl<T: Config> Pallet<T> {
@@ -901,8 +1132,8 @@ mod pallet {
                     Error::<T>::NumericalLimits(NumericalLimitsError::MaxAmountExceeded),
                 );
                 ensure!(
-                    pool.calculate_buy_ln_argument(asset_out, amount_in_minus_fees)?
-                        >= LN_NUMERICAL_LIMIT.saturated_into(),
+                    pool.calculate_buy_ln_argument(asset_out, amount_in_minus_fees)? >=
+                        LN_NUMERICAL_LIMIT.saturated_into(),
                     Error::<T>::NumericalLimits(NumericalLimitsError::MinAmountNotMet),
                 );
                 let buy = vec![asset_out];
@@ -1102,6 +1333,9 @@ mod pallet {
                     BenchmarkInfo::Reassigned => T::WeightInfo::join_reassigned(asset_count_u32),
                     BenchmarkInfo::Leaf => T::WeightInfo::join_leaf(asset_count_u32),
                 };
+                // Notify other pallets that liquidity has been provided.
+                T::OnLiquidityProvided::on_liquidity_provided(&pool_id, &who);
+
                 Ok(weight)
             })?;
             Ok((Some(weight)).into())
@@ -1121,7 +1355,7 @@ mod pallet {
                     let mut ratio = pool_shares_amount
                         .bdiv_floor(pool.liquidity_shares_manager.total_shares()?)?;
                     if pool.is_active()? {
-                        let multiplier = ZeitgeistBase::<BalanceOf<T>>::get()?
+                        let multiplier = PredictionMarketBase::<BalanceOf<T>>::get()?
                             .checked_sub_res(&EXIT_FEE.saturated_into())?;
                         ratio = ratio.bmul_floor(multiplier)?;
                     }
@@ -1145,9 +1379,17 @@ mod pallet {
                         T::MultiCurrency::withdraw(asset, &pool.account_id, remaining)?;
                         Ok(())
                     };
-                    // TODO(#1220): We will withdraw all remaining funds (the "buffer"). This is an
-                    // ugly hack and frame_system should offer the option to whitelist accounts.
-                    withdraw_remaining(&pool.collateral)?;
+
+                    // Transfer any remaining base assets to the designated account.
+                    let remaining =
+                        T::MultiCurrency::free_balance(pool.collateral, &pool.account_id);
+                    T::MultiCurrency::transfer(
+                        pool.collateral,
+                        &pool.account_id,
+                        &Self::early_exit_account()?,
+                        remaining,
+                    )?;
+
                     // Clear left-over tokens. These naturally occur in the form of exit fees.
                     for asset in pool.assets().iter() {
                         withdraw_remaining(asset)?;
@@ -1176,8 +1418,8 @@ mod pallet {
                         let remaining_pool_shares_ratio = remaining_pool_shares_amount
                             .bdiv_floor(pool.liquidity_shares_manager.total_shares()?)?;
                         ensure!(
-                            remaining_pool_shares_ratio
-                                >= MIN_RELATIVE_LP_POSITION_VALUE.saturated_into(),
+                            remaining_pool_shares_ratio >=
+                                MIN_RELATIVE_LP_POSITION_VALUE.saturated_into(),
                             Error::<T>::MinRelativeLiquidityThresholdViolated
                         );
                     }
@@ -1239,8 +1481,8 @@ mod pallet {
             ensure!(
                 spot_prices
                     .iter()
-                    .fold(Zero::zero(), |acc: BalanceOf<T>, &val| acc.saturating_add(val))
-                    == BASE.saturated_into(),
+                    .fold(Zero::zero(), |acc: BalanceOf<T>, &val| acc.saturating_add(val)) ==
+                    BASE.saturated_into(),
                 Error::<T>::InvalidSpotPrices
             );
             for &p in spot_prices.iter() {
@@ -1287,6 +1529,10 @@ mod pallet {
             )?;
             let _ = <Self as PoolStorage>::add(pool)?;
             MarketIdToPoolId::<T>::insert(market_id, pool_id);
+
+            // Notify other pallets that liquidity has been provided.
+            T::OnLiquidityProvided::on_liquidity_provided(&market_id, &who);
+
             Self::deposit_event(Event::<T>::PoolDeployed {
                 who,
                 market_id,
@@ -1320,8 +1566,8 @@ mod pallet {
             ensure!(
                 spot_prices
                     .iter()
-                    .fold(Zero::zero(), |acc: BalanceOf<T>, &val| acc.saturating_add(val))
-                    == BASE.saturated_into(),
+                    .fold(Zero::zero(), |acc: BalanceOf<T>, &val| acc.saturating_add(val)) ==
+                    BASE.saturated_into(),
                 Error::<T>::InvalidSpotPrices
             );
             for &p in spot_prices.iter() {
@@ -1638,6 +1884,14 @@ mod pallet {
             Ok(pool.assets.into_inner())
         }
 
+        pub fn early_exit_account() -> Result<T::AccountId, Error<T>> {
+            Ok(<EarlyExitFeeAccount<T>>::get().ok_or(Error::<T>::EarlyExitFeeAccountNotSet)?)
+        }
+
+        pub fn additional_swap_fee() -> Result<BalanceOf<T>, Error<T>> {
+            Ok(<AdditionalSwapFee<T>>::get().ok_or(Error::<T>::AdditionalSwapFeeNotSet)?)
+        }
+
         /// Distribute swap fees and external fees and returns the remaining amount.
         ///
         /// # Arguments
@@ -1742,7 +1996,7 @@ mod pallet {
 
                     for parent_collection_id in collection_ids.iter() {
                         if split_count > total_splits {
-                            return Err(Error::<T>::Unexpected.into());
+                            return Err(Error::<T>::Unexpected.into())
                         }
 
                         let split_position_info = T::CombinatorialTokens::split_position(
@@ -1807,19 +2061,10 @@ mod pallet {
             amount: BalanceOf<T>,
             fee_fractional: BalanceOf<T>,
         ) -> Result<BalanceOf<T>, DispatchError> {
-            let fee_divisor = ZeitgeistBase::<BalanceOf<T>>::get()?
+            let fee_divisor = PredictionMarketBase::<BalanceOf<T>>::get()?
                 .checked_sub(&fee_fractional)
                 .ok_or(Error::<T>::Unexpected)?;
             amount.bdiv(fee_divisor)
-        }
-
-        fn total_fee_fractional(
-            swap_fee: BalanceOf<T>,
-            external_fee_percentage: Perbill,
-        ) -> Result<BalanceOf<T>, DispatchError> {
-            let external_fee_fractional =
-                external_fee_percentage.mul_floor(ZeitgeistBase::<BalanceOf<T>>::get()?);
-            swap_fee.checked_add_res(&external_fee_fractional)
         }
 
         fn match_failure(error: DispatchError) -> ApiError<AmmSoftFail> {
@@ -1831,10 +2076,10 @@ mod pallet {
                 Error::<T>::NumericalLimits(NumericalLimitsError::MaxAmountExceeded).into();
             let min_amount_not_met: DispatchError =
                 Error::<T>::NumericalLimits(NumericalLimitsError::MinAmountNotMet).into();
-            if spot_price_too_low == error
-                || spot_price_slipped_too_low == error
-                || max_amount_exceeded == error
-                || min_amount_not_met == error
+            if spot_price_too_low == error ||
+                spot_price_slipped_too_low == error ||
+                max_amount_exceeded == error ||
+                min_amount_not_met == error
             {
                 ApiError::SoftFailure(AmmSoftFail::Numerical)
             } else {
@@ -1871,10 +2116,8 @@ mod pallet {
         ) -> Result<Self::Balance, DispatchError> {
             let pool = <Self as PoolStorage>::get(market_id)?;
             let buy_amount = pool.calculate_buy_amount_until(asset, until)?;
-            let total_fee_fractional = Self::total_fee_fractional(
-                pool.swap_fee,
-                T::ExternalFees::fee_percentage(market_id),
-            )?;
+            let total_fee_fractional =
+                pool.swap_fee.checked_add_res(&Self::additional_swap_fee()?)?;
             let buy_amount_plus_fees =
                 Self::amount_including_fee_surplus(buy_amount, total_fee_fractional)?;
             Ok(buy_amount_plus_fees)
@@ -1909,6 +2152,109 @@ mod pallet {
         ) -> Result<AmmTradeOf<T>, ApiError<AmmSoftFail>> {
             Self::do_sell(who, market_id, asset_out, amount_in, min_amount_out)
                 .map_err(Self::match_failure)
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        pub fn encode_signed_join_params(
+            relayer: &T::AccountId,
+            market_id: &MarketIdOf<T>,
+            pool_shares: &BalanceOf<T>,
+            max_amounts_in: &Vec<BalanceOf<T>>,
+            block_number: &BlockNumberFor<T>,
+        ) -> Vec<u8> {
+            (JOIN_CONTEXT, relayer, market_id, pool_shares, max_amounts_in, block_number).encode()
+        }
+
+        pub fn encode_signed_withdraw_fees_params(
+            relayer: &T::AccountId,
+            market_id: &MarketIdOf<T>,
+            block_number: &BlockNumberFor<T>,
+        ) -> Vec<u8> {
+            (WITHDRAW_FEES_CONTEXT, relayer, market_id, block_number).encode()
+        }
+
+        pub fn encode_signed_exit_params(
+            relayer: &T::AccountId,
+            market_id: &MarketIdOf<T>,
+            pool_shares: &BalanceOf<T>,
+            min_amounts_out: &Vec<BalanceOf<T>>,
+            block_number: &BlockNumberFor<T>,
+        ) -> Vec<u8> {
+            (EXIT_CONTEXT, relayer, market_id, pool_shares, min_amounts_out, block_number).encode()
+        }
+
+        pub fn get_encoded_call_param(
+            call: &<T as Config>::RuntimeCall,
+        ) -> Option<(&Proof<T::Signature, T::AccountId>, Vec<u8>)> {
+            let call = match call.is_sub_type() {
+                Some(call) => call,
+                None => return None,
+            };
+
+            match call {
+                Call::signed_join {
+                    ref proof,
+                    ref market_id,
+                    ref pool_shares_amount,
+                    ref max_amounts_in,
+                    ref block_number,
+                } => {
+                    let encoded_data = Self::encode_signed_join_params(
+                        &proof.relayer,
+                        market_id,
+                        pool_shares_amount,
+                        max_amounts_in,
+                        block_number,
+                    );
+
+                    Some((proof, encoded_data))
+                },
+                Call::signed_exit {
+                    ref proof,
+                    ref market_id,
+                    ref pool_shares_amount_out,
+                    ref min_amounts_out,
+                    ref block_number,
+                } => {
+                    let encoded_data = Self::encode_signed_exit_params(
+                        &proof.relayer,
+                        market_id,
+                        pool_shares_amount_out,
+                        min_amounts_out,
+                        block_number,
+                    );
+
+                    Some((proof, encoded_data))
+                },
+                Call::signed_withdraw_fees { ref proof, ref market_id, ref block_number } => {
+                    let encoded_data = Self::encode_signed_withdraw_fees_params(
+                        &proof.relayer,
+                        market_id,
+                        block_number,
+                    );
+
+                    Some((proof, encoded_data))
+                },
+
+                _ => None,
+            }
+        }
+    }
+
+    impl<T: Config> InnerCallValidator for Pallet<T> {
+        type Call = <T as Config>::RuntimeCall;
+
+        fn signature_is_valid(call: &Box<Self::Call>) -> bool {
+            if let Some((proof, signed_payload)) = Self::get_encoded_call_param(call) {
+                return verify_signature::<T::Signature, T::AccountId>(
+                    &proof,
+                    &signed_payload.as_slice(),
+                )
+                .is_ok()
+            }
+
+            return false
         }
     }
 }

@@ -18,9 +18,9 @@
 use crate::{BalanceOf, Config};
 use frame_system::pallet_prelude::BlockNumberFor;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use prediction_market_primitives::math::fixed::FixedDiv;
 use scale_info::TypeInfo;
 use sp_runtime::{traits::Zero, Saturating};
-use zeitgeist_primitives::math::fixed::FixedDiv;
 
 /// Records until the end of time.
 #[derive(Clone, Debug, Decode, Encode, Eq, MaxEncodedLen, PartialEq, TypeInfo)]
@@ -76,7 +76,7 @@ where
         negative_outcome_price: BalanceOf<T>,
     ) {
         if now < self.start {
-            return;
+            return
         }
 
         // Saturation is fine as that just means that the negative outcome is more valuable than the
@@ -107,7 +107,7 @@ where
     /// Skips update on this block and awards a point to the negative outcome.
     pub fn skip_update(&mut self, now: BlockNumberFor<T>) {
         if now < self.start {
-            return;
+            return
         }
 
         // Saturation is fine as that would mean the oracle has been collecting data for

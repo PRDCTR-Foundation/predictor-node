@@ -35,14 +35,14 @@ use frame_support::{
     CloneNoBound, PartialEqNoBound,
 };
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use prediction_market_primitives::math::{
+    checked_ops_res::{CheckedAddRes, CheckedMulRes, CheckedSubRes},
+    fixed::FixedMulDiv,
+};
 use scale_info::TypeInfo;
 use sp_runtime::{
     traits::{AtLeast32BitUnsigned, CheckedSub, Zero},
     DispatchError, DispatchResult,
-};
-use zeitgeist_primitives::math::{
-    checked_ops_res::{CheckedAddRes, CheckedMulRes, CheckedSubRes},
-    fixed::FixedMulDiv,
 };
 
 /// A segment tree used to track balances of liquidity shares which allows `O(log(n))` distribution
@@ -169,7 +169,7 @@ where
                     .map_err(|_| StorageOverflowError::Nodes.into_dispatch_error::<T>())?;
                 (index, BenchmarkInfo::Leaf)
             } else {
-                return Err(LiquidityTreeError::TreeIsFull.into_dispatch_error::<T>());
+                return Err(LiquidityTreeError::TreeIsFull.into_dispatch_error::<T>())
             };
             self.account_to_index
                 .try_insert(who.clone(), index)
@@ -269,7 +269,7 @@ where
     fn propagate_fees(&mut self, index: u32) -> DispatchResult {
         let node = self.get_node(index)?;
         if node.total_stake()? == Zero::zero() {
-            return Ok(()); // Don't propagate if there are no LPs under this node.
+            return Ok(()) // Don't propagate if there are no LPs under this node.
         }
         if node.is_weak_leaf() {
             self.mutate_node(index, |node| {
@@ -374,12 +374,10 @@ where
         for &i in self.path_to_node(index, None)?.iter() {
             let node = self.get_node_mut(i)?;
             match op {
-                UpdateDescendantStakeOperation::Add => {
-                    node.descendant_stake = node.descendant_stake.checked_add_res(&delta)?
-                }
-                UpdateDescendantStakeOperation::Sub => {
-                    node.descendant_stake = node.descendant_stake.checked_sub_res(&delta)?
-                }
+                UpdateDescendantStakeOperation::Add =>
+                    node.descendant_stake = node.descendant_stake.checked_add_res(&delta)?,
+                UpdateDescendantStakeOperation::Sub =>
+                    node.descendant_stake = node.descendant_stake.checked_sub_res(&delta)?,
             }
         }
         Ok(())

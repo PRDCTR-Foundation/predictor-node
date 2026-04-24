@@ -16,12 +16,10 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::math::transcendental::exp;
+use common_primitives::constants::currency::DECIMALS;
 use fixed::FixedU128;
+use prediction_market_primitives::math::fixed::{IntoFixedDecimal, IntoFixedFromDecimal};
 use typenum::U80;
-use zeitgeist_primitives::{
-    constants::DECIMALS,
-    math::fixed::{IntoFixedDecimal, IntoFixedFromDecimal},
-};
 
 type Fractional = U80;
 pub(crate) type FixedType = FixedU128<Fractional>;

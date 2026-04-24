@@ -18,8 +18,8 @@
 #![cfg(all(feature = "mock", test))]
 
 use crate::{BalanceOf, Config, MIN_SPOT_PRICE};
+use prediction_market_primitives::math::fixed::{BaseProvider, PredictionMarketBase};
 use sp_runtime::SaturatedConversion;
-use zeitgeist_primitives::math::fixed::{BaseProvider, ZeitgeistBase};
 
 pub(crate) fn create_spot_prices<T>(asset_count: u16) -> Vec<BalanceOf<T>>
 where
@@ -28,7 +28,7 @@ where
     let mut result = vec![MIN_SPOT_PRICE.saturated_into(); (asset_count - 1) as usize];
     // Price distribution has no bearing on the benchmarks.
     let remaining_u128 =
-        ZeitgeistBase::<u128>::get().unwrap() - (asset_count - 1) as u128 * MIN_SPOT_PRICE;
+        PredictionMarketBase::<u128>::get().unwrap() - (asset_count - 1) as u128 * MIN_SPOT_PRICE;
     result.push(remaining_u128.saturated_into());
     result
 }

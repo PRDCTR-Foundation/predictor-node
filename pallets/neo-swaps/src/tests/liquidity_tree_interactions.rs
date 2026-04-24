@@ -23,12 +23,12 @@ fn withdraw_fees_interacts_correctly_with_join() {
         let category_count = 2;
         let spot_prices = vec![_3_4, _1_4];
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(category_count),
             _10,
             spot_prices.clone(),
-            CENT,
+            CENT_BASE,
         );
 
         // Mock up some fees.
@@ -40,19 +40,19 @@ fn withdraw_fees_interacts_correctly_with_join() {
 
         // Bob joins the pool after fees are distributed.
         let join_amount = _10;
-        deposit_complete_set(market_id, BOB, join_amount + CENT);
+        deposit_complete_set(market_id, bob(), join_amount + CENT_BASE);
         assert_ok!(NeoSwaps::join(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             market_id,
             join_amount,
             vec![u128::MAX; category_count as usize],
         ));
 
         // Alice withdraws and should receive all fees.
-        let old_balance = <Runtime as Config>::MultiCurrency::free_balance(BASE_ASSET, &ALICE);
-        assert_ok!(NeoSwaps::withdraw_fees(RuntimeOrigin::signed(ALICE), market_id));
-        assert_balance!(ALICE, BASE_ASSET, old_balance + fee_amount);
-        assert_ok!(NeoSwaps::withdraw_fees(RuntimeOrigin::signed(BOB), market_id));
-        assert_balance!(BOB, BASE_ASSET, 0);
+        let old_balance = <Runtime as Config>::MultiCurrency::free_balance(BASE_ASSET, &alice());
+        assert_ok!(NeoSwaps::withdraw_fees(RuntimeOrigin::signed(alice()), market_id));
+        assert_balance!(alice(), BASE_ASSET, old_balance + fee_amount);
+        assert_ok!(NeoSwaps::withdraw_fees(RuntimeOrigin::signed(bob()), market_id));
+        assert_balance!(bob(), BASE_ASSET, 0);
     });
 }

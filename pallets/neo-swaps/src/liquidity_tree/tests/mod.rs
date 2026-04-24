@@ -29,9 +29,9 @@ use crate::{
 };
 use alloc::collections::BTreeMap;
 use frame_support::assert_err;
+use prediction_market_primitives::constants::base_multiples::*;
+pub use prediction_market_primitives::test_helper::get_account;
 use sp_runtime::traits::Zero;
-use zeitgeist_primitives::constants::base_multiples::*;
-
 mod deposit_fees;
 mod exit;
 mod join;
@@ -57,7 +57,7 @@ mod utility {
     ///                      (None, 0, 0, _20, _4)           (9, _3, _5, 0, 0)
     ///                          /         \                          /         \
     ///        (5, _3, _1, _12, _3)    (7, _1, _1, _4, _3)  (None, 0, 0, 0, 0)  (None, 0, 0, 0, 0)
-    ///              /       \                   /       
+    ///              /       \                   /
     /// (6, _12, _1, 0, _3)  (None, 0, 0, 0, 0)  (8, _4, _1, 0, 0)
     ///
     /// This tree is used in most tests, but will sometime have to be modified.
@@ -66,7 +66,7 @@ mod utility {
             nodes: vec![
                 // Root
                 Node::<Runtime> {
-                    account: Some(3),
+                    account: Some(get_account(3)),
                     stake: _1,
                     fees: _2,
                     descendant_stake: _23,
@@ -81,7 +81,7 @@ mod utility {
                     lazy_fees: _4,
                 },
                 Node::<Runtime> {
-                    account: Some(9),
+                    account: Some(get_account(9)),
                     stake: _3,
                     fees: _5,
                     descendant_stake: Zero::zero(),
@@ -89,14 +89,14 @@ mod utility {
                 },
                 // Depth 2
                 Node::<Runtime> {
-                    account: Some(5),
+                    account: Some(get_account(5)),
                     stake: _3,
                     fees: _1,
                     descendant_stake: _12,
                     lazy_fees: _3,
                 },
                 Node::<Runtime> {
-                    account: Some(7),
+                    account: Some(get_account(7)),
                     stake: _1,
                     fees: _1,
                     descendant_stake: _4,
@@ -118,7 +118,7 @@ mod utility {
                 },
                 // Depth 3
                 Node::<Runtime> {
-                    account: Some(6),
+                    account: Some(get_account(6)),
                     stake: _12,
                     fees: _1,
                     descendant_stake: Zero::zero(),
@@ -132,7 +132,7 @@ mod utility {
                     lazy_fees: Zero::zero(),
                 },
                 Node::<Runtime> {
-                    account: Some(8),
+                    account: Some(get_account(8)),
                     stake: _4,
                     fees: _1,
                     descendant_stake: Zero::zero(),
@@ -141,7 +141,7 @@ mod utility {
             ]
             .try_into()
             .unwrap(),
-            account_to_index: create_b_tree_map!({3 => 0, 9 => 2, 5 => 3, 7 => 4, 6 => 7, 8 => 9})
+            account_to_index: create_b_tree_map!({get_account(3) => 0, get_account(9) => 2, get_account(5) => 3, get_account(7) => 4, get_account(6) => 7, get_account(8) => 9})
                 .try_into()
                 .unwrap(),
             abandoned_nodes: vec![1, 5, 6, 8].try_into().unwrap(),
@@ -149,16 +149,21 @@ mod utility {
     }
 
     /// Create a full tree. All nodes have the same stake of 1.
+    /// Do not use get_account_from_seed because the tests manipulate account_to_index using
+    /// accounts created by `get_account`
     pub(super) fn create_full_tree() -> LiquidityTreeOf<Runtime> {
         let max_depth = LiquidityTreeOf::<Runtime>::max_depth();
         let node_count = LiquidityTreeOf::<Runtime>::max_node_count();
         let nodes = (0..node_count)
-            .map(|a| Node::<Runtime>::new(a as u128, 1))
+            .map(|a| Node::<Runtime>::new(get_account(a.try_into().unwrap()), 1))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap();
-        let account_to_index =
-            (0..node_count).map(|a| (a as u128, a)).collect::<BTreeMap<_, _>>().try_into().unwrap();
+        let account_to_index = (0..node_count)
+            .map(|a| (get_account(a.try_into().unwrap()), a))
+            .collect::<BTreeMap<_, _>>()
+            .try_into()
+            .unwrap();
         let mut tree = LiquidityTreeOf::<Runtime> {
             nodes,
             account_to_index,

@@ -11,13 +11,14 @@ parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
 typenum = { workspace = true }
-zeitgeist-primitives = { workspace = true }
-zrml-market-commons = { workspace = true }
+prediction-market-primitives = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
+sp-avn-common = { workspace = true }
 
 # Mock
 
 env_logger = { workspace = true, optional = true }
-orml-asset-registry = { workspace = true, optional = true }
+pallet-pm-eth-asset-registry = { workspace = true, optional = true }
 orml-currencies = { workspace = true, optional = true }
 orml-tokens = { workspace = true, optional = true }
 pallet-balances = { workspace = true, optional = true }
@@ -25,23 +26,29 @@ pallet-insecure-randomness-collective-flip = { workspace = true, optional = true
 pallet-timestamp = { workspace = true, optional = true }
 pallet-treasury = { workspace = true, optional = true }
 pallet-xcm = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }   
 sp-api = { workspace = true, optional = true }
-sp-core = { workspace = true, optional = true }
 sp-io = { workspace = true, optional = true }
 xcm = { workspace = true, optional = true }
 xcm-builder = { workspace = true, optional = true }
-zrml-authorized = { workspace = true, optional = true }
-zrml-combinatorial-tokens = { workspace = true, optional = true }
-zrml-court = { workspace = true, optional = true }
-zrml-global-disputes = { workspace = true, optional = true }
-zrml-prediction-markets = { workspace = true, optional = true }
-zrml-prediction-markets-runtime-api = { workspace = true, optional = true }
+sp-core = { workspace = true }
+pallet-pm-authorized = { workspace = true, optional = true }
+pallet-pm-court = { workspace = true, optional = true }
+pallet-pm-combinatorial-tokens = { workspace = true, optional = true }
+pallet-pm-global-disputes = { workspace = true, optional = true }
+pallet-prediction-markets = { workspace = true, optional = true }
+pallet-prediction-markets-runtime-api = { workspace = true, optional = true }
+common-primitives = { workspace = true }
+pallet-avn = { workspace = true }
+sp-keystore = { workspace = true, optional = true }
 
 [dev-dependencies]
+pallet-avn-proxy = { workspace = true }
 more-asserts = { workspace = true }
 test-case = { workspace = true }
-zrml-neo-swaps = { workspace = true, features = ["mock"] }
+pallet-pm-neo-swaps = { workspace = true, features = ["mock"] }
+sp-keystore = { workspace = true, features = ["default"]}
+sp-avn-common = { workspace = true, features=["test-utils"] }
 
 [features]
 default = ["std"]
@@ -54,10 +61,10 @@ mock = [
     "pallet-treasury/default",
     "sp-api/default",
     "sp-io/default",
-    "zeitgeist-primitives/mock",
-    "zrml-prediction-markets-runtime-api/default",
-    "xcm/default",
-    "orml-asset-registry/default",
+    "sp-keystore/default",
+    "prediction-market-primitives/mock",
+    "pallet-prediction-markets-runtime-api/default",
+    "pallet-pm-eth-asset-registry/default",
     "orml-currencies/default",
     "orml-tokens/default",
     "pallet-balances/default",
@@ -65,29 +72,29 @@ mock = [
     "sp-api/default",
     "sp-core/default",
     "sp-io/default",
-    "zrml-combinatorial-tokens/std",
-    "zrml-combinatorial-tokens/mock",
-    "zrml-combinatorial-tokens/default",
-    "zrml-court/std",
-    "zrml-authorized/std",
-    "zrml-global-disputes/std",
-    "zrml-prediction-markets/std",
-    "zrml-prediction-markets/mock",
-    "zrml-prediction-markets/default",
+    "pallet-pm-combinatorial-tokens/std",
+    "pallet-pm-combinatorial-tokens/mock",
+    "pallet-pm-combinatorial-tokens/default",
+    "pallet-pm-court/std",
+    "pallet-pm-authorized/std",
+    "pallet-pm-global-disputes/std",
+    "pallet-prediction-markets/std",
+    "pallet-prediction-markets/mock",
+    "pallet-prediction-markets/default",
     "serde/default",
     "env_logger/default",
 ]
-parachain = ["zrml-prediction-markets/parachain"]
+parachain = ["pallet-prediction-markets/parachain"]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
     "xcm-builder/runtime-benchmarks",
     "pallet-xcm/runtime-benchmarks",
-    "zrml-combinatorial-tokens/runtime-benchmarks",
-    "orml-asset-registry?/runtime-benchmarks",
+    "pallet-pm-combinatorial-tokens/runtime-benchmarks",
+    "pallet-pm-eth-asset-registry?/runtime-benchmarks",
     "pallet-treasury?/runtime-benchmarks",
-    "zrml-prediction-markets?/runtime-benchmarks",
+    "pallet-prediction-markets?/runtime-benchmarks",
 ]
 std = [
     "frame-benchmarking?/std",
@@ -95,11 +102,12 @@ std = [
     "frame-system/std",
     "orml-traits/std",
     "parity-scale-codec/std",
+    "sp-core/std",
     "sp-runtime/std",
-    "xcm-builder/std",
-    "pallet-xcm/std",
-    "zeitgeist-primitives/std",
-    "zrml-market-commons/std",
+    "sp-avn-common/std",
+    "prediction-market-primitives/std",
+    "pallet-pm-market-commons/std",
+    "pallet-avn/std"
 ]
 try-runtime = [
     "frame-support/try-runtime",
@@ -108,5 +116,6 @@ try-runtime = [
 [package]
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
 edition.workspace = true
-name = "zrml-neo-swaps"
-version = "0.6.1"
+name = "pallet-pm-neo-swaps"
+version = { workspace = true }
+

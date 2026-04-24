@@ -23,8 +23,8 @@ use crate::{
 use alloc::collections::BTreeMap;
 use test_case::test_case;
 
-#[test_case(ALICE, create_b_tree_map!({ ALICE => _14 }))]
-#[test_case(BOB, create_b_tree_map!({ ALICE => _10, BOB => _4 }))]
+#[test_case(alice(), create_b_tree_map!({ alice() => _14 }))]
+#[test_case(bob(), create_b_tree_map!({ alice() => _10, bob() => _4 }))]
 fn join_works(
     who: AccountIdOf<Runtime>,
     expected_pool_shares: BTreeMap<AccountIdOf<Runtime>, BalanceOf<Runtime>>,
@@ -32,17 +32,21 @@ fn join_works(
     ExtBuilder::default().build().execute_with(|| {
         let liquidity = _10;
         let spot_prices = vec![_1_6, _5_6 + 1];
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             liquidity,
             spot_prices.clone(),
             swap_fee,
         );
+        // Alice should be a LP because she deployed a pool
+        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &alice()), true);
+
         let pool_shares_amount = _4; // Add 40% to the pool.
         deposit_complete_set(market_id, who, pool_shares_amount);
+
         assert_ok!(NeoSwaps::join(
             RuntimeOrigin::signed(who),
             market_id,
@@ -70,6 +74,8 @@ fn join_works(
             }
             .into(),
         );
+
+        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &who), true);
     });
 }
 
@@ -78,22 +84,23 @@ fn join_fails_on_max_liquidity_providers() {
     ExtBuilder::default().build().execute_with(|| {
         let category_count = 2;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(category_count),
             _100,
             create_spot_prices::<Runtime>(category_count),
-            CENT,
+            CENT_BASE,
         );
         // Populate the tree with the maximum allowed number of LPs.
         let offset = 100;
         let max_node_count = LiquidityTreeOf::<Runtime>::max_node_count() as u128;
         let amount = _10;
         for index in 1..max_node_count {
-            let account = offset + index;
+            let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&(offset + index));
+            let account = get_account_from_seed(seed.into());
             // Adding a little more because ceil rounding may cause slightly higher prices for
             // joining.
-            deposit_complete_set(market_id, account, amount + CENT);
+            deposit_complete_set(market_id, account, amount + CENT_BASE);
             assert_ok!(NeoSwaps::join(
                 RuntimeOrigin::signed(account),
                 market_id,
@@ -101,8 +108,10 @@ fn join_fails_on_max_liquidity_providers() {
                 vec![u128::MAX; category_count as usize],
             ));
         }
-        let account = offset + max_node_count;
-        deposit_complete_set(market_id, account, amount + CENT);
+
+        let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&(offset + max_node_count));
+        let account = get_account_from_seed(seed.into());
+        deposit_complete_set(market_id, account, amount + CENT_BASE);
         assert_noop!(
             NeoSwaps::join(
                 RuntimeOrigin::signed(account),
@@ -119,15 +128,15 @@ fn join_fails_on_max_liquidity_providers() {
 fn join_fails_on_incorrect_vec_len() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         assert_noop!(
-            NeoSwaps::join(RuntimeOrigin::signed(ALICE), market_id, _1, vec![0]),
+            NeoSwaps::join(RuntimeOrigin::signed(alice()), market_id, _1, vec![0]),
             Error::<Runtime>::IncorrectVecLen
         );
     });
@@ -137,17 +146,22 @@ fn join_fails_on_incorrect_vec_len() {
 fn join_fails_on_market_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         Markets::<Runtime>::remove(market_id);
         assert_noop!(
-            NeoSwaps::join(RuntimeOrigin::signed(ALICE), market_id, _1, vec![u128::MAX, u128::MAX]),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist
+            NeoSwaps::join(
+                RuntimeOrigin::signed(alice()),
+                market_id,
+                _1,
+                vec![u128::MAX, u128::MAX]
+            ),
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist
         );
     });
 }
@@ -160,12 +174,12 @@ fn join_fails_on_market_not_found() {
 fn join_fails_on_inactive_market(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         MarketCommons::mutate_market(&market_id, |market| {
             market.status = market_status;
@@ -173,7 +187,7 @@ fn join_fails_on_inactive_market(market_status: MarketStatus) {
         })
         .unwrap();
         assert_noop!(
-            NeoSwaps::join(RuntimeOrigin::signed(BOB), market_id, _1, vec![u128::MAX, u128::MAX]),
+            NeoSwaps::join(RuntimeOrigin::signed(bob()), market_id, _1, vec![u128::MAX, u128::MAX]),
             Error::<Runtime>::MarketNotActive,
         );
     });
@@ -182,10 +196,15 @@ fn join_fails_on_inactive_market(market_status: MarketStatus) {
 #[test]
 fn join_fails_on_pool_not_found() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id = create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Scalar(0..=1),
+            ScoringRule::AmmCdaHybrid,
+        );
         assert_noop!(
             NeoSwaps::join(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 _1,
                 vec![u128::MAX, u128::MAX],
@@ -199,16 +218,16 @@ fn join_fails_on_pool_not_found() {
 fn join_fails_on_insufficient_funds() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         assert_noop!(
             NeoSwaps::join(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 _100,
                 vec![u128::MAX, u128::MAX]
@@ -222,22 +241,22 @@ fn join_fails_on_insufficient_funds() {
 fn join_fails_on_amount_in_above_max() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _20,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         let pool_shares_amount = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             pool_shares_amount,
         ));
         assert_noop!(
             NeoSwaps::join(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 pool_shares_amount,
                 vec![pool_shares_amount - 1, pool_shares_amount]
@@ -251,19 +270,19 @@ fn join_fails_on_amount_in_above_max() {
 fn join_pool_fails_on_relative_liquidity_threshold_violated() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _100,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         // Bob contributes slightly less than 1.39098411% additional liquidity; this should fail.
         let amount = 139098411 - 100;
-        deposit_complete_set(market_id, BOB, amount + CENT);
+        deposit_complete_set(market_id, bob(), amount + CENT_BASE);
         assert_noop!(
             NeoSwaps::join(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 amount,
                 vec![u128::MAX, u128::MAX],
@@ -279,16 +298,16 @@ fn join_pool_fails_on_small_amounts() {
     // funnel money from the pool.
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             100_000_000_000 * _1,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
-        deposit_complete_set(market_id, BOB, CENT);
+        deposit_complete_set(market_id, bob(), CENT_BASE);
         assert_noop!(
-            NeoSwaps::join(RuntimeOrigin::signed(BOB), market_id, 1, vec![u128::MAX, u128::MAX],),
+            NeoSwaps::join(RuntimeOrigin::signed(bob()), market_id, 1, vec![u128::MAX, u128::MAX],),
             Error::<Runtime>::MinRelativeLiquidityThresholdViolated
         );
     });

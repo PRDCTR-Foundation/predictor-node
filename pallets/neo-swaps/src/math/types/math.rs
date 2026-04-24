@@ -240,7 +240,7 @@ mod detail {
     ) -> Option<FixedType> {
         if reserve.is_zero() {
             // Ensure that if the reserve is zero, we don't accidentally return a non-zero value.
-            return None;
+            return None
         }
         let exp_neg_x_over_b: FixedType = protected_exp(amount_in.checked_div(liquidity)?, true)?;
         let exp_r_over_b = protected_exp(reserve.checked_div(liquidity)?, false)?;
@@ -269,7 +269,7 @@ mod detail {
     ) -> Option<(FixedType, Vec<FixedType>)> {
         if amount.is_zero() {
             // Ensure that if the amount is zero, we don't accidentally return meaningless results.
-            return None;
+            return None
         }
         let tmp_reserves = spot_prices
             .iter()
@@ -279,8 +279,10 @@ mod detail {
             .ok()?;
         let max_value = *tmp_reserves.iter().max()?;
         let liquidity = amount.checked_div(max_value)?;
-        let reserves: Vec<FixedType> =
-            tmp_reserves.iter().map(|&r| r.checked_mul(liquidity)).collect::<Option<Vec<_>>>()?;
+        let reserves: Vec<FixedType> = tmp_reserves
+            .iter()
+            .map(|&r| r.checked_mul(liquidity))
+            .collect::<Option<Vec<_>>>()?;
         Some((liquidity, reserves))
     }
 
@@ -297,7 +299,9 @@ mod detail {
         } else {
             FixedType::checked_from_num(0)? // Underflow to zero.
         };
-        exp_x_over_b.checked_add(exp_neg_r_over_b)?.checked_sub(FixedType::checked_from_num(1)?)
+        exp_x_over_b
+            .checked_add(exp_neg_r_over_b)?
+            .checked_sub(FixedType::checked_from_num(1)?)
     }
 
     /// Calculate `-b * ln( (1-q) / (1-p_i(r)) )` where `q = until` if `q > p_i(r)`; otherwise,
@@ -312,7 +316,7 @@ mod detail {
         let ln_arg = numerator.checked_div(denominator)?;
         let (ln_result, ln_neg) = ln(ln_arg).ok()?;
         if !ln_neg {
-            return Some(FixedType::zero());
+            return Some(FixedType::zero())
         }
         liquidity.checked_mul(ln_result)
     }
@@ -336,7 +340,7 @@ mod detail {
         let ln_arg = second_term.checked_sub(first_term)?;
         let (ln_result, ln_neg) = ln(ln_arg).ok()?;
         if ln_neg {
-            return Some(FixedType::zero());
+            return Some(FixedType::zero())
         }
         liquidity.checked_mul(ln_result)
     }
@@ -353,8 +357,8 @@ mod tests {
     };
     use alloc::str::FromStr;
     use frame_support::assert_err;
+    use prediction_market_primitives::constants::base_multiples::*;
     use test_case::test_case;
-    use zeitgeist_primitives::constants::base_multiples::*;
 
     type MockBalance = BalanceOf<MockRuntime>;
     type MockMath = Math<MockRuntime>;

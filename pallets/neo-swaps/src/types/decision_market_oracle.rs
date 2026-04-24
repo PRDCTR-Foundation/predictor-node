@@ -22,9 +22,9 @@ use crate::{
 use frame_support::pallet_prelude::Weight;
 use frame_system::pallet_prelude::BlockNumberFor;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use prediction_market_primitives::traits::FutarchyOracle;
 use scale_info::TypeInfo;
 use sp_runtime::DispatchError;
-use zeitgeist_primitives::traits::FutarchyOracle;
 
 /// Struct that implements `FutarchyOracle` using price measurements from liquidity pools.
 ///
