@@ -23,12 +23,12 @@
 // <https://github.com/balancer-labs/balancer-core>.
 
 use super::checked_ops_res::{CheckedAddRes, CheckedDivRes, CheckedMulRes, CheckedSubRes};
-use crate::constants::BASE;
 use alloc::{
     borrow::ToOwned,
     format,
     string::{String, ToString},
 };
+use common_primitives::constants::currency::BASE;
 use core::{cmp::Ordering, convert::TryFrom, marker::PhantomData};
 use fixed::{traits::Fixed, ParseFixedError};
 use frame_support::ensure;
@@ -45,15 +45,16 @@ pub trait BaseProvider<T> {
 }
 
 /// Used to avoid saturating operations when converting `BASE` to `Balance`.
-pub struct ZeitgeistBase<T>(PhantomData<T>);
+pub struct PredictionMarketBase<T>(PhantomData<T>);
 
-impl<T> BaseProvider<T> for ZeitgeistBase<T>
+impl<T> BaseProvider<T> for PredictionMarketBase<T>
 where
     T: AtLeast32BitUnsigned,
 {
     fn get() -> Result<T, DispatchError> {
-        BASE.try_into()
-            .map_err(|_| DispatchError::Other("ZeitgeistBase failed to convert BASE to Balance"))
+        BASE.try_into().map_err(|_| {
+            DispatchError::Other("PredictionMarketBase failed to convert BASE to Balance")
+        })
     }
 }
 
@@ -113,20 +114,20 @@ where
 {
     fn bmul(&self, other: Self) -> Result<Self, DispatchError> {
         let prod = self.checked_mul_res(&other)?;
-        let adjustment = ZeitgeistBase::<T>::get()?.checked_div_res(&2u8.into())?;
+        let adjustment = PredictionMarketBase::<T>::get()?.checked_div_res(&2u8.into())?;
         let prod_adjusted = prod.checked_add_res(&adjustment)?;
-        prod_adjusted.checked_div_res(&ZeitgeistBase::get()?)
+        prod_adjusted.checked_div_res(&PredictionMarketBase::get()?)
     }
 
     fn bmul_floor(&self, other: Self) -> Result<Self, DispatchError> {
-        self.checked_mul_res(&other)?.checked_div_res(&ZeitgeistBase::get()?)
+        self.checked_mul_res(&other)?.checked_div_res(&PredictionMarketBase::get()?)
     }
 
     fn bmul_ceil(&self, other: Self) -> Result<Self, DispatchError> {
         let prod = self.checked_mul_res(&other)?;
-        let adjustment = ZeitgeistBase::<Self>::get()?.checked_sub_res(&1u8.into())?;
+        let adjustment = PredictionMarketBase::<Self>::get()?.checked_sub_res(&1u8.into())?;
         let prod_adjusted = prod.checked_add_res(&adjustment)?;
-        prod_adjusted.checked_div_res(&ZeitgeistBase::get()?)
+        prod_adjusted.checked_div_res(&PredictionMarketBase::get()?)
     }
 }
 
@@ -135,19 +136,19 @@ where
     T: AtLeast32BitUnsigned,
 {
     fn bdiv(&self, other: Self) -> Result<Self, DispatchError> {
-        let prod = self.checked_mul_res(&ZeitgeistBase::get()?)?;
+        let prod = self.checked_mul_res(&PredictionMarketBase::get()?)?;
         let adjustment = other.checked_div_res(&2u8.into())?;
         let prod_adjusted = prod.checked_add_res(&adjustment)?;
         prod_adjusted.checked_div_res(&other)
     }
 
     fn bdiv_floor(&self, other: Self) -> Result<Self, DispatchError> {
-        self.checked_mul_res(&ZeitgeistBase::get()?)?.checked_div_res(&other)
+        self.checked_mul_res(&PredictionMarketBase::get()?)?.checked_div_res(&other)
     }
 
     fn bdiv_ceil(&self, other: Self) -> Result<Self, DispatchError> {
         ensure!(other != Zero::zero(), DispatchError::Arithmetic(ArithmeticError::DivisionByZero));
-        let prod = self.checked_mul_res(&ZeitgeistBase::get()?)?;
+        let prod = self.checked_mul_res(&PredictionMarketBase::get()?)?;
         let adjustment = other.checked_sub_res(&1u8.into())?;
         let prod_adjusted = prod.checked_add_res(&adjustment)?;
         prod_adjusted.checked_div_res(&other)
@@ -167,22 +168,23 @@ where
     // Try to multiply first, then divide. This overflows if the (mathematical) product of `x` and
     // `multiplier` is around 3M. Use divide-first if this is the case.
     let maybe_prod = x.checked_mul_res(&multiplier);
-    let maybe_scaled_prod = maybe_prod.and_then(|r| r.checked_mul_res(&ZeitgeistBase::get()?));
+    let maybe_scaled_prod =
+        maybe_prod.and_then(|r| r.checked_mul_res(&PredictionMarketBase::get()?));
     if let Ok(scaled_prod) = maybe_scaled_prod {
         // Multiply first, then divide.
         let quot = scaled_prod.checked_div_res(&divisor)?;
         let adjusted_quot = quot.checked_add_res(&adjustment)?;
-        adjusted_quot.checked_div_res(&ZeitgeistBase::get()?)
+        adjusted_quot.checked_div_res(&PredictionMarketBase::get()?)
     } else {
         // Divide first, multiply later. It's cleaner to use the maximum of (x, multiplier) as
         // divident.
         let smallest = x.min(&multiplier);
         let largest = x.max(&multiplier);
-        let scaled_divident = largest.checked_mul_res(&ZeitgeistBase::get()?)?;
+        let scaled_divident = largest.checked_mul_res(&PredictionMarketBase::get()?)?;
         let quot = scaled_divident.checked_div_res(&divisor)?;
         let prod = quot.checked_mul_res(smallest)?;
         let adjusted_prod = prod.checked_add_res(&adjustment)?;
-        adjusted_prod.checked_div_res(&ZeitgeistBase::get()?)
+        adjusted_prod.checked_div_res(&PredictionMarketBase::get()?)
     }
 }
 
@@ -193,7 +195,7 @@ where
     T: AtLeast32BitUnsigned + Copy,
 {
     fn bmul_bdiv(&self, multiplier: Self, divisor: Self) -> Result<Self, DispatchError> {
-        let adjustment = ZeitgeistBase::<T>::get()?.checked_div_res(&2u8.into())?;
+        let adjustment = PredictionMarketBase::<T>::get()?.checked_div_res(&2u8.into())?;
         bmul_bdiv_common(self, multiplier, divisor, adjustment)
     }
 
@@ -202,7 +204,7 @@ where
     }
 
     fn bmul_bdiv_ceil(&self, multiplier: Self, divisor: Self) -> Result<Self, DispatchError> {
-        let adjustment = ZeitgeistBase::<T>::get()?.checked_sub_res(&1u8.into())?;
+        let adjustment = PredictionMarketBase::<T>::get()?.checked_sub_res(&1u8.into())?;
         bmul_bdiv_common(self, multiplier, divisor, adjustment)
     }
 }
@@ -245,9 +247,9 @@ impl<F: Fixed, N: Into<u128>> FromFixedDecimal<N> for F {
 
         if decimal_string.len() <= places as usize {
             // This can never underflow (places >= len). Saturating subtraction to satisfy clippy.
-            decimal_string = "0.".to_owned()
-                + &"0".repeat((places as usize).saturating_sub(decimal_string.len()))
-                + &decimal_string;
+            decimal_string = "0.".to_owned() +
+                &"0".repeat((places as usize).saturating_sub(decimal_string.len())) +
+                &decimal_string;
         } else {
             // This can never underflow (len > places). Saturating subtraction to satisfy clippy.
             decimal_string.insert(decimal_string.len().saturating_sub(places as usize), '.');
@@ -277,7 +279,7 @@ impl<F: Fixed + ToString, N: TryFrom<u128>> FromFixedToDecimal<F> for N {
         let frac_part = parts.next().unwrap_or("0");
         // Ensure that the iterator is now exhausted.
         if parts.next().is_some() {
-            return Err("The string contains multiple decimal points");
+            return Err("The string contains multiple decimal points")
         }
 
         let mut increment_int_part = false;
@@ -289,7 +291,7 @@ impl<F: Fixed + ToString, N: TryFrom<u128>> FromFixedToDecimal<F> for N {
                     frac_part,
                     "0".repeat(decimals_usize.saturating_sub(frac_part.len()))
                 )
-            }
+            },
             Ordering::Greater => {
                 let round_digit =
                     frac_part.chars().nth(decimals_usize).and_then(|c| c.to_digit(10)).ok_or(
@@ -300,7 +302,7 @@ impl<F: Fixed + ToString, N: TryFrom<u128>> FromFixedToDecimal<F> for N {
                     increment_int_part = true;
                 }
                 frac_part.chars().take(decimals_usize).collect::<String>()
-            }
+            },
             Ordering::Equal => frac_part.to_string(),
         };
 
@@ -387,7 +389,7 @@ mod tests {
                             *left_val, *right_val, *precision_val, diff
                         );
                     }
-                }
+                },
             }
         };
     }
