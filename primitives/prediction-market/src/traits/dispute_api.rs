@@ -52,7 +52,8 @@ pub trait DisputeApi {
     /// Initiate a dispute of a reported outcome.
     ///
     /// Further interaction with the dispute API (if necessary) **should** happen through an
-    /// associated pallet. **May** assume that `market.dispute_mechanism` refers to the calling dispute API.
+    /// associated pallet. **May** assume that `market.dispute_mechanism` refers to the calling
+    /// dispute API.
     fn on_dispute(
         market_id: &Self::MarketId,
         market: &MarketOfDisputeApi<Self>,

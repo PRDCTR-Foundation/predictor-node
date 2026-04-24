@@ -77,7 +77,8 @@ where
 {
     #[inline]
     fn checked_add_res(&self, other: &Self) -> Result<Self, DispatchError> {
-        self.checked_add(other).ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
+        self.checked_add(other)
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
     }
 }
 
@@ -87,7 +88,8 @@ where
 {
     #[inline]
     fn checked_sub_res(&self, other: &Self) -> Result<Self, DispatchError> {
-        self.checked_sub(other).ok_or(DispatchError::Arithmetic(ArithmeticError::Underflow))
+        self.checked_sub(other)
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::Underflow))
     }
 }
 
@@ -97,7 +99,8 @@ where
 {
     #[inline]
     fn checked_mul_res(&self, other: &Self) -> Result<Self, DispatchError> {
-        self.checked_mul(other).ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
+        self.checked_mul(other)
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
     }
 }
 
@@ -107,7 +110,8 @@ where
 {
     #[inline]
     fn checked_div_res(&self, other: &Self) -> Result<Self, DispatchError> {
-        self.checked_div(other).ok_or(DispatchError::Arithmetic(ArithmeticError::DivisionByZero))
+        self.checked_div(other)
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::DivisionByZero))
     }
 }
 
@@ -127,7 +131,8 @@ where
 {
     #[inline]
     fn checked_rem_res(&self, other: &Self) -> Result<Self, DispatchError> {
-        self.checked_rem(other).ok_or(DispatchError::Arithmetic(ArithmeticError::DivisionByZero))
+        self.checked_rem(other)
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::DivisionByZero))
     }
 }
 
@@ -137,6 +142,7 @@ where
 {
     #[inline]
     fn checked_inc_res(&self) -> Result<Self, DispatchError> {
-        self.checked_add(&1u8.into()).ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
+        self.checked_add(&1u8.into())
+            .ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
     }
 }
