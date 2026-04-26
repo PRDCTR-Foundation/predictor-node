@@ -18,33 +18,32 @@
 #![cfg(all(feature = "mock", test))]
 
 use crate::{mock::*, types::*, utils::*, AccountIdOf, BalanceOf, MarketIdOf, *};
+use common_primitives::constants::currency::{BASE, CENT_BASE};
 use frame_support::{assert_noop, assert_ok, traits::fungible::Mutate};
 use orml_currencies::Error as CurrenciesError;
 use orml_tokens::Error as TokensError;
 use orml_traits::MultiCurrency;
-use sp_runtime::{Perbill, SaturatedConversion};
-use zeitgeist_primitives::{
-    constants::{base_multiples::*, BASE, CENT},
+use pallet_pm_market_commons::{Error as MError, MarketCommonsPalletApi, Markets};
+use pallet_pm_neo_swaps::Event as NeoSwapsEvent;
+use pallet_pm_order_book::Orders;
+use pallet_prediction_markets::WhitelistedMarketCreators;
+use prediction_market_primitives::{
+    constants::base_multiples::*,
     orderbook::Order,
     types::{
-        AccountIdTest, Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus,
-        MarketType, MultiHash, ScoringRule,
+        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
+        MultiHash, ScoringRule, TestAccountIdPK,
     },
 };
-use zrml_market_commons::{Error as MError, MarketCommonsPalletApi, Markets};
-use zrml_neo_swaps::Event as NeoSwapsEvent;
-use zrml_orderbook::Orders;
+pub use sp_runtime::{traits::Hash, Perbill, SaturatedConversion};
 
 mod buy;
 mod sell;
 
-#[cfg(not(feature = "parachain"))]
-const BASE_ASSET: Asset<MarketId> = Asset::Ztg;
-#[cfg(feature = "parachain")]
 const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
 
 fn create_market(
-    creator: AccountIdTest,
+    creator: TestAccountIdPK,
     base_asset: AssetOf<Runtime>,
     market_type: MarketType,
     scoring_rule: ScoringRule,
@@ -52,15 +51,17 @@ fn create_market(
     let mut metadata = [2u8; 50];
     metadata[0] = 0x15;
     metadata[1] = 0x30;
+    <WhitelistedMarketCreators<Runtime>>::insert(&creator, ());
     assert_ok!(PredictionMarkets::create_market(
         RuntimeOrigin::signed(creator),
         base_asset,
         Perbill::zero(),
-        EVE,
+        eve(),
         MarketPeriod::Block(0..2),
         Deadlines {
             grace_period: 0_u32.into(),
-            oracle_duration: <Runtime as zrml_prediction_markets::Config>::MinOracleDuration::get(),
+            oracle_duration:
+                <Runtime as pallet_prediction_markets::Config>::MinOracleDuration::get().into(),
             dispute_duration: 0_u32.into(),
         },
         MultiHash::Sha3_384(metadata),
@@ -82,12 +83,12 @@ fn create_market_and_deploy_pool(
 ) -> MarketIdOf<Runtime> {
     let market_id = create_market(creator, base_asset, market_type, ScoringRule::AmmCdaHybrid);
     assert_ok!(PredictionMarkets::buy_complete_set(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         market_id,
         amount,
     ));
     assert_ok!(NeoSwaps::deploy_pool(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         market_id,
         amount,
         spot_prices.clone(),
