@@ -30,8 +30,8 @@ fn buy_complete_set_works() {
         );
 
         let market_id = 0;
-        let who = BOB;
-        let amount = CENT;
+        let who = bob();
+        let amount = CENT_BASE;
         assert_ok!(PredictionMarkets::buy_complete_set(
             RuntimeOrigin::signed(who),
             market_id,
@@ -54,10 +54,11 @@ fn buy_complete_set_works() {
         assert_eq!(market_bal, amount);
         System::assert_last_event(Event::BoughtCompleteSet(market_id, amount, who).into());
     };
+
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
-    #[cfg(feature = "parachain")]
+
     ExtBuilder::default().build().execute_with(|| {
         test(Asset::ForeignAsset(100));
     });
@@ -67,13 +68,13 @@ fn buy_complete_set_works() {
 fn buy_complete_fails_on_zero_amount() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,
         );
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(BOB), 0, 0),
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(bob()), 0, 0),
             Error::<Runtime>::ZeroAmount
         );
     });
@@ -89,14 +90,14 @@ fn buy_complete_set_fails_on_insufficient_balance() {
             ScoringRule::AmmCdaHybrid,
         );
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(BOB), 0, 10000 * BASE),
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(bob()), 0, 10000 * BASE),
             Error::<Runtime>::NotEnoughBalance
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
-    #[cfg(feature = "parachain")]
+
     ExtBuilder::default().build().execute_with(|| {
         test(Asset::ForeignAsset(100));
     });
@@ -110,7 +111,7 @@ fn buy_complete_set_fails_on_insufficient_balance() {
 fn buy_complete_set_fails_if_market_is_not_active(status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -121,7 +122,7 @@ fn buy_complete_set_fails_if_market_is_not_active(status: MarketStatus) {
             Ok(())
         }));
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(FRED), market_id, 1),
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(fred()), market_id, 1),
             Error::<Runtime>::MarketIsNotActive,
         );
     });
@@ -131,14 +132,14 @@ fn buy_complete_set_fails_if_market_is_not_active(status: MarketStatus) {
 fn buy_complete_set_fails_if_market_has_wrong_scoring_rule(scoring_rule: ScoringRule) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             scoring_rule,
         );
         let market_id = 0;
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(FRED), market_id, 1),
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(fred()), market_id, 1),
             Error::<Runtime>::InvalidScoringRule,
         );
     });
@@ -148,8 +149,8 @@ fn buy_complete_set_fails_if_market_has_wrong_scoring_rule(scoring_rule: Scoring
 fn fails_if_market_is_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         assert_noop!(
-            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(FRED), 0, 1),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            PredictionMarkets::buy_complete_set(RuntimeOrigin::signed(fred()), 0, 1),
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
     });
 }

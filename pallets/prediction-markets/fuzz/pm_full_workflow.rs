@@ -23,14 +23,14 @@ use core::ops::{Range, RangeInclusive};
 use frame_support::traits::Hooks;
 use libfuzzer_sys::fuzz_target;
 use sp_arithmetic::Perbill;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     constants::mock::MaxCreatorFee,
     types::{
         Asset, Deadlines, MarketCreation, MarketDisputeMechanism, MarketPeriod, MarketType,
         MultiHash, OutcomeReport, ScoringRule,
     },
 };
-use zrml_prediction_markets::mock::{ExtBuilder, PredictionMarkets, RuntimeOrigin, System};
+use pallet_prediction_markets::mock::{ExtBuilder, PredictionMarkets, RuntimeOrigin, System};
 
 fuzz_target!(|data: Data| {
     let mut ext = ExtBuilder::default().build();
@@ -48,7 +48,7 @@ fuzz_target!(|data: Data| {
         let fee = Perbill::from_parts(bounded_parts.try_into().unwrap());
         let _ = PredictionMarkets::create_market(
             RuntimeOrigin::signed(data.create_scalar_market_origin.into()),
-            Asset::Ztg,
+            Asset::Tru,
             fee,
             data.create_scalar_market_oracle.into(),
             MarketPeriod::Block(data.create_scalar_market_period),

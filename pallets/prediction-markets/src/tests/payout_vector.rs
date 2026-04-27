@@ -16,15 +16,15 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use prediction_market_primitives::traits::PayoutApi;
 use test_case::test_case;
-use zeitgeist_primitives::traits::PayoutApi;
 
 #[test]
 fn payout_vector_works_categorical() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -37,7 +37,7 @@ fn payout_vector_works_categorical() {
         run_to_block(grace_period + 1);
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Categorical(1)
         ));
@@ -50,14 +50,14 @@ fn payout_vector_works_categorical() {
 
 #[test_case(50, vec![0, BASE])]
 #[test_case(100, vec![0, BASE])]
-#[test_case(130, vec![30 * CENT, 70 * CENT])]
+#[test_case(130, vec![30 * CENT_BASE, 70 * CENT_BASE])]
 #[test_case(200, vec![BASE, 0])]
 #[test_case(250, vec![BASE, 0])]
 fn payout_vector_works_scalar(value: u128, expected: Vec<BalanceOf<Runtime>>) {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_scalar_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -70,7 +70,7 @@ fn payout_vector_works_scalar(value: u128, expected: Vec<BalanceOf<Runtime>>) {
         run_to_block(grace_period + 1);
 
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             0,
             OutcomeReport::Scalar(value)
         ));
@@ -92,7 +92,7 @@ fn payout_vector_fails_on_market_not_found() {
 fn payout_vector_fails_if_market_is_not_redeemable() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::Parimutuel,
@@ -115,7 +115,7 @@ fn payout_vector_fails_if_market_is_not_redeemable() {
 fn payout_vector_fails_on_invalid_market_status(status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,

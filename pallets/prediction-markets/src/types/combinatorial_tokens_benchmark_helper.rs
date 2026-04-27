@@ -18,11 +18,11 @@
 use crate::{BalanceOf, Config, MarketIdOf};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use sp_runtime::{traits::Zero, DispatchResult};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::{CombinatorialTokensBenchmarkHelper, MarketCommonsPalletApi},
     types::{MarketStatus, OutcomeReport},
 };
+use sp_runtime::{traits::Zero, DispatchResult};
 
 pub struct PredictionMarketsCombinatorialTokensBenchmarkHelper<T>(PhantomData<T>);
 
@@ -43,7 +43,7 @@ where
         let payout_vector = payout_vector.unwrap();
         let index = payout_vector.iter().position(|&value| !value.is_zero()).unwrap();
 
-        <zrml_market_commons::Pallet<T> as MarketCommonsPalletApi>::mutate_market(
+        <pallet_pm_market_commons::Pallet<T> as MarketCommonsPalletApi>::mutate_market(
             &market_id,
             |market| {
                 market.resolved_outcome =

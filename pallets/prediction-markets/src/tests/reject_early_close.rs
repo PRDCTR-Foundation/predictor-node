@@ -18,8 +18,8 @@
 
 use super::*;
 
-use crate::MarketIdsPerCloseBlock;
-use zeitgeist_primitives::types::EarlyCloseState;
+use crate::{MarketIdsPerCloseBlock, WhitelistedMarketCreators};
+use prediction_market_primitives::types::EarlyCloseState;
 
 // TODO(#1239) MarketDoesNotExist
 // TODO(#1239) NoEarlyCloseScheduled
@@ -29,7 +29,7 @@ fn reject_early_close_emits_event() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -38,11 +38,13 @@ fn reject_early_close_emits_event() {
         let market_id = 0;
 
         assert_ok!(PredictionMarkets::schedule_early_close(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
         ));
 
-        assert_ok!(PredictionMarkets::dispute_early_close(RuntimeOrigin::signed(BOB), market_id,));
+        assert_ok!(
+            PredictionMarkets::dispute_early_close(RuntimeOrigin::signed(bob()), market_id,)
+        );
 
         assert_ok!(PredictionMarkets::reject_early_close(
             RuntimeOrigin::signed(CloseMarketEarlyOrigin::get()),
@@ -58,7 +60,7 @@ fn reject_early_close_fails_if_state_is_scheduled_as_market_creator() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -70,7 +72,7 @@ fn reject_early_close_fails_if_state_is_scheduled_as_market_creator() {
         let market_id = 0;
 
         assert_ok!(PredictionMarkets::schedule_early_close(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
         ));
 
@@ -89,7 +91,7 @@ fn reject_early_close_fails_if_state_is_rejected() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -124,11 +126,12 @@ fn reject_early_close_fails_if_state_is_rejected() {
 fn reject_early_close_resets_to_old_market_period() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -168,11 +171,12 @@ fn reject_early_close_resets_to_old_market_period() {
 fn reject_early_close_settles_bonds() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -184,18 +188,20 @@ fn reject_early_close_settles_bonds() {
 
         let market_id = 0;
         assert_ok!(PredictionMarkets::schedule_early_close(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
         ));
 
         run_blocks(1);
 
-        assert_ok!(PredictionMarkets::dispute_early_close(RuntimeOrigin::signed(BOB), market_id,));
+        assert_ok!(
+            PredictionMarkets::dispute_early_close(RuntimeOrigin::signed(bob()), market_id,)
+        );
 
-        let reserved_bob = Balances::reserved_balance(BOB);
-        let reserved_alice = Balances::reserved_balance(ALICE);
-        let free_bob = Balances::free_balance(BOB);
-        let free_alice = Balances::free_balance(ALICE);
+        let reserved_bob = Balances::reserved_balance(bob());
+        let reserved_alice = Balances::reserved_balance(alice());
+        let free_bob = Balances::free_balance(bob());
+        let free_alice = Balances::free_balance(alice());
 
         assert_ok!(PredictionMarkets::reject_early_close(
             RuntimeOrigin::signed(CloseMarketEarlyOrigin::get()),
@@ -205,10 +211,10 @@ fn reject_early_close_settles_bonds() {
         let market = MarketCommons::market(&market_id).unwrap();
         assert_eq!(market.early_close.unwrap().state, EarlyCloseState::Rejected);
 
-        let reserved_bob_after = Balances::reserved_balance(BOB);
-        let reserved_alice_after = Balances::reserved_balance(ALICE);
-        let free_bob_after = Balances::free_balance(BOB);
-        let free_alice_after = Balances::free_balance(ALICE);
+        let reserved_bob_after = Balances::reserved_balance(bob());
+        let reserved_alice_after = Balances::reserved_balance(alice());
+        let free_bob_after = Balances::free_balance(bob());
+        let free_alice_after = Balances::free_balance(alice());
 
         assert_eq!(
             reserved_alice - reserved_alice_after,
@@ -221,8 +227,8 @@ fn reject_early_close_settles_bonds() {
         // disputant Bob gets the bonds
         assert_eq!(
             free_bob_after - free_bob,
-            <Runtime as Config>::CloseEarlyRequestBond::get()
-                + <Runtime as Config>::CloseEarlyDisputeBond::get()
+            <Runtime as Config>::CloseEarlyRequestBond::get() +
+                <Runtime as Config>::CloseEarlyDisputeBond::get()
         );
         assert_eq!(free_alice_after - free_alice, 0);
     });

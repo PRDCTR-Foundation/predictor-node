@@ -29,7 +29,7 @@ use crate::MarketIdsForEdit;
 fn only_creator_can_edit_market() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -50,13 +50,13 @@ fn only_creator_can_edit_market() {
 
         assert!(MarketIdsForEdit::<Runtime>::contains_key(0));
 
-        // ALICE is market creator through simple_create_categorical_market
+        // alice() is market creator through simple_create_categorical_market
         assert_noop!(
             PredictionMarkets::edit_market(
-                RuntimeOrigin::signed(BOB),
-                Asset::Ztg,
+                RuntimeOrigin::signed(bob()),
+                Asset::Tru,
                 0,
-                CHARLIE,
+                charlie(),
                 MarketPeriod::Block(0..2),
                 get_deadlines(),
                 gen_metadata(2),
@@ -73,7 +73,7 @@ fn only_creator_can_edit_market() {
 fn edit_cycle_for_proposed_markets() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             2..4,
             ScoringRule::AmmCdaHybrid,
@@ -93,13 +93,13 @@ fn edit_cycle_for_proposed_markets() {
 
         assert!(MarketIdsForEdit::<Runtime>::contains_key(0));
 
-        // BOB was the oracle before through simple_create_categorical_market
-        // After this edit its changed to ALICE
+        // bob() was the oracle before through simple_create_categorical_market
+        // After this edit its changed to alice()
         assert_ok!(PredictionMarkets::edit_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             0,
-            CHARLIE,
+            charlie(),
             MarketPeriod::Block(2..4),
             get_deadlines(),
             gen_metadata(2),
@@ -110,9 +110,9 @@ fn edit_cycle_for_proposed_markets() {
         let edited_market = MarketCommons::market(&0).expect("Market not found");
         System::assert_last_event(Event::MarketEdited(0, edited_market).into());
         assert!(!MarketIdsForEdit::<Runtime>::contains_key(0));
-        // verify oracle is CHARLIE
+        // verify oracle is charlie()
         let market = MarketCommons::market(&0);
-        assert_eq!(market.unwrap().oracle, CHARLIE);
+        assert_eq!(market.unwrap().oracle, charlie());
     });
 }
 
@@ -122,7 +122,7 @@ fn edit_market_with_foreign_asset() {
     ExtBuilder::default().build().execute_with(|| {
         // Creates an advised market.
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -143,14 +143,14 @@ fn edit_market_with_foreign_asset() {
 
         assert!(MarketIdsForEdit::<Runtime>::contains_key(0));
 
-        // ALICE is market creator through simple_create_categorical_market
+        // Alice is market creator through simple_create_categorical_market
         // As per Mock asset_registry genesis ForeignAsset(50) is not registered in asset_registry.
         assert_noop!(
             PredictionMarkets::edit_market(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 Asset::ForeignAsset(50),
                 0,
-                CHARLIE,
+                charlie(),
                 MarketPeriod::Block(0..2),
                 get_deadlines(),
                 gen_metadata(2),
@@ -160,13 +160,14 @@ fn edit_market_with_foreign_asset() {
             ),
             Error::<Runtime>::UnregisteredForeignAsset
         );
-        // As per Mock asset_registry genesis ForeignAsset(420) has allow_as_base_asset set to false.
+        // As per Mock asset_registry genesis ForeignAsset(420) has allow_as_base_asset set to
+        // false.
         assert_noop!(
             PredictionMarkets::edit_market(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 Asset::ForeignAsset(420),
                 0,
-                CHARLIE,
+                charlie(),
                 MarketPeriod::Block(0..2),
                 get_deadlines(),
                 gen_metadata(2),
@@ -178,10 +179,10 @@ fn edit_market_with_foreign_asset() {
         );
         // As per Mock asset_registry genesis ForeignAsset(100) has allow_as_base_asset set to true.
         assert_ok!(PredictionMarkets::edit_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             Asset::ForeignAsset(100),
             0,
-            CHARLIE,
+            charlie(),
             MarketPeriod::Block(0..2),
             get_deadlines(),
             gen_metadata(2),

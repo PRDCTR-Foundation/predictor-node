@@ -17,8 +17,8 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-
-use zeitgeist_primitives::types::OutcomeReport;
+use crate::WhitelistedMarketCreators;
+use prediction_market_primitives::types::OutcomeReport;
 
 // TODO(#1239) MarketDoesNotExist
 // TODO(#1239) NoDisputeMechanism
@@ -31,11 +31,12 @@ use zeitgeist_primitives::types::OutcomeReport;
 fn start_global_dispute_fails_on_wrong_mdm() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..2),
             get_deadlines(),
             gen_metadata(2),
@@ -50,7 +51,7 @@ fn start_global_dispute_fails_on_wrong_mdm() {
         let grace_period = market.deadlines.grace_period;
         run_to_block(end + grace_period + 1);
         assert_ok!(PredictionMarkets::report(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             market_id,
             OutcomeReport::Categorical(0)
         ));
@@ -58,13 +59,13 @@ fn start_global_dispute_fails_on_wrong_mdm() {
         run_to_block(dispute_at_0);
 
         // only one dispute allowed for authorized mdm
-        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(CHARLIE), market_id,));
+        assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(charlie()), market_id,));
         run_blocks(1);
         let market = MarketCommons::market(&market_id).unwrap();
         assert_eq!(market.status, MarketStatus::Disputed);
 
         assert_noop!(
-            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(CHARLIE), market_id),
+            PredictionMarkets::start_global_dispute(RuntimeOrigin::signed(charlie()), market_id),
             Error::<Runtime>::InvalidDisputeMechanism
         );
     });

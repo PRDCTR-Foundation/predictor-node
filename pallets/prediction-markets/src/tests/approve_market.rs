@@ -19,7 +19,7 @@
 use super::*;
 use test_case::test_case;
 
-use crate::MarketIdsForEdit;
+use crate::{MarketIdsForEdit, WhitelistedMarketCreators};
 use sp_runtime::DispatchError;
 
 #[test_case(MarketStatus::Active)]
@@ -30,7 +30,7 @@ use sp_runtime::DispatchError;
 fn fails_if_market_status_is_not_proposed(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -54,7 +54,7 @@ fn fails_if_market_status_is_not_proposed(market_status: MarketStatus) {
 fn it_allows_advisory_origin_to_approve_markets() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -65,7 +65,7 @@ fn it_allows_advisory_origin_to_approve_markets() {
 
         // Make sure it fails for the random joe
         assert_noop!(
-            PredictionMarkets::approve_market(RuntimeOrigin::signed(BOB), 0),
+            PredictionMarkets::approve_market(RuntimeOrigin::signed(bob()), 0),
             DispatchError::BadOrigin
         );
 
@@ -84,7 +84,7 @@ fn market_with_edit_request_cannot_be_approved() {
     ExtBuilder::default().build().execute_with(|| {
         // Creates an advised market.
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Advised,
             0..2,
             ScoringRule::AmmCdaHybrid,
@@ -112,14 +112,15 @@ fn market_with_edit_request_cannot_be_approved() {
 
 #[test]
 fn approve_market_correctly_unreserves_advisory_bond() {
-    // NOTE: Bonds are always in ZTG, irrespective of base_asset.
+    // NOTE: Bonds are always in TRUU, irrespective of base_asset.
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             base_asset,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..100),
             get_deadlines(),
             gen_metadata(2),
@@ -129,21 +130,21 @@ fn approve_market_correctly_unreserves_advisory_bond() {
             ScoringRule::AmmCdaHybrid,
         ));
         let market_id = 0;
-        let alice_balance_before = Balances::free_balance(ALICE);
-        check_reserve(&ALICE, AdvisoryBond::get() + OracleBond::get());
+        let alice_balance_before = Balances::free_balance(alice());
+        check_reserve(&alice(), AdvisoryBond::get() + OracleBond::get());
         assert_ok!(PredictionMarkets::approve_market(
             RuntimeOrigin::signed(ApproveOrigin::get()),
             market_id
         ));
-        check_reserve(&ALICE, OracleBond::get());
-        assert_eq!(Balances::free_balance(ALICE), alice_balance_before + AdvisoryBond::get());
+        check_reserve(&alice(), OracleBond::get());
+        assert_eq!(Balances::free_balance(alice()), alice_balance_before + AdvisoryBond::get());
         let market = MarketCommons::market(&market_id).unwrap();
         assert!(market.bonds.creation.unwrap().is_settled);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
-    #[cfg(feature = "parachain")]
+
     ExtBuilder::default().build().execute_with(|| {
         test(Asset::ForeignAsset(100));
     });

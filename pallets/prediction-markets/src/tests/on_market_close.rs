@@ -18,24 +18,25 @@
 
 use super::*;
 
-use crate::{LastTimeFrame, MarketIdsForEdit};
-use zeitgeist_primitives::constants::MILLISECS_PER_BLOCK;
+use crate::{LastTimeFrame, MarketIdsForEdit, WhitelistedMarketCreators};
+use common_primitives::constants::MILLISECS_PER_BLOCK;
 
 #[test]
 fn on_market_close_auto_rejects_expired_advised_market() {
-    // NOTE: Bonds are always in ZTG, irrespective of base_asset.
+    // NOTE: Bonds are always in TRUU, irrespective of base_asset.
     let test = |base_asset: AssetOf<Runtime>| {
-        // Give ALICE `SENTINEL_AMOUNT` free and reserved ZTG; we record the free balance to check
-        // that the AdvisoryBond and the OracleBond gets unreserved, when the advised market expires.
-        assert_ok!(AssetManager::deposit(Asset::Ztg, &ALICE, 2 * SENTINEL_AMOUNT));
+        // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // check that the AdvisoryBond and the OracleBond gets unreserved, when the advised
+        // market expires.
+        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
-            &ALICE,
+            &alice(),
             SENTINEL_AMOUNT
         ));
-        let balance_free_before_alice = Balances::free_balance(ALICE);
+        let balance_free_before_alice = Balances::free_balance(alice());
         let balance_reserved_before_alice =
-            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &ALICE);
+            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &alice());
 
         let end = 33;
         simple_create_categorical_market(
@@ -49,18 +50,18 @@ fn on_market_close_auto_rejects_expired_advised_market() {
         run_to_block(end);
 
         assert_eq!(
-            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &ALICE),
+            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &alice()),
             balance_reserved_before_alice
         );
-        assert_eq!(Balances::free_balance(ALICE), balance_free_before_alice);
+        assert_eq!(Balances::free_balance(alice()), balance_free_before_alice);
         assert_noop!(
             MarketCommons::market(&market_id),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
         System::assert_has_event(Event::MarketExpired(market_id).into());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -71,17 +72,18 @@ fn on_market_close_auto_rejects_expired_advised_market() {
 #[test]
 fn on_market_close_auto_rejects_expired_advised_market_with_edit_request() {
     let test = |base_asset: AssetOf<Runtime>| {
-        // Give ALICE `SENTINEL_AMOUNT` free and reserved ZTG; we record the free balance to check
-        // that the AdvisoryBond and the OracleBond gets unreserved, when the advised market expires.
-        assert_ok!(AssetManager::deposit(Asset::Ztg, &ALICE, 2 * SENTINEL_AMOUNT));
+        // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // check that the AdvisoryBond and the OracleBond gets unreserved, when the advised
+        // market expires.
+        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
-            &ALICE,
+            &alice(),
             SENTINEL_AMOUNT
         ));
-        let balance_free_before_alice = Balances::free_balance(ALICE);
+        let balance_free_before_alice = Balances::free_balance(alice());
         let balance_reserved_before_alice =
-            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &ALICE);
+            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &alice());
 
         let end = 33;
         simple_create_categorical_market(
@@ -108,18 +110,18 @@ fn on_market_close_auto_rejects_expired_advised_market_with_edit_request() {
         assert!(!MarketIdsForEdit::<Runtime>::contains_key(0));
 
         assert_eq!(
-            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &ALICE),
+            Balances::reserved_balance_named(&PredictionMarkets::reserve_id(), &alice()),
             balance_reserved_before_alice
         );
-        assert_eq!(Balances::free_balance(ALICE), balance_free_before_alice);
+        assert_eq!(Balances::free_balance(alice()), balance_free_before_alice);
         assert_noop!(
             MarketCommons::market(&market_id),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
         System::assert_has_event(Event::MarketExpired(market_id).into());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Ztg);
+        test(Asset::Tru);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -132,11 +134,12 @@ fn on_market_close_successfully_auto_closes_market_with_blocks() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 33;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -164,11 +167,12 @@ fn on_market_close_successfully_auto_closes_market_with_timestamps() {
     ExtBuilder::default().build().execute_with(|| {
         let end = (2 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -204,11 +208,12 @@ fn on_market_close_successfully_auto_closes_multiple_markets_after_stall() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -218,10 +223,10 @@ fn on_market_close_successfully_auto_closes_multiple_markets_after_stall() {
             ScoringRule::AmmCdaHybrid,
         ));
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -255,11 +260,12 @@ fn on_market_close_market_status_manager_exceeds_max_recovery_time_frames_after_
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),
@@ -269,10 +275,10 @@ fn on_market_close_market_status_manager_exceeds_max_recovery_time_frames_after_
             ScoringRule::AmmCdaHybrid,
         ));
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            ALICE,
+            alice(),
             MarketPeriod::Timestamp(0..end),
             get_deadlines(),
             gen_metadata(50),

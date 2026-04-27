@@ -18,11 +18,9 @@
 
 use super::*;
 
-use crate::{MarketIdsPerCloseBlock, MarketIdsPerCloseTimeFrame};
-use zeitgeist_primitives::{
-    constants::MILLISECS_PER_BLOCK,
-    types::{EarlyClose, EarlyCloseState},
-};
+use crate::{MarketIdsPerCloseBlock, MarketIdsPerCloseTimeFrame, WhitelistedMarketCreators};
+use common_primitives::constants::MILLISECS_PER_BLOCK;
+use prediction_market_primitives::types::{EarlyClose, EarlyCloseState};
 
 // TODO(#1239) MarketDoesNotExist
 // TODO(#1239) RequesterNotCreator
@@ -36,7 +34,7 @@ fn schedule_early_close_emits_event() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         simple_create_categorical_market(
-            Asset::Ztg,
+            Asset::Tru,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -69,11 +67,12 @@ fn schedule_early_close_emits_event() {
 fn sudo_schedule_early_close_at_block_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -136,16 +135,17 @@ fn sudo_schedule_early_close_at_block_works() {
 fn sudo_schedule_early_close_at_timeframe_works() {
     ExtBuilder::default().build().execute_with(|| {
         let start_block = 7;
-        set_timestamp_for_on_initialize(start_block * MILLISECS_PER_BLOCK as u64);
+        set_timestamp_for_on_initialize(start_block as u64 * MILLISECS_PER_BLOCK as u64);
         run_blocks(start_block);
-        let start = <zrml_market_commons::Pallet<Runtime>>::now();
+        let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
 
         let end = start + (42 * MILLISECS_PER_BLOCK) as u64;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(start..end),
             get_deadlines(),
             gen_metadata(2),
@@ -171,7 +171,7 @@ fn sudo_schedule_early_close_at_timeframe_works() {
             market_id
         ));
 
-        let now = <zrml_market_commons::Pallet<Runtime>>::now();
+        let now = <pallet_pm_market_commons::Pallet<Runtime>>::now();
         let new_end = now + <Runtime as Config>::CloseEarlyProtectionTimeFramePeriod::get();
         assert!(new_end < end);
 
@@ -199,8 +199,10 @@ fn sudo_schedule_early_close_at_timeframe_works() {
         assert_eq!(second.0, end.saturating_div(MILLISECS_PER_BLOCK.into()));
         assert!(second.1.clone().into_inner().is_empty());
 
-        set_timestamp_for_on_initialize(start_block * MILLISECS_PER_BLOCK as u64 + new_end);
-        run_to_block(start_block + new_end.saturating_div(MILLISECS_PER_BLOCK.into()) + 1);
+        set_timestamp_for_on_initialize(start_block as u64 * MILLISECS_PER_BLOCK as u64 + new_end);
+        let new_end_in_block: u32 =
+            (new_end.saturating_div(MILLISECS_PER_BLOCK.into())).try_into().unwrap();
+        run_to_block(start_block + new_end_in_block + 1);
 
         let market = MarketCommons::market(&0).unwrap();
         assert_eq!(market.status, MarketStatus::Closed);
@@ -211,11 +213,12 @@ fn sudo_schedule_early_close_at_timeframe_works() {
 fn schedule_early_close_block_fails_if_early_close_request_too_late() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -229,7 +232,7 @@ fn schedule_early_close_block_fails_if_early_close_request_too_late() {
 
         let market_id = 0;
         assert_noop!(
-            PredictionMarkets::schedule_early_close(RuntimeOrigin::signed(ALICE), market_id,),
+            PredictionMarkets::schedule_early_close(RuntimeOrigin::signed(alice()), market_id,),
             Error::<Runtime>::EarlyCloseRequestTooLate
         );
     });
@@ -239,15 +242,16 @@ fn schedule_early_close_block_fails_if_early_close_request_too_late() {
 fn schedule_early_close_timestamp_fails_if_early_close_request_too_late() {
     ExtBuilder::default().build().execute_with(|| {
         let start_block = 7;
-        set_timestamp_for_on_initialize(start_block * MILLISECS_PER_BLOCK as u64);
+        set_timestamp_for_on_initialize(start_block as u64 * MILLISECS_PER_BLOCK as u64);
         run_blocks(start_block);
-        let start = <zrml_market_commons::Pallet<Runtime>>::now();
-        let end = start + (42 * MILLISECS_PER_BLOCK) as u64;
+        let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
+        let end = start + (42 * MILLISECS_PER_BLOCK as u64);
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Timestamp(start..end),
             get_deadlines(),
             gen_metadata(2),
@@ -257,12 +261,12 @@ fn schedule_early_close_timestamp_fails_if_early_close_request_too_late() {
             ScoringRule::AmmCdaHybrid
         ));
 
-        run_to_block(end.saturating_div(MILLISECS_PER_BLOCK.into()) - 1);
+        run_to_block((end.saturating_div(MILLISECS_PER_BLOCK.into()) - 1).try_into().unwrap());
         set_timestamp_for_on_initialize(end - MILLISECS_PER_BLOCK as u64);
 
         let market_id = 0;
         assert_noop!(
-            PredictionMarkets::schedule_early_close(RuntimeOrigin::signed(ALICE), market_id,),
+            PredictionMarkets::schedule_early_close(RuntimeOrigin::signed(alice()), market_id,),
             Error::<Runtime>::EarlyCloseRequestTooLate
         );
     });
@@ -272,11 +276,12 @@ fn schedule_early_close_timestamp_fails_if_early_close_request_too_late() {
 fn schedule_early_close_as_market_creator_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
+        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
-            RuntimeOrigin::signed(ALICE),
-            Asset::Ztg,
+            RuntimeOrigin::signed(alice()),
+            Asset::Tru,
             Perbill::zero(),
-            BOB,
+            bob(),
             MarketPeriod::Block(0..end),
             get_deadlines(),
             gen_metadata(2),
@@ -295,14 +300,14 @@ fn schedule_early_close_as_market_creator_works() {
         assert_eq!(market_ids_to_close.1.into_inner(), vec![market_id]);
         assert!(market.early_close.is_none());
 
-        let reserved_balance_alice = Balances::reserved_balance(ALICE);
+        let reserved_balance_alice = Balances::reserved_balance(alice());
 
         assert_ok!(PredictionMarkets::schedule_early_close(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
         ));
 
-        let reserved_balance_alice_after = Balances::reserved_balance(ALICE);
+        let reserved_balance_alice_after = Balances::reserved_balance(alice());
         assert_eq!(
             reserved_balance_alice_after - reserved_balance_alice,
             <Runtime as Config>::CloseEarlyRequestBond::get()
