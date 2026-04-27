@@ -34,7 +34,7 @@ fn admin_move_market_to_resolved_resolves_reported_market() {
         );
         let market_id = 0;
 
-        // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the correct bonds are unreserved!
         assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
@@ -104,7 +104,7 @@ fn admin_move_market_to_resolved_resolves_disputed_market() {
         );
         let market_id = 0;
 
-        // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the correct bonds are unreserved!
         assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(

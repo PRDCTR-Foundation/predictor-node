@@ -72,7 +72,7 @@ fn on_market_close_auto_rejects_expired_advised_market() {
 #[test]
 fn on_market_close_auto_rejects_expired_advised_market_with_edit_request() {
     let test = |base_asset: AssetOf<Runtime>| {
-        // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the AdvisoryBond and the OracleBond gets unreserved, when the advised
         // market expires.
         assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));

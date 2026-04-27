@@ -130,7 +130,7 @@ fn reject_market_unreserves_oracle_bond_and_slashes_advisory_bond() {
             ScoringRule::AmmCdaHybrid,
         );
 
-        // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
+        // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the AdvisoryBond gets slashed but the OracleBond gets unreserved.
         assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
