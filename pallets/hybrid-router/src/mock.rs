@@ -22,8 +22,9 @@
     clippy::too_many_arguments,
 )]
 
-use crate as zrml_hybrid_router;
+use crate as pallet_pm_hybrid_router;
 use crate::{AssetOf, BalanceOf, MarketIdOf};
+use common_primitives::types::{Balance, Hash, Moment};
 use core::marker::PhantomData;
 use frame_support::{
     construct_runtime, ord_parameter_types, parameter_types,
@@ -33,17 +34,13 @@ use frame_support::{
     },
     Blake2_256,
 };
-use frame_system::{mocking::MockBlock, EnsureRoot, EnsureSignedBy};
-use orml_traits::MultiCurrency;
+use frame_system::{mocking::MockBlockU32, EnsureRoot, EnsureSignedBy};
+use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
+use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
-#[cfg(feature = "runtime-benchmarks")]
-use sp_core::{H160, H256};
-use sp_runtime::{
-    traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
-    BuildStorage, Perbill, Percent, SaturatedConversion,
-};
-use zeitgeist_primitives::{
+use parity_scale_codec::{alloc::sync::Arc, Encode};
+use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
         BlockHashCount, BlocksPerYear, CloseEarlyBlockPeriod, CloseEarlyDisputeBond,
@@ -58,51 +55,83 @@ use zeitgeist_primitives::{
         MaxYearlyInflation, MinCategories, MinDisputeDuration, MinJurorStake, MinOracleDuration,
         MinOutcomeVoteAmount, MinimumPeriod, NeoMaxSwapFee, NeoSwapsPalletId, OrderbookPalletId,
         OutsiderBond, PmPalletId, RemoveKeysLimit, RequestInterval, TreasuryPalletId, VotePeriod,
-        VotingOutcomeFee, BASE, CENT, MAX_ASSETS,
+        VotingOutcomeFee, BASE, CENT_BASE, MAX_ASSETS,
     },
-    traits::DistributeFees,
+    traits::{DistributeFees, NoopLiquidityProvider},
     types::{
-        AccountIdTest, Amount, Balance, BasicCurrencyAdapter, CombinatorialId, CurrencyId, Hash,
-        MarketId, Moment,
+        AccountIdTest, Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata,
+        MarketId, OrmlAmount, SignatureTest, TestAccountIdPK,
     },
 };
-use zrml_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
-
-#[cfg(feature = "parachain")]
-use {
-    orml_traits::asset_registry::AssetProcessor, parity_scale_codec::Encode,
-    sp_runtime::DispatchError, zeitgeist_primitives::types::Asset,
-    zeitgeist_primitives::types::CustomMetadata,
+#[cfg(feature = "runtime-benchmarks")]
+use sp_core::{H160, H256};
+use sp_runtime::{
+    traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
+    BuildStorage, DispatchError, Perbill, Percent, SaturatedConversion,
 };
 
 #[cfg(feature = "runtime-benchmarks")]
-use zeitgeist_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
+use prediction_market_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
 
-pub const ALICE: AccountIdTest = 0;
-#[allow(unused)]
-pub const BOB: AccountIdTest = 1;
-pub const CHARLIE: AccountIdTest = 2;
-pub const DAVE: AccountIdTest = 3;
-pub const EVE: AccountIdTest = 4;
-pub const FEE_ACCOUNT: AccountIdTest = 5;
-pub const SUDO: AccountIdTest = 123456;
-pub const EXTERNAL_FEES: Balance = CENT;
+use sp_core::H160;
+use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
+
+pub use prediction_market_primitives::test_helper::get_account;
 pub const INITIAL_BALANCE: Balance = 100 * BASE;
-#[allow(unused)]
-pub const MARKET_CREATOR: AccountIdTest = ALICE;
 
-#[cfg(feature = "parachain")]
+// pub const ALICE: AccountIdTest = 0;
+// #[allow(unused)]
+// pub const BOB: AccountIdTest = 1;
+// pub const CHARLIE: AccountIdTest = 2;
+// pub const DAVE: AccountIdTest = 3;
+// pub const EVE: AccountIdTest = 4;
+// pub const FEE_ACCOUNT: AccountIdTest = 5;
+// pub const SUDO: AccountIdTest = 123456;
+// pub const EXTERNAL_FEES: Balance = CENT;
+// pub const INITIAL_BALANCE: Balance = 100 * BASE;
+// #[allow(unused)]
+// pub const MARKET_CREATOR: AccountIdTest = ALICE;
+
+pub fn alice() -> TestAccountIdPK {
+    get_account(0u8)
+}
+#[allow(unused)]
+pub fn bob() -> TestAccountIdPK {
+    get_account(1u8)
+}
+pub fn charlie() -> TestAccountIdPK {
+    get_account(2u8)
+}
+pub fn dave() -> TestAccountIdPK {
+    get_account(3u8)
+}
+pub fn eve() -> TestAccountIdPK {
+    get_account(4u8)
+}
+pub fn sudo() -> TestAccountIdPK {
+    get_account(123u8)
+}
+pub fn fee_account() -> TestAccountIdPK {
+    get_account(5u8)
+}
+pub fn market_creator() -> TestAccountIdPK {
+    alice()
+}
+pub fn winning_fee_account() -> TestAccountIdPK {
+    get_account(95u8)
+}
+
 pub const FOREIGN_ASSET: Asset<MarketId> = Asset::ForeignAsset(1);
 
 parameter_types! {
-    pub const FeeAccount: AccountIdTest = FEE_ACCOUNT;
+    pub FeeAccount: TestAccountIdPK = fee_account();
 }
+
 ord_parameter_types! {
-    pub const AuthorizedDisputeResolutionUser: AccountIdTest = ALICE;
+    pub const Sudo: TestAccountIdPK = sudo();
+    pub const AuthorizedDisputeResolutionUser: TestAccountIdPK = alice();
 }
-ord_parameter_types! {
-    pub const Sudo: AccountIdTest = SUDO;
-}
+
 parameter_types! {
     pub storage NeoMinSwapFee: Balance = 0;
     pub storage MaxSplits: u16 = 128;
@@ -114,15 +143,15 @@ parameter_types! {
     pub const ValidityBond: Balance = 0;
     pub const DisputeBond: Balance = 0;
     pub const MaxCategories: u16 = MAX_ASSETS + 1;
-    pub TreasuryAccount: AccountIdTest = Treasury::account_id();
+    pub TreasuryAccount: TestAccountIdPK = Treasury::account_id();
+    pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
+    pub WinningFeeAccount: TestAccountIdPK = winning_fee_account();
 }
 
-pub fn fee_percentage() -> Perbill {
-    Perbill::from_rational(EXTERNAL_FEES, BASE)
-}
-
-pub fn calculate_fee<T: crate::Config>(amount: BalanceOf<T>) -> BalanceOf<T> {
-    fee_percentage().mul_floor(amount.saturated_into::<BalanceOf<T>>())
+pub fn calculate_fee<T: crate::Config>(_amount: BalanceOf<T>) -> BalanceOf<T> {
+    pallet_pm_neo_swaps::AdditionalSwapFee::<Runtime>::get()
+        .unwrap()
+        .saturated_into()
 }
 
 pub struct ExternalFees<T, F>(PhantomData<T>, PhantomData<F>);
@@ -148,40 +177,65 @@ where
             Err(_) => Zero::zero(),
         }
     }
+}
 
-    fn fee_percentage(_market_id: Self::MarketId) -> Perbill {
-        fee_percentage()
+pub fn calculate_winning_fee<T: crate::Config>(amount: BalanceOf<T>) -> BalanceOf<T> {
+    WinnerFeePercentage::get().mul_floor(amount.saturated_into::<BalanceOf<T>>())
+}
+
+pub struct WinningFees<T, F>(PhantomData<T>, PhantomData<F>);
+
+impl<T: crate::Config, F> DistributeFees for WinningFees<T, F>
+where
+    F: Get<T::AccountId>,
+{
+    type Asset = AssetOf<T>;
+    type AccountId = T::AccountId;
+    type Balance = BalanceOf<T>;
+    type MarketId = MarketIdOf<T>;
+
+    fn distribute(
+        _market_id: Self::MarketId,
+        asset: Self::Asset,
+        account: &Self::AccountId,
+        amount: Self::Balance,
+    ) -> Self::Balance {
+        let fees = calculate_winning_fee::<T>(amount);
+        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
+            Ok(_) => fees,
+            Err(_) => Zero::zero(),
+        }
     }
 }
 
 pub struct DustRemovalWhitelist;
 
-impl Contains<AccountIdTest> for DustRemovalWhitelist {
-    fn contains(account_id: &AccountIdTest) -> bool {
-        *account_id == FEE_ACCOUNT
+impl Contains<TestAccountIdPK> for DustRemovalWhitelist {
+    fn contains(account_id: &TestAccountIdPK) -> bool {
+        *account_id == fee_account()
     }
 }
 
 construct_runtime!(
     pub enum Runtime {
-        HybridRouter: zrml_hybrid_router,
-        Orderbook: zrml_orderbook,
-        NeoSwaps: zrml_neo_swaps,
-        #[cfg(feature = "parachain")]
-        AssetRegistry: orml_asset_registry::module,
-        Authorized: zrml_authorized,
+        HybridRouter: pallet_pm_hybrid_router,
+        Orderbook: pallet_pm_order_book,
+        NeoSwaps: pallet_pm_neo_swaps,
+        AssetRegistry: pallet_pm_eth_asset_registry,
+        Authorized: pallet_pm_authorized,
         Balances: pallet_balances,
-        CombinatorialTokens: zrml_combinatorial_tokens,
-        Court: zrml_court,
+        CombinatorialTokens: pallet_pm_combinatorial_tokens,
+        Court: pallet_pm_court,
         AssetManager: orml_currencies,
-        MarketCommons: zrml_market_commons,
-        PredictionMarkets: zrml_prediction_markets,
+        MarketCommons: pallet_pm_market_commons,
+        PredictionMarkets: pallet_prediction_markets,
         RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip,
-        GlobalDisputes: zrml_global_disputes,
+        GlobalDisputes: pallet_pm_global_disputes,
         System: frame_system,
         Timestamp: pallet_timestamp,
         Tokens: orml_tokens,
         Treasury: pallet_treasury,
+        AVN: pallet_avn,
     }
 );
 
@@ -197,19 +251,31 @@ impl crate::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxOrders = MaxOrders;
     type PalletId = HybridRouterPalletId;
-    type WeightInfo = zrml_hybrid_router::weights::WeightInfo<Runtime>;
+    type RuntimeCall = RuntimeCall;
+    type Public = TestAccountIdPK;
+    type Signature = SignatureTest;
+    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_orderbook::Config for Runtime {
+impl pallet_avn::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type AuthorityId = pallet_avn::sr25519::AuthorityId;
+    type EthereumPublicKeyChecker = ();
+    type NewSessionHandler = ();
+    type DisabledValidatorChecker = ();
+    type WeightInfo = ();
+}
+
+impl pallet_pm_order_book::Config for Runtime {
     type AssetManager = AssetManager;
     type ExternalFees = ExternalFees<Runtime, FeeAccount>;
     type RuntimeEvent = RuntimeEvent;
     type MarketCommons = MarketCommons;
     type PalletId = OrderbookPalletId;
-    type WeightInfo = zrml_orderbook::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_order_book::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_neo_swaps::Config for Runtime {
+impl pallet_pm_neo_swaps::Config for Runtime {
     type CombinatorialId = CombinatorialId;
     type CombinatorialTokens = CombinatorialTokens;
     type CombinatorialTokensUnsafe = CombinatorialTokens;
@@ -223,16 +289,21 @@ impl zrml_neo_swaps::Config for Runtime {
     type MaxSplits = MaxSplits;
     type MaxSwapFee = NeoMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
-    type WeightInfo = zrml_neo_swaps::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
+    type SignedTxLifetime = ConstU32<16>;
+    type Public = TestAccountIdPK;
+    type Signature = SignatureTest;
+    type RuntimeCall = RuntimeCall;
+    type PalletAdminGetter = PredictionMarkets;
+    type OnLiquidityProvided = NoopLiquidityProvider<TestAccountIdPK, MarketId>;
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 
-impl zrml_prediction_markets::Config for Runtime {
+impl pallet_prediction_markets::Config for Runtime {
     type AdvisoryBond = AdvisoryBond;
     type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
-    type ApproveOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
-    #[cfg(feature = "parachain")]
+    type ApproveOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
     type AssetRegistry = AssetRegistry;
     type Authorized = Authorized;
     type CloseEarlyBlockPeriod = CloseEarlyBlockPeriod;
@@ -241,8 +312,8 @@ impl zrml_prediction_markets::Config for Runtime {
     type CloseEarlyProtectionBlockPeriod = CloseEarlyProtectionBlockPeriod;
     type CloseEarlyProtectionTimeFramePeriod = CloseEarlyProtectionTimeFramePeriod;
     type CloseEarlyRequestBond = CloseEarlyRequestBond;
-    type CloseMarketEarlyOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
-    type CloseOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type CloseMarketEarlyOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type CloseOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
     type Court = Court;
     type Currency = Balances;
     type DeployPool = NeoSwaps;
@@ -264,28 +335,34 @@ impl zrml_prediction_markets::Config for Runtime {
     type OracleBond = OracleBond;
     type OutsiderBond = OutsiderBond;
     type PalletId = PmPalletId;
-    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
-    type RequestEditOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
-    type ResolveOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type RequestEditOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type ResolveOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
-    type WeightInfo = zrml_prediction_markets::weights::WeightInfo<Runtime>;
+    type RuntimeCall = RuntimeCall;
+    type Public = TestAccountIdPK;
+    type Signature = SignatureTest;
+    type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
+    type TokenInterface = ();
+    type WinnerFeePercentage = WinnerFeePercentage;
+    type WinnerFeeHandler = WinningFees<Runtime, WinningFeeAccount>;
 }
 
-impl zrml_authorized::Config for Runtime {
+impl pallet_pm_authorized::Config for Runtime {
     type AuthorizedDisputeResolutionOrigin =
-        EnsureSignedBy<AuthorizedDisputeResolutionUser, AccountIdTest>;
+        EnsureSignedBy<AuthorizedDisputeResolutionUser, TestAccountIdPK>;
     type CorrectionPeriod = CorrectionPeriod;
     type Currency = Balances;
     type RuntimeEvent = RuntimeEvent;
-    type DisputeResolution = zrml_prediction_markets::Pallet<Runtime>;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
     type MarketCommons = MarketCommons;
     type PalletId = AuthorizedPalletId;
-    type WeightInfo = zrml_authorized::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_authorized::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_combinatorial_tokens::Config for Runtime {
+impl pallet_pm_combinatorial_tokens::Config for Runtime {
     #[cfg(feature = "runtime-benchmarks")]
     type BenchmarkHelper = NoopCombinatorialTokensBenchmarkHelper<Balance, MarketId>;
     type CombinatorialIdManager = CryptographicIdManager<MarketId, Blake2_256>;
@@ -295,13 +372,13 @@ impl zrml_combinatorial_tokens::Config for Runtime {
     type Payout = PredictionMarkets;
     type RuntimeEvent = RuntimeEvent;
     type PalletId = CombinatorialTokensPalletId;
-    type WeightInfo = zrml_combinatorial_tokens::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
 }
 
-impl zrml_court::Config for Runtime {
+impl pallet_pm_court::Config for Runtime {
     type AppealBond = AppealBond;
     type BlocksPerYear = BlocksPerYear;
-    type DisputeResolution = zrml_prediction_markets::Pallet<Runtime>;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
     type VotePeriod = VotePeriod;
     type AggregationPeriod = AggregationPeriod;
     type AppealPeriod = AppealPeriod;
@@ -316,20 +393,20 @@ impl zrml_court::Config for Runtime {
     type MaxCourtParticipants = MaxCourtParticipants;
     type MaxYearlyInflation = MaxYearlyInflation;
     type MinJurorStake = MinJurorStake;
-    type MonetaryGovernanceOrigin = EnsureRoot<AccountIdTest>;
+    type MonetaryGovernanceOrigin = EnsureRoot<TestAccountIdPK>;
     type PalletId = CourtPalletId;
     type Random = RandomnessCollectiveFlip;
     type RequestInterval = RequestInterval;
     type Slash = Treasury;
     type TreasuryPalletId = TreasuryPalletId;
-    type WeightInfo = zrml_court::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_court::weights::WeightInfo<Runtime>;
 }
 
 impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
-    type AccountId = AccountIdTest;
+    type AccountId = TestAccountIdPK;
     type BaseCallFilter = Everything;
-    type Block = MockBlock<Runtime>;
+    type Block = MockBlockU32<Runtime>;
     type BlockHashCount = BlockHashCount;
     type BlockLength = ();
     type BlockWeights = ();
@@ -357,34 +434,29 @@ impl frame_system::Config for Runtime {
     type OnSetCode = ();
 }
 
-cfg_if::cfg_if!(
-    if #[cfg(feature = "parachain")] {
-        type AssetMetadata = orml_traits::asset_registry::AssetMetadata<
-            Balance,
-            CustomMetadata,
-            ConstU32<1024>
-        >;
-        pub struct NoopAssetProcessor {}
+type AssetMetadata =
+    orml_traits::asset_registry::AssetMetadata<Balance, CustomMetadata, ConstU32<1024>>;
+pub struct NoopAssetProcessor {}
 
-        impl AssetProcessor<CurrencyId, AssetMetadata> for NoopAssetProcessor {
-            fn pre_register(id: Option<CurrencyId>, asset_metadata: AssetMetadata)
-             -> Result<(CurrencyId, AssetMetadata), DispatchError> {
-                Ok((id.unwrap(), asset_metadata))
-            }
-        }
-
-        impl orml_asset_registry::module::Config for Runtime {
-            type RuntimeEvent = RuntimeEvent;
-            type CustomMetadata = CustomMetadata;
-            type AssetId = CurrencyId;
-            type AuthorityOrigin = EnsureRoot<AccountIdTest>;
-            type AssetProcessor = NoopAssetProcessor;
-            type Balance = Balance;
-            type StringLimit = ConstU32<1024>;
-            type WeightInfo = ();
-        }
+impl AssetProcessor<CurrencyId, AssetMetadata> for NoopAssetProcessor {
+    fn pre_register(
+        id: Option<CurrencyId>,
+        asset_metadata: AssetMetadata,
+    ) -> Result<(CurrencyId, AssetMetadata), DispatchError> {
+        Ok((id.unwrap(), asset_metadata))
     }
-);
+}
+
+impl pallet_pm_eth_asset_registry::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type CustomMetadata = CustomMetadata;
+    type AssetId = CurrencyId;
+    type AuthorityOrigin = EnsureRoot<TestAccountIdPK>;
+    type Balance = Balance;
+    type StringLimit = ConstU32<1024>;
+    type AssetProcessor = NoopAssetProcessor;
+    type WeightInfo = ();
+}
 
 impl orml_currencies::Config for Runtime {
     type GetNativeCurrencyId = GetNativeCurrencyId;
@@ -394,7 +466,7 @@ impl orml_currencies::Config for Runtime {
 }
 
 impl orml_tokens::Config for Runtime {
-    type Amount = Amount;
+    type Amount = OrmlAmount;
     type Balance = Balance;
     type CurrencyId = CurrencyId;
     type DustRemovalWhitelist = DustRemovalWhitelist;
@@ -423,7 +495,7 @@ impl pallet_balances::Config for Runtime {
     type WeightInfo = ();
 }
 
-impl zrml_market_commons::Config for Runtime {
+impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
     type Timestamp = Timestamp;
@@ -436,10 +508,10 @@ impl pallet_timestamp::Config for Runtime {
     type WeightInfo = ();
 }
 
-impl zrml_global_disputes::Config for Runtime {
+impl pallet_pm_global_disputes::Config for Runtime {
     type AddOutcomePeriod = AddOutcomePeriod;
     type RuntimeEvent = RuntimeEvent;
-    type DisputeResolution = zrml_prediction_markets::Pallet<Runtime>;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
     type MarketCommons = MarketCommons;
     type Currency = Balances;
     type GlobalDisputeLockId = GlobalDisputeLockId;
@@ -450,7 +522,7 @@ impl zrml_global_disputes::Config for Runtime {
     type RemoveKeysLimit = RemoveKeysLimit;
     type GdVotingPeriod = GdVotingPeriod;
     type VotingOutcomeFee = VotingOutcomeFee;
-    type WeightInfo = zrml_global_disputes::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_global_disputes::weights::WeightInfo<Runtime>;
 }
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -471,8 +543,8 @@ impl ArgumentsFactory<(), AccountIdTest> for BenchmarkHelper {
 impl pallet_treasury::Config for Runtime {
     type AssetKind = ();
     type BalanceConverter = UnityAssetBalanceConversion;
-    type Beneficiary = AccountIdTest;
-    type BeneficiaryLookup = IdentityLookup<AccountIdTest>;
+    type Beneficiary = TestAccountIdPK;
+    type BeneficiaryLookup = IdentityLookup<TestAccountIdPK>;
     type Burn = ();
     type BurnDestination = ();
     type Currency = Balances;
@@ -481,7 +553,7 @@ impl pallet_treasury::Config for Runtime {
     type PalletId = TreasuryPalletId;
     type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
     type PayoutPeriod = ();
-    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
     type SpendFunds = ();
     type SpendOrigin = NeverEnsureOrigin<Balance>;
     type SpendPeriod = ();
@@ -492,7 +564,7 @@ impl pallet_treasury::Config for Runtime {
 
 #[allow(unused)]
 pub struct ExtBuilder {
-    balances: Vec<(AccountIdTest, Balance)>,
+    balances: Vec<(TestAccountIdPK, Balance)>,
 }
 
 // TODO(#1222): Remove this in favor of adding whatever the account need in the individual tests.
@@ -501,11 +573,11 @@ impl Default for ExtBuilder {
     fn default() -> Self {
         Self {
             balances: vec![
-                (ALICE, INITIAL_BALANCE),
-                (CHARLIE, INITIAL_BALANCE),
-                (DAVE, INITIAL_BALANCE),
-                (EVE, INITIAL_BALANCE),
-                (FEE_ACCOUNT, INITIAL_BALANCE),
+                (alice(), INITIAL_BALANCE),
+                (charlie(), INITIAL_BALANCE),
+                (dave(), INITIAL_BALANCE),
+                (eve(), INITIAL_BALANCE),
+                (fee_account(), INITIAL_BALANCE),
             ],
         }
     }
@@ -514,45 +586,55 @@ impl Default for ExtBuilder {
 #[allow(unused)]
 impl ExtBuilder {
     pub fn build(self) -> sp_io::TestExternalities {
+        let keystore = MemoryKeystore::new();
         let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
         let _ = env_logger::builder().is_test(true).try_init();
+        pallet_pm_neo_swaps::GenesisConfig::<Runtime> { additional_swap_fee: CENT_BASE / 100 }
+            .assimilate_storage(&mut t)
+            .unwrap();
         pallet_balances::GenesisConfig::<Runtime> { balances: self.balances }
             .assimilate_storage(&mut t)
             .unwrap();
-        #[cfg(feature = "parachain")]
-        {
-            orml_tokens::GenesisConfig::<Runtime> {
-                balances: vec![
-                    (ALICE, FOREIGN_ASSET, INITIAL_BALANCE),
-                    (FEE_ACCOUNT, FOREIGN_ASSET, INITIAL_BALANCE),
-                ],
-            }
-            .assimilate_storage(&mut t)
-            .unwrap();
-            let custom_metadata = zeitgeist_primitives::types::CustomMetadata {
-                allow_as_base_asset: true,
-                ..Default::default()
-            };
-            orml_asset_registry::module::GenesisConfig::<Runtime> {
-                assets: vec![(
-                    FOREIGN_ASSET,
-                    AssetMetadata {
-                        decimals: 18,
-                        name: "MKL".as_bytes().to_vec().try_into().unwrap(),
-                        symbol: "MKL".as_bytes().to_vec().try_into().unwrap(),
-                        existential_deposit: 0,
-                        location: None,
-                        additional: custom_metadata,
-                    }
-                    .encode(),
-                )],
-                last_asset_id: FOREIGN_ASSET,
-            }
-            .assimilate_storage(&mut t)
-            .unwrap();
+        orml_tokens::GenesisConfig::<Runtime> {
+            balances: vec![
+                (alice(), FOREIGN_ASSET, INITIAL_BALANCE),
+                (fee_account(), FOREIGN_ASSET, INITIAL_BALANCE),
+            ],
         }
+        .assimilate_storage(&mut t)
+        .unwrap();
+        let custom_metadata = prediction_market_primitives::types::CustomMetadata {
+            allow_as_base_asset: true,
+            ..Default::default()
+        };
+        pallet_pm_eth_asset_registry::GenesisConfig::<Runtime> {
+            assets: vec![(
+                H160::from([1; 20]),
+                FOREIGN_ASSET,
+                AssetMetadata {
+                    decimals: 18,
+                    name: "MKL".as_bytes().to_vec().try_into().unwrap(),
+                    symbol: "MKL".as_bytes().to_vec().try_into().unwrap(),
+                    existential_deposit: 0,
+                    location: None,
+                    additional: custom_metadata,
+                }
+                .encode(),
+            )],
+            last_asset_id: FOREIGN_ASSET,
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
+        pallet_prediction_markets::GenesisConfig::<Runtime> {
+            vault_account: Some(sudo()),
+            market_admin: Some(market_creator()),
+        }
+        .assimilate_storage(&mut t)
+        .unwrap();
+
         let mut test_ext: sp_io::TestExternalities = t.into();
+        test_ext.register_extension(KeystoreExt(Arc::new(keystore)));
         test_ext.execute_with(|| System::set_block_number(1));
         test_ext
     }

@@ -19,7 +19,7 @@
 
 use crate::{AccountIdOf, BalanceOf, MarketIdOf};
 use frame_system::pallet_prelude::BlockNumberFor;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::MarketCommonsPalletApi,
     types::{Asset, Market},
 };
@@ -33,18 +33,18 @@ pub(crate) fn market_mock<T>(creator: T::AccountId) -> MarketOf<T>
 where
     T: crate::Config,
 {
-    use sp_runtime::{traits::AccountIdConversion, Perbill};
-    use zeitgeist_primitives::{
+    use prediction_market_primitives::{
         constants::mock::PmPalletId,
         types::{
             Deadlines, MarketBonds, MarketCreation, MarketDisputeMechanism, MarketPeriod,
             MarketStatus, MarketType, ScoringRule,
         },
     };
+    use sp_runtime::{traits::AccountIdConversion, Perbill};
 
-    zeitgeist_primitives::types::Market {
+    prediction_market_primitives::types::Market {
         market_id: 0u8.into(),
-        base_asset: Asset::Ztg,
+        base_asset: Asset::Tru,
         creation: MarketCreation::Permissionless,
         creator_fee: Perbill::zero(),
         creator,
