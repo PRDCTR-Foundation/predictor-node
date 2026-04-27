@@ -23,7 +23,7 @@ use sp_runtime::BuildStorage;
 use {
     crate::mock::{consts::FOREIGN_ASSET, runtime::AssetMetadata},
     parity_scale_codec::Encode,
-    zeitgeist_primitives::types::CustomMetadata,
+    prediction_market_primitives::types::CustomMetadata,
 };
 
 pub struct ExtBuilder;

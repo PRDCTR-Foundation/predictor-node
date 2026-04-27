@@ -23,17 +23,17 @@ use frame_benchmarking::v2::*;
 use frame_support::dispatch::RawOrigin;
 use frame_system::Pallet as System;
 use orml_traits::MultiCurrency;
-use sp_runtime::{traits::Zero, Perbill};
-use zeitgeist_primitives::{
-    math::fixed::{BaseProvider, ZeitgeistBase},
+use prediction_market_primitives::{
+    math::fixed::{BaseProvider, PredictionMarketBase},
     traits::{CombinatorialTokensBenchmarkHelper, CombinatorialTokensFuel, MarketCommonsPalletApi},
     types::{Asset, Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
+use sp_runtime::{traits::Zero, Perbill};
 
 fn create_market<T: Config>(caller: T::AccountId, asset_count: u16) -> MarketIdOf<T> {
     let market = Market {
         market_id: Default::default(),
-        base_asset: Asset::Ztg,
+        base_asset: Asset::Tru,
         creation: MarketCreation::Permissionless,
         creator_fee: Perbill::zero(),
         creator: caller.clone(),
@@ -55,7 +55,7 @@ fn create_market<T: Config>(caller: T::AccountId, asset_count: u16) -> MarketIdO
 
 fn create_payout_vector<T: Config>(asset_count: u16) -> Vec<BalanceOf<T>> {
     let mut result = vec![Zero::zero(); asset_count as usize];
-    result[0] = ZeitgeistBase::get().unwrap();
+    result[0] = PredictionMarketBase::get().unwrap();
 
     result
 }
@@ -82,9 +82,9 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
-        T::MultiCurrency::deposit(Asset::Ztg, &alice, amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Tru, &alice, amount).unwrap();
 
         #[extrinsic_call]
         split_position(
@@ -121,7 +121,7 @@ mod benchmarks {
             parent_collection_id,
             market_id,
             partition,
-            asset_in: Asset::Ztg,
+            asset_in: Asset::Tru,
             assets_out,
             collection_ids,
             amount,
@@ -158,7 +158,7 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
         T::MultiCurrency::deposit(pos_01, &alice, amount).unwrap();
 
@@ -224,7 +224,7 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
         // Add 1...10 to Alice's account.
         let mut asset_in_index_set = vec![true; asset_count];
@@ -298,7 +298,7 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
         let assets_in: Vec<_> = partition
             .iter()
@@ -317,7 +317,7 @@ mod benchmarks {
         for &asset in assets_in.iter() {
             T::MultiCurrency::deposit(asset, &alice, amount).unwrap();
         }
-        T::MultiCurrency::deposit(Asset::Ztg, &Pallet::<T>::account_id(), amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Tru, &Pallet::<T>::account_id(), amount).unwrap();
 
         #[extrinsic_call]
         merge_position(
@@ -334,7 +334,7 @@ mod benchmarks {
             parent_collection_id,
             market_id,
             partition,
-            asset_out: Asset::Ztg,
+            asset_out: Asset::Tru,
             assets_in,
             amount,
         });
@@ -370,7 +370,7 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
         let assets_in: Vec<_> = partition
             .iter()
@@ -431,7 +431,7 @@ mod benchmarks {
                 index_set
             })
             .collect();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
 
         let assets_in: Vec<_> = partition
             .iter()
@@ -509,9 +509,9 @@ mod benchmarks {
             T::Fuel::from_total(total),
         )
         .unwrap();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
         T::MultiCurrency::deposit(position, &alice, amount).unwrap();
-        T::MultiCurrency::deposit(Asset::Ztg, &Pallet::<T>::account_id(), amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Tru, &Pallet::<T>::account_id(), amount).unwrap();
 
         #[extrinsic_call]
         redeem_position(
@@ -529,7 +529,7 @@ mod benchmarks {
             index_set,
             asset_in: position,
             amount_in: amount,
-            asset_out: Asset::Ztg,
+            asset_out: Asset::Tru,
             amount_out: amount,
         });
         System::<T>::assert_last_event(expected_event.into());
@@ -566,7 +566,7 @@ mod benchmarks {
             T::Fuel::from_total(total),
         )
         .unwrap();
-        let amount = ZeitgeistBase::get().unwrap();
+        let amount = PredictionMarketBase::get().unwrap();
         T::MultiCurrency::deposit(pos_01_10, &alice, amount).unwrap();
 
         let payout_vector = create_payout_vector::<T>(asset_count);

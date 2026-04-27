@@ -33,15 +33,15 @@ use crate::{
 };
 use frame_support::{assert_noop, assert_ok};
 use orml_traits::MultiCurrency;
-use sp_runtime::{DispatchError, Perbill};
-use zeitgeist_primitives::{
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::{
     constants::base_multiples::*,
     types::{
         AccountIdTest, Asset, Asset::CombinatorialToken, Balance, Market, MarketBonds,
         MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType, ScoringRule,
     },
 };
-use zrml_market_commons::MarketCommonsPalletApi;
+use sp_runtime::{DispatchError, Perbill};
 
 // For better readability of index sets.
 pub(crate) const B0: bool = false;

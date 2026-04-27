@@ -19,7 +19,7 @@ use super::*;
 use test_case::test_case;
 
 #[test_case(
-    Asset::Ztg,
+    Asset::Tru,
     CombinatorialToken([207, 168, 160, 93, 238, 221, 197, 1, 171, 102, 28, 24, 18, 107, 205, 231, 227, 98, 220, 105, 211, 29, 181, 30, 53, 7, 200, 154, 134, 246, 38, 139]),
     CombinatorialToken([101, 210, 61, 196, 5, 247, 150, 41, 186, 49, 11, 63, 139, 53, 25, 65, 161, 83, 24, 142, 225, 102, 57, 241, 199, 18, 226, 137, 68, 3, 219, 131])
 )]
@@ -35,11 +35,15 @@ fn merge_position_works_no_parent(
 ) {
     ExtBuilder::build().execute_with(|| {
         let amount = _100;
-        let alice =
-            Account::new(0).deposit(ct_001, amount).unwrap().deposit(ct_110, amount).unwrap();
+        let alice = Account::new(0)
+            .deposit(ct_001, amount)
+            .unwrap()
+            .deposit(ct_110, amount)
+            .unwrap();
         // Mock a deposit into the pallet's account.
-        let pallet =
-            Account::new(Pallet::<Runtime>::account_id()).deposit(collateral, amount).unwrap();
+        let pallet = Account::new(Pallet::<Runtime>::account_id())
+            .deposit(collateral, amount)
+            .unwrap();
 
         let parent_collection_id = None;
         let market_id = create_market(collateral, MarketType::Categorical(3));
@@ -96,14 +100,14 @@ fn merge_position_works_parent() {
             .deposit(ct_001_1010, amount)
             .unwrap();
 
-        let _ = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let _ = create_market(Asset::Tru, MarketType::Categorical(3));
 
         // Collection ID of [0, 0, 1].
         let parent_collection_id = Some([
             6, 44, 173, 50, 122, 106, 144, 185, 253, 19, 252, 218, 215, 241, 218, 37, 196, 112, 45,
             133, 165, 48, 231, 189, 87, 123, 131, 18, 190, 5, 110, 93,
         ]);
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(4));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(4));
         let partition = vec![vec![B0, B1, B0, B1], vec![B1, B0, B1, B0]];
         assert_ok!(CombinatorialTokens::merge_position(
             alice.signed(),
@@ -152,7 +156,7 @@ fn merge_position_horizontal_works() {
         let amount = _100;
         let alice = Account::new(0).deposit(ct_100, _100).unwrap().deposit(ct_010, _100).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_ok!(CombinatorialTokens::merge_position(
             alice.signed(),
@@ -172,7 +176,7 @@ fn merge_position_horizontal_works() {
 #[test]
 fn merge_position_fails_if_market_not_found() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
         assert_noop!(
             CombinatorialTokens::merge_position(
@@ -183,7 +187,7 @@ fn merge_position_fails_if_market_not_found() {
                 1,
                 Fuel::new(16, false),
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
     });
 }
@@ -191,10 +195,10 @@ fn merge_position_fails_if_market_not_found() {
 #[test]
 fn merge_position_fails_on_invalid_partition_length() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
         // Market has three outcomes, but there's an element in the partition of size two.
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B1]];
 
         assert_noop!(
@@ -214,9 +218,9 @@ fn merge_position_fails_on_invalid_partition_length() {
 #[test]
 fn merge_position_fails_on_trivial_partition_member() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B0, B0]];
 
         assert_noop!(
@@ -236,9 +240,9 @@ fn merge_position_fails_on_trivial_partition_member() {
 #[test]
 fn merge_position_fails_on_overlapping_partition_members() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
         let partition = vec![vec![B1, B0, B1], vec![B0, B0, B1]];
 
         assert_noop!(
@@ -258,9 +262,9 @@ fn merge_position_fails_on_overlapping_partition_members() {
 #[test]
 fn merge_position_fails_on_insufficient_funds() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Ztg, _99).unwrap();
+        let alice = Account::new(0).deposit(Asset::Tru, _99).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_noop!(
             CombinatorialTokens::merge_position(
@@ -281,7 +285,7 @@ fn merge_position_fails_on_insufficient_funds_foreign_token() {
     ExtBuilder::build().execute_with(|| {
         let alice = Account::new(0).deposit(Asset::ForeignAsset(1), _99).unwrap();
 
-        let market_id = create_market(Asset::Ztg, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
 
         assert_noop!(
             CombinatorialTokens::merge_position(

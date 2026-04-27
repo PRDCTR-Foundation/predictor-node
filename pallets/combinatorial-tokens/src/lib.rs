@@ -57,12 +57,7 @@ mod pallet {
     };
     use orml_traits::MultiCurrency;
     use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
-    use scale_info::TypeInfo;
-    use sp_runtime::{
-        traits::{AccountIdConversion, Get, Zero},
-        DispatchError, DispatchResult, SaturatedConversion,
-    };
-    use zeitgeist_primitives::{
+    use prediction_market_primitives::{
         math::{checked_ops_res::CheckedAddRes, fixed::FixedMul},
         traits::{
             CombinatorialTokensApi, CombinatorialTokensFuel, CombinatorialTokensUnsafeApi,
@@ -70,9 +65,14 @@ mod pallet {
         },
         types::{Asset, CombinatorialId, SplitPositionDispatchInfo},
     };
+    use scale_info::TypeInfo;
+    use sp_runtime::{
+        traits::{AccountIdConversion, Get, Zero},
+        DispatchError, DispatchResult, SaturatedConversion,
+    };
 
     #[cfg(feature = "runtime-benchmarks")]
-    use zeitgeist_primitives::traits::CombinatorialTokensBenchmarkHelper;
+    use prediction_market_primitives::traits::CombinatorialTokensBenchmarkHelper;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -144,9 +144,9 @@ mod pallet {
         /// User `who` has split `amount` units of token `asset_in` into the same amount of each
         /// token in `assets_out` using `partition`. The ith element of `partition` matches the ith
         /// element of `assets_out`, so `assets_out[i]` is the outcome represented by the specified
-        /// `parent_collection_id` when split using `partition[i]` in `market_id`. The same goes for
-        /// the `collection_ids` vector, the ith element of which specifies the collection ID of
-        /// `assets_out[i]`.
+        /// `parent_collection_id` when split using `partition[i]` in `market_id`. The same goes
+        /// for the `collection_ids` vector, the ith element of which specifies the
+        /// collection ID of `assets_out[i]`.
         TokenSplit {
             who: AccountIdOf<T>,
             parent_collection_id: Option<CombinatorialId>,
@@ -230,8 +230,8 @@ mod pallet {
         /// pallet account, depending on whether or not it is a true combinatorial token or
         /// collateral.
         ///
-        /// If the `parent_collection_id` is `None`, then the position split is the collateral of the
-        /// market given by `market_id`.
+        /// If the `parent_collection_id` is `None`, then the position split is the collateral of
+        /// the market given by `market_id`.
         ///
         /// If the `parent_collection_id` is `Some(pid)`, then there are two cases: vertical and
         /// horizontal split. If `partition` is complete (i.e. there is no index `i` so that `b[i]`
@@ -294,8 +294,8 @@ mod pallet {
         /// up of the position to be split and the conjunction `(x|...|z)` where `x, ..., z` are the
         /// items of `b`. The position given by `parent_collection_id` is
         ///
-        /// If the `parent_collection_id` is `None`, then the position split is the collateral of the
-        /// market given by `market_id`.
+        /// If the `parent_collection_id` is `None`, then the position split is the collateral of
+        /// the market given by `market_id`.
         ///
         /// If the `parent_collection_id` is `Some(pid)`, then there are two cases: vertical and
         /// horizontal merge. If `partition` is complete (i.e. there is no index `i` so that `b[i]`
@@ -401,7 +401,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
                 TransmutationType::VerticalSansParent => {
                     // Split collateral into first level position. Store the collateral in the
                     // pallet account. This is the legacy `buy_complete_set`.
@@ -412,7 +412,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
                 TransmutationType::Horizontal => {
                     // Horizontal split.
                     T::MultiCurrency::ensure_can_withdraw(position, &who, amount)?;
@@ -422,7 +422,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
             };
 
             // Deposit the new tokens.
@@ -513,7 +513,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
                 TransmutationType::VerticalSansParent => {
                     // Merge first-level tokens into collateral. Move collateral from the pallet
                     // account to the user's wallet. This is the legacy `sell_complete_set`.
@@ -523,7 +523,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
                 TransmutationType::Horizontal => {
                     // Horizontal merge.
                     T::MultiCurrency::deposit(position, &who, amount)?;
@@ -532,7 +532,7 @@ mod pallet {
                         partition.len().saturated_into(),
                         fuel.total(),
                     )
-                }
+                },
             };
 
             Self::deposit_event(Event::<T>::TokenMerged {

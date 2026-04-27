@@ -17,7 +17,7 @@
 
 use alloc::vec;
 use core::cell::RefCell;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::PayoutApi,
     types::{Balance, MarketId},
 };
@@ -35,7 +35,7 @@ impl MockPayout {
 
     pub fn called_once_with(expected: MarketId) -> bool {
         if PAYOUT_VECTOR_CALL_DATA.with(|values| values.borrow().len()) != 1 {
-            return false;
+            return false
         }
 
         let actual =

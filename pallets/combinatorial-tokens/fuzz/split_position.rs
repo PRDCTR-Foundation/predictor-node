@@ -22,11 +22,11 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
     types::{Asset, MarketType},
 };
-use zrml_combinatorial_tokens::{
+use pallet_pm_combinatorial_tokens::{
     mock::{
         ext_builder::ExtBuilder,
         runtime::{CombinatorialTokens, Runtime, RuntimeOrigin},
@@ -79,7 +79,7 @@ fuzz_target!(|params: SplitPositionFuzzParams| {
     ext.execute_with(|| {
         // We create a market and equip the user with the tokens they require to make the
         // `split_position` call meaningful.
-        let collateral = Asset::Ztg;
+        let collateral = Asset::Tru;
         let asset_count = if let Some(member) = params.partition.first() {
             member.len().max(2) as u16
         } else {
@@ -99,7 +99,7 @@ fuzz_target!(|params: SplitPositionFuzzParams| {
 
             Asset::CombinatorialToken(position_id)
         } else {
-            Asset::Ztg
+            Asset::Tru
         };
         <<Runtime as Config>::MultiCurrency>::deposit(position, &params.account_id, params.amount)
             .unwrap();

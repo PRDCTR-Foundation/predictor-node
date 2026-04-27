@@ -16,7 +16,7 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 #[cfg(feature = "parachain")]
-use zeitgeist_primitives::types::{Asset, MarketId};
+use prediction_market_primitives::types::{Asset, MarketId};
 
 #[cfg(feature = "parachain")]
 pub(crate) const FOREIGN_ASSET: Asset<MarketId> = Asset::ForeignAsset(1);
