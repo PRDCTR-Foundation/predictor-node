@@ -8,13 +8,13 @@ test = false
 arbitrary = { workspace = true, features = ["derive"] }
 frame-system = { workspace = true, features = ["default"] }
 libfuzzer-sys = { workspace = true }
-zeitgeist-primitives = { workspace = true, features = ["default"] }
-zrml-orderbook = { workspace = true, features = ["default", "mock"] }
+prediction-market-primitives = { workspace = true, features = ["default"] }
+pallet-pm-order-book = { workspace = true, features = ["default", "mock"] }
 
 [package]
 authors = ["Automatically generated"]
 edition.workspace = true
-name = "zrml-orderbook-fuzz"
+name = "pallet-pm-order-book-fuzz"
 publish = false
 version = "0.6.1"
 

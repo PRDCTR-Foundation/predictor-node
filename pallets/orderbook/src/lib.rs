@@ -38,8 +38,7 @@ use frame_system::{
 };
 use orml_traits::{BalanceStatus, MultiCurrency, NamedMultiReservableCurrency};
 pub use pallet::*;
-use sp_runtime::traits::{Get, Zero};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     hybrid_router_api_types::{ApiError, ExternalFee, OrderbookSoftFail, OrderbookTrade},
     math::{
         checked_ops_res::{CheckedAddRes, CheckedSubRes},
@@ -49,6 +48,7 @@ use zeitgeist_primitives::{
     traits::{DistributeFees, HybridRouterOrderbookApi, MarketCommonsPalletApi},
     types::{Asset, Market, MarketStatus, MarketType, ScalarPosition, ScoringRule},
 };
+use sp_runtime::traits::{Get, Zero};
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarks;
@@ -64,7 +64,7 @@ mod pallet {
     use super::*;
 
     #[allow(dead_code)]
-    const LOG_TARGET: &str = "runtime::zrml-orderbook";
+    const LOG_TARGET: &str = "runtime::pallet-pm-order-book";
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -262,13 +262,13 @@ mod pallet {
                         assets.push(Asset::CategoricalOutcome(market_id, i));
                     }
                     assets
-                }
+                },
                 MarketType::Scalar(_) => {
                     vec![
                         Asset::ScalarOutcome(market_id, ScalarPosition::Long),
                         Asset::ScalarOutcome(market_id, ScalarPosition::Short),
                     ]
-                }
+                },
             }
         }
 
@@ -305,8 +305,8 @@ mod pallet {
             // this ensures that partial fills, which fill nearly the whole order, are not executed
             // this protects the last fill happening
             // without a division by zero for `Perquintill::from_rational`
-            let is_ratio_quotient_valid = maker_full_fill.is_zero()
-                || maker_full_fill >= T::AssetManager::minimum_balance(order_data.taker_asset);
+            let is_ratio_quotient_valid = maker_full_fill.is_zero() ||
+                maker_full_fill >= T::AssetManager::minimum_balance(order_data.taker_asset);
             ensure!(is_ratio_quotient_valid, Error::<T>::PartialFillNearFullFillNotAllowed);
             Ok(())
         }

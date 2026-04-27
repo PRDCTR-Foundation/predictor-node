@@ -24,12 +24,13 @@
 
 use super::*;
 use crate::{utils::market_mock, Pallet as Orderbook};
+use common_primitives::constants::currency::BASE;
 use frame_benchmarking::{account, benchmarks, whitelisted_caller};
 use frame_support::traits::UnfilteredDispatchable;
 use frame_system::RawOrigin;
 use orml_traits::MultiCurrency;
+use prediction_market_primitives::types::Asset;
 use sp_runtime::SaturatedConversion;
-use zeitgeist_primitives::{constants::BASE, types::Asset};
 
 fn generate_funded_account<T: Config>(
     seed: Option<u32>,

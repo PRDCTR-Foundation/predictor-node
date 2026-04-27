@@ -17,18 +17,18 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{mock::*, utils::market_mock, Error, Event, Order, Orders};
+use common_primitives::constants::currency::BASE;
 use frame_support::{assert_noop, assert_ok};
 use orml_tokens::Error as AError;
 use orml_traits::{MultiCurrency, MultiReservableCurrency};
 use pallet_balances::Error as BError;
-use sp_runtime::{Perbill, Perquintill};
-use test_case::test_case;
-use zeitgeist_primitives::{
-    constants::BASE,
+use pallet_pm_market_commons::{Error as MError, MarketCommonsPalletApi, Markets};
+use prediction_market_primitives::{
     hybrid_router_api_types::ExternalFee,
     types::{Asset, MarketStatus, MarketType, ScalarPosition, ScoringRule},
 };
-use zrml_market_commons::{Error as MError, MarketCommonsPalletApi, Markets};
+use sp_runtime::{Perbill, Perquintill};
+use test_case::test_case;
 
 #[test_case(ScoringRule::Parimutuel; "Parimutuel")]
 fn place_order_fails_with_wrong_scoring_rule(scoring_rule: ScoringRule) {
@@ -424,7 +424,7 @@ fn place_order_fails_if_market_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = 0u128;
 
-        let maker_asset = Asset::Ztg;
+        let maker_asset = Asset::Tru;
         let taker_asset = Asset::CategoricalOutcome(0, 2);
 
         assert_noop!(
@@ -830,7 +830,8 @@ fn it_fills_order_partially_maker_outcome_asset() {
                 order_id,
                 maker: BOB,
                 taker: ALICE,
-                // this is confusing, it's 140_000_000_000, so the invert of 860_000_000_000, which got filled
+                // this is confusing, it's 140_000_000_000, so the invert of 860_000_000_000, which
+                // got filled
                 filled_maker_amount: maker_amount - filled_maker_amount,
                 filled_taker_amount: alice_portion,
                 unfilled_maker_amount: filled_maker_amount,

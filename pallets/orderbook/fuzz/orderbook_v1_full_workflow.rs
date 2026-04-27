@@ -19,8 +19,8 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use zeitgeist_primitives::types::{Asset, ScalarPosition};
-use zrml_orderbook::mock::{ExtBuilder, Orderbook, RuntimeOrigin};
+use prediction_market_primitives::types::{Asset, ScalarPosition};
+use pallet_pm_order_book::mock::{ExtBuilder, Orderbook, RuntimeOrigin};
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::{Arbitrary, Result, Unstructured};
@@ -93,7 +93,7 @@ fn asset(seed: (u128, u16)) -> Asset<u128> {
             Asset::ScalarOutcome(seed0, scalar_position)
         }
         2 => Asset::PoolShare(seed0),
-        _ => Asset::Ztg,
+        _ => Asset::Tru,
     }
 }
 

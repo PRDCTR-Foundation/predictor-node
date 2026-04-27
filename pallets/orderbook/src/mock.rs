@@ -18,43 +18,38 @@
 
 #![cfg(feature = "mock")]
 
-use crate as zrml_orderbook;
+use crate as pallet_pm_order_book;
 use crate::{AssetOf, BalanceOf, MarketIdOf};
+use common_primitives::types::{Balance, Hash, Moment};
 use core::marker::PhantomData;
 use frame_support::{construct_runtime, pallet_prelude::Get, parameter_types, traits::Everything};
 use frame_system::mocking::MockBlock;
 use orml_traits::MultiCurrency;
-use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, Zero},
-    BuildStorage, Perbill, SaturatedConversion,
-};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     constants::mock::{
         BlockHashCount, ExistentialDeposit, ExistentialDeposits, GetNativeCurrencyId, MaxLocks,
-        MaxReserves, MinimumPeriod, OrderbookPalletId, BASE, CENT,
+        MaxReserves, MinimumPeriod, OrderbookPalletId, BASE, CENT_BASE,
     },
     traits::DistributeFees,
-    types::{
-        AccountIdTest, Amount, Balance, BasicCurrencyAdapter, CurrencyId, Hash, MarketId, Moment,
-    },
+    types::{AccountIdTest, BasicCurrencyAdapter, CurrencyId, MarketId, OrmlAmount},
+};
+use sp_runtime::{
+    traits::{BlakeTwo256, IdentityLookup, Zero},
+    BuildStorage, SaturatedConversion,
 };
 
 pub const ALICE: AccountIdTest = 0;
 pub const BOB: AccountIdTest = 1;
 pub const MARKET_CREATOR: AccountIdTest = 42;
 pub const INITIAL_BALANCE: Balance = 100 * BASE;
-pub const EXTERNAL_FEES: Balance = CENT;
+pub const EXTERNAL_FEES: Balance = CENT_BASE / 100;
 
 parameter_types! {
     pub const FeeAccount: AccountIdTest = MARKET_CREATOR;
 }
 
-pub fn fee_percentage<T: crate::Config>() -> Perbill {
-    Perbill::from_rational(EXTERNAL_FEES, BASE)
-}
-
-pub fn calculate_fee<T: crate::Config>(amount: BalanceOf<T>) -> BalanceOf<T> {
-    fee_percentage::<T>().mul_floor(amount.saturated_into::<BalanceOf<T>>())
+pub fn calculate_fee<T: crate::Config>(_amount: BalanceOf<T>) -> BalanceOf<T> {
+    EXTERNAL_FEES.saturated_into()
 }
 
 pub struct ExternalFees<T, F>(PhantomData<T>, PhantomData<F>);
@@ -80,17 +75,13 @@ where
             Err(_) => Zero::zero(),
         }
     }
-
-    fn fee_percentage(_market_id: Self::MarketId) -> Perbill {
-        fee_percentage::<T>()
-    }
 }
 
 construct_runtime!(
     pub enum Runtime {
         Balances: pallet_balances,
-        MarketCommons: zrml_market_commons,
-        Orderbook: zrml_orderbook,
+        MarketCommons: pallet_pm_market_commons,
+        Orderbook: pallet_pm_order_book,
         System: frame_system,
         Tokens: orml_tokens,
         AssetManager: orml_currencies,
@@ -104,7 +95,7 @@ impl crate::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MarketCommons = MarketCommons;
     type PalletId = OrderbookPalletId;
-    type WeightInfo = zrml_orderbook::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_order_book::weights::WeightInfo<Runtime>;
 }
 
 impl frame_system::Config for Runtime {
@@ -147,7 +138,7 @@ impl orml_currencies::Config for Runtime {
 }
 
 impl orml_tokens::Config for Runtime {
-    type Amount = Amount;
+    type Amount = OrmlAmount;
     type Balance = Balance;
     type CurrencyId = CurrencyId;
     type DustRemovalWhitelist = Everything;
@@ -183,7 +174,7 @@ impl pallet_timestamp::Config for Runtime {
     type WeightInfo = ();
 }
 
-impl zrml_market_commons::Config for Runtime {
+impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
     type Timestamp = Timestamp;
