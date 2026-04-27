@@ -26,31 +26,37 @@ mod deploy_pool;
 mod exit;
 mod join;
 mod liquidity_tree_interactions;
+mod pallet_admin_tests;
 mod sell;
+mod signed_exit;
+mod signed_join;
+mod signed_withdraw_fees;
 mod withdraw_fees;
 
 use crate::{consts::*, mock::*, traits::*, *};
+use common_primitives::constants::currency::CENT_BASE;
 use frame_support::{assert_noop, assert_ok};
 use orml_traits::MultiCurrency;
-use sp_runtime::Perbill;
-use zeitgeist_primitives::{
-    constants::{base_multiples::*, CENT},
+use pallet_pm_combinatorial_tokens::types::Fuel;
+use pallet_pm_market_commons::{MarketCommonsPalletApi, Markets};
+use pallet_prediction_markets::WhitelistedMarketCreators;
+pub use prediction_market_primitives::test_helper::get_account_from_seed;
+use prediction_market_primitives::{
+    constants::base_multiples::*,
     math::fixed::{FixedDiv, FixedMul},
     types::{
-        AccountIdTest, Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus,
-        MarketType, MultiHash, ScalarPosition, ScoringRule,
+        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
+        MultiHash, ScalarPosition, ScoringRule, TestAccountIdPK,
     },
 };
-use zrml_combinatorial_tokens::types::Fuel;
-use zrml_market_commons::{MarketCommonsPalletApi, Markets};
 
-#[cfg(not(feature = "parachain"))]
-const BASE_ASSET: Asset<MarketId> = Asset::Ztg;
-#[cfg(feature = "parachain")]
-const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
+const BASE_ASSET: Asset<MarketId> = Asset::Tru;
+// const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
+pub use sp_runtime::traits::Hash;
+use sp_runtime::Perbill;
 
 fn create_market(
-    creator: AccountIdTest,
+    creator: TestAccountIdPK,
     base_asset: Asset<MarketId>,
     market_type: MarketType,
     scoring_rule: ScoringRule,
@@ -58,15 +64,17 @@ fn create_market(
     let mut metadata = [2u8; 50];
     metadata[0] = 0x15;
     metadata[1] = 0x30;
+    <WhitelistedMarketCreators<Runtime>>::insert(&creator, ());
     assert_ok!(PredictionMarkets::create_market(
         RuntimeOrigin::signed(creator),
         base_asset,
         Perbill::zero(),
-        EVE,
+        eve(),
         MarketPeriod::Block(0..2),
         Deadlines {
             grace_period: 0_u32.into(),
-            oracle_duration: <Runtime as zrml_prediction_markets::Config>::MinOracleDuration::get(),
+            oracle_duration:
+                <Runtime as pallet_prediction_markets::Config>::MinOracleDuration::get().into(),
             dispute_duration: 0_u32.into(),
         },
         MultiHash::Sha3_384(metadata),
@@ -85,15 +93,15 @@ fn create_market_and_deploy_pool(
     amount: BalanceOf<Runtime>,
     spot_prices: Vec<BalanceOf<Runtime>>,
     swap_fee: BalanceOf<Runtime>,
-) -> MarketId {
+) -> MarketIdOf<Runtime> {
     let market_id = create_market(creator, base_asset, market_type, ScoringRule::AmmCdaHybrid);
     assert_ok!(PredictionMarkets::buy_complete_set(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         market_id,
         amount,
     ));
     assert_ok!(NeoSwaps::deploy_pool(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         market_id,
         amount,
         spot_prices.clone(),
@@ -123,7 +131,7 @@ fn create_markets_and_deploy_combinatorial_pool(
 
     let pool_id = <Pallet<Runtime> as PoolStorage>::next_pool_id();
     assert_ok!(NeoSwaps::deploy_combinatorial_pool(
-        RuntimeOrigin::signed(ALICE),
+        RuntimeOrigin::signed(alice()),
         asset_count,
         market_ids.clone(),
         amount,

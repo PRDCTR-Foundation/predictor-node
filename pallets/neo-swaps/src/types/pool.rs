@@ -31,14 +31,14 @@ use frame_support::{
     storage::bounded_btree_map::BoundedBTreeMap, BoundedVec, CloneNoBound, PartialEqNoBound,
     RuntimeDebugNoBound,
 };
+use pallet_pm_market_commons::MarketCommonsPalletApi;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use prediction_market_primitives::types::MarketStatus;
 use scale_info::TypeInfo;
 use sp_runtime::{
     traits::{CheckedAdd, CheckedSub, Get},
     DispatchError, DispatchResult, SaturatedConversion, Saturating,
 };
-use zeitgeist_primitives::types::MarketStatus;
-use zrml_market_commons::MarketCommonsPalletApi;
 
 #[derive(
     CloneNoBound, Decode, Encode, Eq, MaxEncodedLen, PartialEqNoBound, RuntimeDebugNoBound, TypeInfo,
@@ -89,7 +89,7 @@ where
             let market = T::MarketCommons::market(market_id)?;
 
             if market.status != MarketStatus::Active {
-                return Ok(false);
+                return Ok(false)
             }
         }
 

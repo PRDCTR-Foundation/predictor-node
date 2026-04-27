@@ -23,9 +23,9 @@ fn combo_sell_works() {
     ExtBuilder::default().build().execute_with(|| {
         let liquidity = _10;
         let spot_prices = vec![_1_4, _3_4];
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Scalar(0..=1)],
             liquidity,
@@ -44,11 +44,11 @@ fn combo_sell_works() {
         let sell = vec![sell_asset];
 
         for &asset in buy.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_buy));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_buy));
         }
 
         assert_ok!(NeoSwaps::combo_sell(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             pool_id,
             2,
             buy.clone(),
@@ -64,14 +64,14 @@ fn combo_sell_works() {
         let expected_swap_fee_amount = expected_fees / 2;
         let expected_external_fee_amount = expected_fees - expected_swap_fee_amount;
         let expected_amount_out_minus_fees = expected_amount_out - expected_fees;
-        assert_balance!(BOB, BASE_ASSET, expected_amount_out_minus_fees);
-        assert_balance!(BOB, buy_asset, 0);
+        assert_balance!(bob(), BASE_ASSET, expected_amount_out_minus_fees);
+        assert_balance!(bob(), buy_asset, 0);
         assert_pool_state!(
             pool_id,
             vec![40367746103, 61119621067],
             [5_714_285_714, 4_285_714_286],
             liquidity_parameter_before,
-            create_b_tree_map!({ ALICE => liquidity }),
+            create_b_tree_map!({ alice() => liquidity }),
             expected_swap_fee_amount,
         );
         assert_balance!(
@@ -79,10 +79,10 @@ fn combo_sell_works() {
             BASE_ASSET,
             expected_swap_fee_amount + AssetManager::minimum_balance(pool.collateral)
         );
-        assert_balance!(FEE_ACCOUNT, BASE_ASSET, expected_external_fee_amount);
+        assert_balance!(fee_account(), BASE_ASSET, expected_external_fee_amount);
         System::assert_last_event(
             Event::ComboSellExecuted {
-                who: BOB,
+                who: bob(),
                 pool_id,
                 buy,
                 keep,
@@ -133,7 +133,7 @@ fn combo_sell_works() {
 #[test_case(
     vec![MarketType::Categorical(3)],
     _321,
-    vec![20 * CENT, 30 * CENT, 50 * CENT],
+    vec![20 * CENT_BASE, 30 * CENT_BASE, 50 * CENT_BASE],
     vec![0, 2],
     vec![],
     vec![1],
@@ -168,9 +168,9 @@ fn combo_sell_works_multi_market(
 ) {
     ExtBuilder::default().build().execute_with(|| {
         let asset_count = spot_prices.len() as u16;
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             market_types,
             liquidity,
@@ -186,14 +186,14 @@ fn combo_sell_works_multi_market(
         let sell: Vec<_> = sell_indices.iter().map(|&i| pool.assets()[i as usize]).collect();
 
         for &asset in buy.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_in_buy));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_in_buy));
         }
         for &asset in keep.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_in_keep));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_in_keep));
         }
 
         assert_ok!(NeoSwaps::combo_sell(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             pool_id,
             asset_count,
             buy.clone(),
@@ -204,16 +204,16 @@ fn combo_sell_works_multi_market(
             0,
         ));
 
-        assert_balance!(BOB, BASE_ASSET, expected_amount_out);
+        assert_balance!(bob(), BASE_ASSET, expected_amount_out);
         for asset in pool.assets() {
-            assert_balance!(BOB, asset, 0);
+            assert_balance!(bob(), asset, 0);
         }
         assert_pool_state!(
             pool_id,
             expected_reserves,
             expected_spot_prices,
             expected_liquidity,
-            create_b_tree_map!({ ALICE => liquidity }),
+            create_b_tree_map!({ alice() => liquidity }),
             expected_fees,
         );
     });
@@ -223,18 +223,18 @@ fn combo_sell_works_multi_market(
 fn combo_sell_fails_on_incorrect_asset_count() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 7,
                 vec![pool.assets()[0]],
@@ -253,18 +253,18 @@ fn combo_sell_fails_on_incorrect_asset_count() {
 fn combo_sell_fails_on_pool_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 1,
                 2,
                 vec![pool.assets()[0]],
@@ -287,12 +287,12 @@ fn combo_sell_fails_on_pool_not_found() {
 fn combo_sell_fails_on_inactive_market(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         let (market_ids, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         MarketCommons::mutate_market(&market_ids[1], |market| {
@@ -302,7 +302,7 @@ fn combo_sell_fails_on_inactive_market(market_status: MarketStatus) {
         .unwrap();
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 8,
                 vec![pool.assets()[0]],
@@ -321,29 +321,29 @@ fn combo_sell_fails_on_inactive_market(market_status: MarketStatus) {
 fn combo_sell_fails_on_insufficient_funds_with_keep() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let buy_amount = _10;
         let keep_amount = _9;
 
-        assert_ok!(AssetManager::deposit(pool.assets()[0], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[1], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[2], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[3], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[4], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[5], &BOB, buy_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[6], &BOB, keep_amount));
-        assert_ok!(AssetManager::deposit(pool.assets()[7], &BOB, keep_amount - 1));
+        assert_ok!(AssetManager::deposit(pool.assets()[0], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[1], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[2], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[3], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[4], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[5], &bob(), buy_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[6], &bob(), keep_amount));
+        assert_ok!(AssetManager::deposit(pool.assets()[7], &bob(), keep_amount - 1));
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 8,
                 vec![pool.assets()[0], pool.assets()[2], pool.assets()[4]],
@@ -362,28 +362,28 @@ fn combo_sell_fails_on_insufficient_funds_with_keep() {
 fn combo_sell_fails_on_insufficient_funds_sans_keep() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_in = _10;
 
-        assert_ok!(AssetManager::deposit(pool.assets()[0], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[1], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[2], &BOB, amount_in - 1));
-        assert_ok!(AssetManager::deposit(pool.assets()[3], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[4], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[5], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[6], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[7], &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[0], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[1], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[2], &bob(), amount_in - 1));
+        assert_ok!(AssetManager::deposit(pool.assets()[3], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[4], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[5], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[6], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[7], &bob(), amount_in));
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 8,
                 vec![pool.assets()[0], pool.assets()[2], pool.assets()[4], pool.assets()[6]],
@@ -402,28 +402,28 @@ fn combo_sell_fails_on_insufficient_funds_sans_keep() {
 fn combo_sell_fails_on_amount_out_below_min() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
 
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_in = _10;
-        assert_ok!(AssetManager::deposit(pool.assets()[0], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[1], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[2], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[3], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[4], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[5], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[6], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[7], &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[0], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[1], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[2], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[3], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[4], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[5], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[6], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[7], &bob(), amount_in));
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 8,
                 vec![pool.assets()[0], pool.assets()[2], pool.assets()[4], pool.assets()[6]],
@@ -453,24 +453,24 @@ fn combo_sell_fails_on_invalid_partition(
 ) {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(2), MarketType::Categorical(2), MarketType::Scalar(0..=1)],
             _100,
             vec![1_250_000_000; 8],
-            CENT,
+            CENT_BASE,
         );
 
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_in = _10;
-        assert_ok!(AssetManager::deposit(pool.assets()[0], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[1], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[2], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[3], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[4], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[5], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[6], &BOB, amount_in));
-        assert_ok!(AssetManager::deposit(pool.assets()[7], &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[0], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[1], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[2], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[3], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[4], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[5], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[6], &bob(), amount_in));
+        assert_ok!(AssetManager::deposit(pool.assets()[7], &bob(), amount_in));
 
         let buy: Vec<_> = buy_indices.iter().map(|&i| pool.assets()[i as usize]).collect();
         let keep: Vec<_> = keep_indices.iter().map(|&i| pool.assets()[i as usize]).collect();
@@ -479,7 +479,7 @@ fn combo_sell_fails_on_invalid_partition(
         // Buying 1 at price of .5 will return less than 2 outcomes due to slippage.
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 8,
                 buy,
@@ -498,12 +498,12 @@ fn combo_sell_fails_on_invalid_partition(
 fn combo_sell_fails_on_spot_price_slipping_too_low() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(5)],
             _100,
-            vec![20 * CENT; 5],
-            CENT,
+            vec![20 * CENT_BASE; 5],
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_buy = 1_000 * _1;
@@ -512,12 +512,12 @@ fn combo_sell_fails_on_spot_price_slipping_too_low() {
         let sell = pool.assets()[4..5].to_vec();
 
         for &asset in buy.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_buy));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_buy));
         }
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 5,
                 buy,
@@ -536,12 +536,12 @@ fn combo_sell_fails_on_spot_price_slipping_too_low() {
 fn combo_sell_fails_on_large_amount() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(5)],
             _100,
-            vec![20 * CENT; 5],
-            CENT,
+            vec![20 * CENT_BASE; 5],
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_buy = 100 * _100;
@@ -550,12 +550,12 @@ fn combo_sell_fails_on_large_amount() {
         let buy = pool.assets()[4..5].to_vec();
 
         for &asset in buy.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_buy));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_buy));
         }
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 5,
                 buy,
@@ -575,12 +575,12 @@ fn combo_sell_fails_on_large_amount() {
 fn combo_sell_fails_on_invalid_amount_keep(keep_indices: Vec<u16>, amount_in_keep: u128) {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Categorical(5)],
             _100,
-            vec![20 * CENT; 5],
-            CENT,
+            vec![20 * CENT_BASE; 5],
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
 
@@ -590,7 +590,7 @@ fn combo_sell_fails_on_invalid_amount_keep(keep_indices: Vec<u16>, amount_in_kee
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 5,
                 buy,
@@ -609,12 +609,12 @@ fn combo_sell_fails_on_invalid_amount_keep(keep_indices: Vec<u16>, amount_in_kee
 fn combo_sell_fails_on_invalid_pool_type() {
     ExtBuilder::default().build().execute_with(|| {
         let pool_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(5),
             _10,
             vec![_1_5, _1_5, _1_5, _1_5, _1_5],
-            CENT,
+            CENT_BASE,
         );
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let amount_buy = _1;
@@ -623,12 +623,12 @@ fn combo_sell_fails_on_invalid_pool_type() {
         let buy = pool.assets()[4..5].to_vec();
 
         for &asset in buy.iter() {
-            assert_ok!(AssetManager::deposit(asset, &BOB, amount_buy));
+            assert_ok!(AssetManager::deposit(asset, &bob(), amount_buy));
         }
 
         assert_noop!(
             NeoSwaps::combo_sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 pool_id,
                 5,
                 buy,

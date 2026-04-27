@@ -17,8 +17,8 @@
 
 use crate::{traits::PoolStorage, Config, Error, Pallet, PoolCount, PoolOf, Pools};
 use frame_support::require_transactional;
+use prediction_market_primitives::math::checked_ops_res::CheckedIncRes;
 use sp_runtime::DispatchError;
-use zeitgeist_primitives::math::checked_ops_res::CheckedIncRes;
 
 impl<T> PoolStorage for Pallet<T>
 where

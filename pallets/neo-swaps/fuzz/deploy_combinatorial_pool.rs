@@ -22,7 +22,7 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     constants::base_multiples::*,
     traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
     types::{Asset, MarketType},

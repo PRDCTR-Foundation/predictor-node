@@ -24,12 +24,12 @@ use crate::{
 };
 use alloc::{collections::BTreeMap, vec};
 use core::marker::PhantomData;
-use sp_runtime::{traits::Zero, Saturating};
-use zeitgeist_primitives::{
+use prediction_market_primitives::{
     math::fixed::{BaseProvider, ZeitgeistBase},
     traits::FutarchyBenchmarkHelper,
     types::Asset,
 };
+use sp_runtime::{traits::Zero, Saturating};
 
 pub struct DecisionMarketBenchmarkHelper<T>(PhantomData<T>);
 

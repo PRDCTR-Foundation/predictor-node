@@ -27,7 +27,7 @@
   tabsize=4
 }
 
-\title{zrml-neo-swaps Documentation}
+\title{pallet-pm-neo-swaps Documentation}
 \date{0.4.3 (\today)}
 
 \begin{document}
@@ -36,7 +36,7 @@
 
 \section{Introduction}
 
-This document provides the mathematical and technical details for zrml-neo-swaps. The automatic market maker (AMM) implemented by zrml-neo-swaps is a variant of the Logarithmic Market Scoring Rule (LMSR; \cite{hanson_2003}) which was first developed by Gnosis (see \url{https://gnosis-conditional-tokens.readthedocs.io/en/latest/developer-guide.html#}). We often refer to it as AMM 2.0.
+This document provides the mathematical and technical details for pallet-pm-neo-swaps. The automatic market maker (AMM) implemented by pallet-pm-neo-swaps is a variant of the Logarithmic Market Scoring Rule (LMSR; \cite{hanson_2003}) which was first developed by Gnosis (see \url{https://gnosis-conditional-tokens.readthedocs.io/en/latest/developer-guide.html#}). We often refer to it as AMM 2.0.
 
 Unlike the typical implementation using a cost function (see \cite{chen_vaughan_2010}), this implementation of LMSR is a \emph{constant-function market maker} (CFMM), similar to the classical constant product market maker, which allows us to implement \emph{dynamic liquidity}. In other words, liquidity providers (LPs) can come and go as they please, allowing the market to self-regulate how much price resistance the AMM should provide.
 
@@ -217,7 +217,7 @@ Let $A = 10$. Python calculates $e^A = 22026.465794806718$ and $e^{-A} = 4.53999
     \item When buying, then the $\ln$ argument must satisfy $e^{x/b} - 1 + e^{-r_i/b} \geq c$ and $x \leq M$ (to avoid overflows).
 \end{itemize}
 
-The last restriction may need some elaboration. We actually allow $e^{-r_i/b}$ to underflow to zero during calculation, but only provided that the remaining term $e^{x/b} - 1$ is large enough to avoid this to cause any damage. In fact, on the interval $[c, \infty)$, the logarithm has derivative $\leq c^{-1} = 10$, so all rounding errors in the argument of $\ln$ cause (only) ten times the error in the calculation of $\ln$. 
+The last restriction may need some elaboration. We actually allow $e^{-r_i/b}$ to underflow to zero during calculation, but only provided that the remaining term $e^{x/b} - 1$ is large enough to avoid this to cause any damage. In fact, on the interval $[c, \infty)$, the logarithm has derivative $\leq c^{-1} = 10$, so all rounding errors in the argument of $\ln$ cause (only) ten times the error in the calculation of $\ln$.
 
 How \emph{bad} are these restrictions? The restriction $x \leq M$ is completely irrelevant: Suppose Alice executes a trade of $y(x)$ units of outcome $i$ for $x = M$ dollars, the maximum allowed value. Let $q = 1 - e^{-r_i/b} \in (0, 1)$. Then
 \begin{align*}

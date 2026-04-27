@@ -192,7 +192,7 @@ mod detail {
         liquidity: FixedType,
     ) -> Option<FixedType> {
         if buy.is_empty() || sell.is_empty() || amount_in.is_zero() {
-            return None;
+            return None
         }
 
         let exp_sum_buy = exp_sum(buy, liquidity)?;
@@ -218,7 +218,7 @@ mod detail {
         liquidity: FixedType,
     ) -> Option<FixedType> {
         if buy.is_empty() || sell.is_empty() || amount_buy.is_zero() {
-            return None;
+            return None
         }
 
         let exp_sum_buy = exp_sum(buy, liquidity)?;
@@ -244,10 +244,10 @@ mod detail {
     ) -> Option<FixedType> {
         // Ensure that either `keep` is empty and `amount_keep` is zero, or `keep` is non-empty and
         // `amount_keep` is non-zero.
-        if (keep.is_empty() && !amount_keep.is_zero())
-            || (!keep.is_empty() && amount_keep.is_zero())
+        if (keep.is_empty() && !amount_keep.is_zero()) ||
+            (!keep.is_empty() && amount_keep.is_zero())
         {
-            return None;
+            return None
         }
 
         // Reserves change after the first equalization. Since we do two equalization calculations
@@ -267,8 +267,10 @@ mod detail {
 
             let buy_intermediate =
                 buy.into_iter().map(|x| x.checked_add(delta_buy)).collect::<Option<Vec<_>>>()?;
-            let keep_intermediate =
-                keep.into_iter().map(|x| x.checked_sub(delta_keep)).collect::<Option<Vec<_>>>()?;
+            let keep_intermediate = keep
+                .into_iter()
+                .map(|x| x.checked_sub(delta_keep))
+                .collect::<Option<Vec<_>>>()?;
             let buy_keep = buy_intermediate.into_iter().chain(keep_intermediate).collect();
 
             (amount_buy.checked_sub(delta_buy)?, buy_keep)
@@ -305,8 +307,8 @@ mod tests {
     use super::*;
     use crate::mock::Runtime as MockRuntime;
     use frame_support::assert_err;
+    use prediction_market_primitives::constants::base_multiples::*;
     use test_case::test_case;
-    use zeitgeist_primitives::constants::base_multiples::*;
 
     type MockBalance = BalanceOf<MockRuntime>;
     type MockMath = ComboMath<MockRuntime>;

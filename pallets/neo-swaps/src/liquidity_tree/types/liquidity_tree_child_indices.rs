@@ -17,8 +17,8 @@
 
 /// Structure for managing children in a liquidity tree.
 pub(crate) struct LiquidityTreeChildIndices {
-    /// Left-hand side child; `None` if there's no left-hand side child (the node is either empty or
-    /// the parent is a leaf).
+    /// Left-hand side child; `None` if there's no left-hand side child (the node is either empty
+    /// or the parent is a leaf).
     pub(crate) lhs: Option<u32>,
     /// Right-hand side child; `None` if there's no right-hand side child (the node is either empty
     /// of the parent is a leaf).

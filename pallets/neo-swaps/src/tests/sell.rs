@@ -23,9 +23,9 @@ fn sell_works() {
     ExtBuilder::default().build().execute_with(|| {
         let liquidity = _10;
         let spot_prices = vec![_1_4, _3_4];
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             liquidity,
@@ -35,30 +35,32 @@ fn sell_works() {
         let pool = Pools::<Runtime>::get(market_id).unwrap();
         let amount_in = _10;
         let liquidity_parameter_before = pool.liquidity_parameter;
-        deposit_complete_set(market_id, BOB, amount_in);
+        deposit_complete_set(market_id, bob(), amount_in);
         let asset_in = pool.assets()[1];
         assert_ok!(NeoSwaps::sell(
-            RuntimeOrigin::signed(BOB),
+            RuntimeOrigin::signed(bob()),
             market_id,
             2,
             asset_in,
             amount_in,
             0,
         ));
-        let total_fee_percentage = swap_fee + EXTERNAL_FEES;
+
         let expected_amount_out = 59632253897;
-        let expected_fees = total_fee_percentage.bmul(expected_amount_out).unwrap();
-        let expected_swap_fee_amount = expected_fees / 2;
-        let expected_external_fee_amount = expected_fees - expected_swap_fee_amount;
+        let expected_fees =
+            swap_fee.bmul(expected_amount_out).unwrap() + NeoSwaps::additional_swap_fee().unwrap();
+        let expected_swap_fee_amount = expected_fees - NeoSwaps::additional_swap_fee().unwrap();
+        let expected_external_fee_amount = NeoSwaps::additional_swap_fee().unwrap();
         let expected_amount_out_minus_fees = expected_amount_out - expected_fees;
-        assert_balance!(BOB, BASE_ASSET, expected_amount_out_minus_fees);
-        assert_balance!(BOB, asset_in, 0);
+
+        assert_balance!(bob(), BASE_ASSET, expected_amount_out_minus_fees);
+        assert_balance!(bob(), asset_in, 0);
         assert_pool_state!(
             market_id,
             vec![40367746103, 61119621067],
             [5_714_285_714, 4_285_714_286],
             liquidity_parameter_before,
-            create_b_tree_map!({ ALICE => liquidity }),
+            create_b_tree_map!({ alice() => liquidity }),
             expected_swap_fee_amount,
         );
         assert_balance!(
@@ -66,7 +68,7 @@ fn sell_works() {
             BASE_ASSET,
             expected_swap_fee_amount + AssetManager::minimum_balance(pool.collateral)
         );
-        assert_balance!(FEE_ACCOUNT, BASE_ASSET, expected_external_fee_amount);
+        assert_balance!(fee_account(), BASE_ASSET, expected_external_fee_amount);
         assert_eq!(
             AssetManager::total_issuance(pool.assets()[0]),
             liquidity + amount_in - expected_amount_out
@@ -77,7 +79,7 @@ fn sell_works() {
         );
         System::assert_last_event(
             Event::SellExecuted {
-                who: BOB,
+                who: bob(),
                 pool_id: market_id,
                 asset_in,
                 amount_in,
@@ -94,16 +96,16 @@ fn sell_works() {
 fn sell_fails_on_incorrect_asset_count() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 1,
                 Asset::ScalarOutcome(market_id, ScalarPosition::Long),
@@ -119,24 +121,24 @@ fn sell_fails_on_incorrect_asset_count() {
 fn sell_fails_on_market_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         Markets::<Runtime>::remove(market_id);
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 2,
                 Asset::ScalarOutcome(market_id, ScalarPosition::Long),
                 _1,
                 0
             ),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
     });
 }
@@ -149,12 +151,12 @@ fn sell_fails_on_market_not_found() {
 fn sell_fails_on_inactive_market(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         MarketCommons::mutate_market(&market_id, |market| {
             market.status = market_status;
@@ -163,7 +165,7 @@ fn sell_fails_on_inactive_market(market_status: MarketStatus) {
         .unwrap();
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 2,
                 Asset::ScalarOutcome(market_id, ScalarPosition::Long),
@@ -178,11 +180,15 @@ fn sell_fails_on_inactive_market(market_status: MarketStatus) {
 #[test]
 fn sell_fails_on_pool_not_found() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Scalar(0..=1),
+            ScoringRule::AmmCdaHybrid,
+        );
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 2,
                 Asset::ScalarOutcome(market_id, ScalarPosition::Long),
@@ -199,16 +205,16 @@ fn sell_fails_on_pool_not_found() {
 fn sell_fails_on_asset_not_found(market_type: MarketType) {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             market_type,
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 2,
                 Asset::CategoricalOutcome(market_id, 2),
@@ -225,20 +231,20 @@ fn sell_fails_if_amount_in_is_greater_than_numerical_threshold() {
     ExtBuilder::default().build().execute_with(|| {
         let asset_count = 4;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(asset_count),
             _10,
             vec![_1_4, _1_4, _1_4, _1_4],
-            CENT,
+            CENT_BASE,
         );
         let pool = Pools::<Runtime>::get(market_id).unwrap();
         let asset_in = Asset::CategoricalOutcome(market_id, asset_count - 1);
         let amount_in = pool.calculate_numerical_threshold() + 1;
-        assert_ok!(AssetManager::deposit(asset_in, &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(asset_in, &bob(), amount_in));
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 asset_count,
                 asset_in,
@@ -255,12 +261,12 @@ fn sell_fails_if_price_is_too_low() {
     ExtBuilder::default().build().execute_with(|| {
         let asset_count = 4;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(asset_count),
             _10,
             vec![_1_4, _1_4, _1_4, _1_4],
-            CENT,
+            CENT_BASE,
         );
         let asset_in = Asset::CategoricalOutcome(market_id, asset_count - 1);
         // Force the price below the threshold by changing the reserve of the pool. Strictly
@@ -272,10 +278,10 @@ fn sell_fails_if_price_is_too_low() {
         })
         .unwrap();
         let amount_in = _1;
-        assert_ok!(AssetManager::deposit(asset_in, &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(asset_in, &bob(), amount_in));
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 asset_count,
                 asset_in,
@@ -292,12 +298,12 @@ fn sell_fails_if_price_is_pushed_below_threshold() {
     ExtBuilder::default().build().execute_with(|| {
         let asset_count = 4;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(asset_count),
             _10,
             vec![_1_4, _1_4, _1_4, _1_4],
-            CENT,
+            CENT_BASE,
         );
         let asset_in = Asset::CategoricalOutcome(market_id, asset_count - 1);
         // Force the price below the threshold by changing the reserve of the pool. Strictly
@@ -311,13 +317,13 @@ fn sell_fails_if_price_is_pushed_below_threshold() {
         })
         .unwrap();
         let amount_in = _10;
-        assert_ok!(AssetManager::deposit(asset_in, &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(asset_in, &bob(), amount_in));
         // The received amount is so small that it triggers an ED error if we don't "pad out" Bob's
         // account with some funds.
-        assert_ok!(AssetManager::deposit(BASE_ASSET, &BOB, _1));
+        assert_ok!(AssetManager::deposit(BASE_ASSET, &bob(), _1));
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 asset_count,
                 asset_in,
@@ -333,19 +339,19 @@ fn sell_fails_if_price_is_pushed_below_threshold() {
 fn sell_fails_on_insufficient_funds() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         let amount_in = _10;
         let asset_in = Asset::ScalarOutcome(market_id, ScalarPosition::Long);
-        assert_ok!(AssetManager::deposit(asset_in, &BOB, amount_in - 1));
+        assert_ok!(AssetManager::deposit(asset_in, &bob(), amount_in - 1));
         assert_noop!(
             NeoSwaps::sell(
-                RuntimeOrigin::signed(BOB),
+                RuntimeOrigin::signed(bob()),
                 market_id,
                 2,
                 asset_in,
@@ -361,19 +367,19 @@ fn sell_fails_on_insufficient_funds() {
 fn sell_fails_on_amount_out_below_min() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _100,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         let amount_in = _20;
         let asset_in = Asset::ScalarOutcome(market_id, ScalarPosition::Long);
-        assert_ok!(AssetManager::deposit(asset_in, &BOB, amount_in));
+        assert_ok!(AssetManager::deposit(asset_in, &bob(), amount_in));
         // Selling 20 at price of .5 will return less than 10 dollars due to slippage.
         assert_noop!(
-            NeoSwaps::sell(RuntimeOrigin::signed(BOB), market_id, 2, asset_in, amount_in, _10),
+            NeoSwaps::sell(RuntimeOrigin::signed(bob()), market_id, 2, asset_in, amount_in, _10),
             Error::<Runtime>::AmountOutBelowMin,
         );
     });
@@ -383,19 +389,19 @@ fn sell_fails_on_amount_out_below_min() {
 fn sell_fails_on_invalid_pool_type() {
     ExtBuilder::default().build().execute_with(|| {
         let (_, pool_id) = create_markets_and_deploy_combinatorial_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             vec![MarketType::Scalar(0..=1)],
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
 
         let pool = <Pallet<Runtime> as PoolStorage>::get(pool_id).unwrap();
         let assets = pool.assets();
 
         assert_noop!(
-            NeoSwaps::sell(RuntimeOrigin::signed(BOB), pool_id, 2, assets[0], _1, 0),
+            NeoSwaps::sell(RuntimeOrigin::signed(bob()), pool_id, 2, assets[0], _1, 0),
             Error::<Runtime>::InvalidPoolType,
         );
     });

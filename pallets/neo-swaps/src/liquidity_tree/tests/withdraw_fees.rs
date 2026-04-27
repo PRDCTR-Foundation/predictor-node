@@ -31,7 +31,7 @@ fn withdraw_fees_works_root() {
     nodes[1].lazy_fees += 300_000_000_000; // 30
     nodes[2].lazy_fees += 45_000_000_000; // 4.5
 
-    assert_eq!(tree.withdraw_fees(&3).unwrap(), 35_000_000_000); // 2 (fees) + 1.5 (lazy)
+    assert_eq!(tree.withdraw_fees(&get_account(3)).unwrap(), 35_000_000_000); // 2 (fees) + 1.5 (lazy)
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }
 
@@ -49,7 +49,7 @@ fn withdraw_fees_works_middle() {
     nodes[4].lazy_fees += _1;
     nodes[7].lazy_fees += 48_000_000_000; // 4.8
 
-    assert_eq!(tree.withdraw_fees(&5).unwrap(), 22_000_000_000); // 1 (fees) + 1.2 (lazy)
+    assert_eq!(tree.withdraw_fees(&get_account(5)).unwrap(), 22_000_000_000); // 1 (fees) + 1.2 (lazy)
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }
 
@@ -68,6 +68,6 @@ fn withdraw_fees_works_leaf() {
     nodes[7].fees = Zero::zero();
     nodes[7].lazy_fees = Zero::zero();
 
-    assert_eq!(tree.withdraw_fees(&6).unwrap(), 88_000_000_000); // 1 (fees) + 7.8 (lazy)
+    assert_eq!(tree.withdraw_fees(&get_account(6)).unwrap(), 88_000_000_000); // 1 (fees) + 7.8 (lazy)
     assert_liquidity_tree_state!(tree, nodes, account_to_index, abandoned_nodes);
 }

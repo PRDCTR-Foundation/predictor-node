@@ -18,17 +18,17 @@
 use crate::{BalanceOf, Config};
 use frame_support::RuntimeDebugNoBound;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use prediction_market_primitives::math::checked_ops_res::CheckedAddRes;
 use scale_info::TypeInfo;
 use sp_runtime::{traits::Zero, DispatchError};
-use zeitgeist_primitives::math::checked_ops_res::CheckedAddRes;
 
 /// Type for nodes of a liquidity tree.
 ///
 /// # Notes
 ///
 /// - `descendant_stake` does not contain the stake of `self`.
-/// - `lazy_fees`, when propagated, is distributed not only to the descendants of `self`, but also to
-///   `self`.
+/// - `lazy_fees`, when propagated, is distributed not only to the descendants of `self`, but also
+///   to `self`.
 #[derive(Clone, Decode, Encode, Eq, MaxEncodedLen, PartialEq, RuntimeDebugNoBound, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 pub(crate) struct Node<T: Config> {

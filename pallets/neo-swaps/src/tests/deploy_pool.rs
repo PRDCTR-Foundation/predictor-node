@@ -23,12 +23,12 @@ use test_case::test_case;
 #[test]
 fn deploy_pool_works_with_binary_markets() {
     ExtBuilder::default().build().execute_with(|| {
-        let alice_before = AssetManager::free_balance(BASE_ASSET, &ALICE);
+        let alice_before = AssetManager::free_balance(BASE_ASSET, &alice());
         let amount = _10;
         let spot_prices = vec![_1_2, _1_2];
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(2),
             amount,
@@ -46,13 +46,13 @@ fn deploy_pool_works_with_binary_markets() {
         assert_liquidity_tree_state!(
             pool.liquidity_shares_manager,
             [Node::<Runtime> {
-                account: Some(ALICE),
+                account: Some(alice()),
                 stake: amount,
                 fees: 0u128,
                 descendant_stake: 0u128,
                 lazy_fees: 0u128,
             }],
-            create_b_tree_map!({ ALICE => 0 }),
+            create_b_tree_map!({ alice() => 0 }),
             Vec::<u32>::new(),
         );
         assert_eq!(pool.swap_fee, swap_fee);
@@ -63,15 +63,15 @@ fn deploy_pool_works_with_binary_markets() {
         assert_eq!(pool.reserve_of(&assets[1]).unwrap(), amount);
         assert_eq!(pool.calculate_spot_price(assets[0]).unwrap(), spot_prices[0]);
         assert_eq!(pool.calculate_spot_price(assets[1]).unwrap(), spot_prices[1]);
-        assert_balance!(ALICE, BASE_ASSET, alice_before - amount - buffer);
-        assert_balance!(ALICE, assets[0], 0);
-        assert_balance!(ALICE, assets[1], 0);
+        assert_balance!(alice(), BASE_ASSET, alice_before - amount - buffer);
+        assert_balance!(alice(), assets[0], 0);
+        assert_balance!(alice(), assets[1], 0);
         let mut reserves = BTreeMap::new();
         reserves.insert(assets[0], amount);
         reserves.insert(assets[1], amount);
         System::assert_last_event(
             Event::PoolDeployed {
-                who: ALICE,
+                who: alice(),
                 market_id,
                 pool_id: market_id,
                 account_id: pool.account_id,
@@ -83,16 +83,17 @@ fn deploy_pool_works_with_binary_markets() {
             }
             .into(),
         );
+        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &alice()), true);
     });
 }
 
 #[test]
 fn deploy_pool_works_with_scalar_marktes() {
     ExtBuilder::default().build().execute_with(|| {
-        let alice_before = AssetManager::free_balance(BASE_ASSET, &ALICE);
+        let alice_before = AssetManager::free_balance(BASE_ASSET, &alice());
         let amount = _100;
         let spot_prices = vec![_1_6, _5_6 + 1];
-        let swap_fee = CENT;
+        let swap_fee = CENT_BASE;
         let market_id: MarketId = 0;
         let assets = vec![
             Asset::ScalarOutcome(market_id, ScalarPosition::Long),
@@ -107,7 +108,7 @@ fn deploy_pool_works_with_scalar_marktes() {
             rogue_funds
         ));
         let _ = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             amount,
@@ -124,13 +125,13 @@ fn deploy_pool_works_with_scalar_marktes() {
         assert_liquidity_tree_state!(
             pool.liquidity_shares_manager,
             [Node::<Runtime> {
-                account: Some(ALICE),
+                account: Some(alice()),
                 stake: amount,
                 fees: 0u128,
                 descendant_stake: 0u128,
                 lazy_fees: 0u128,
             }],
-            create_b_tree_map!({ ALICE => 0 }),
+            create_b_tree_map!({ alice() => 0 }),
             Vec::<u32>::new(),
         );
         assert_eq!(pool.swap_fee, swap_fee);
@@ -140,18 +141,21 @@ fn deploy_pool_works_with_scalar_marktes() {
         assert_eq!(pool.reserve_of(&assets[1]).unwrap(), expected_amounts[1]);
         assert_eq!(pool.calculate_spot_price(assets[0]).unwrap(), spot_prices[0]);
         assert_eq!(pool.calculate_spot_price(assets[1]).unwrap(), spot_prices[1]);
-        assert_balance!(ALICE, BASE_ASSET, alice_before - amount - buffer);
-        assert_balance!(ALICE, assets[0], 0);
-        assert_balance!(ALICE, assets[1], amount - expected_amounts[1]);
-        let price_sum =
-            pool.assets().iter().map(|&a| pool.calculate_spot_price(a).unwrap()).sum::<u128>();
+        assert_balance!(alice(), BASE_ASSET, alice_before - amount - buffer);
+        assert_balance!(alice(), assets[0], 0);
+        assert_balance!(alice(), assets[1], amount - expected_amounts[1]);
+        let price_sum = pool
+            .assets()
+            .iter()
+            .map(|&a| pool.calculate_spot_price(a).unwrap())
+            .sum::<u128>();
         assert_eq!(price_sum, _1);
         let mut reserves = BTreeMap::new();
         reserves.insert(assets[0], expected_amounts[0]);
         reserves.insert(assets[1], expected_amounts[1]);
         System::assert_last_event(
             Event::PoolDeployed {
-                who: ALICE,
+                who: alice(),
                 market_id,
                 pool_id: market_id,
                 account_id: pool.account_id,
@@ -163,16 +167,27 @@ fn deploy_pool_works_with_scalar_marktes() {
             }
             .into(),
         );
+        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &alice()), true);
     });
 }
 
 #[test]
 fn deploy_pool_fails_on_incorrect_vec_len() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Scalar(0..=1),
+            ScoringRule::AmmCdaHybrid,
+        );
         assert_noop!(
-            NeoSwaps::deploy_pool(RuntimeOrigin::signed(ALICE), market_id, _10, vec![_1_3], CENT),
+            NeoSwaps::deploy_pool(
+                RuntimeOrigin::signed(alice()),
+                market_id,
+                _10,
+                vec![_1_3],
+                CENT_BASE
+            ),
             Error::<Runtime>::IncorrectVecLen
         );
     });
@@ -182,8 +197,14 @@ fn deploy_pool_fails_on_incorrect_vec_len() {
 fn deploy_pool_fails_on_market_not_found() {
     ExtBuilder::default().build().execute_with(|| {
         assert_noop!(
-            NeoSwaps::deploy_pool(RuntimeOrigin::signed(ALICE), 0, _10, vec![_1_4, _3_4], CENT),
-            zrml_market_commons::Error::<Runtime>::MarketDoesNotExist,
+            NeoSwaps::deploy_pool(
+                RuntimeOrigin::signed(alice()),
+                0,
+                _10,
+                vec![_1_4, _3_4],
+                CENT_BASE
+            ),
+            pallet_pm_market_commons::Error::<Runtime>::MarketDoesNotExist,
         );
     });
 }
@@ -195,8 +216,12 @@ fn deploy_pool_fails_on_market_not_found() {
 #[test_case(MarketStatus::Resolved)]
 fn deploy_pool_fails_on_inactive_market(market_status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Scalar(0..=1),
+            ScoringRule::AmmCdaHybrid,
+        );
         MarketCommons::mutate_market(&market_id, |market| {
             market.status = market_status;
             Ok(())
@@ -204,11 +229,11 @@ fn deploy_pool_fails_on_inactive_market(market_status: MarketStatus) {
         .unwrap();
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 _1,
                 vec![_1_2, _1_2],
-                CENT,
+                CENT_BASE,
             ),
             Error::<Runtime>::MarketNotActive,
         );
@@ -219,20 +244,20 @@ fn deploy_pool_fails_on_inactive_market(market_status: MarketStatus) {
 fn deploy_pool_fails_on_duplicate_pool() {
     ExtBuilder::default().build().execute_with(|| {
         let market_id = create_market_and_deploy_pool(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Scalar(0..=1),
             _10,
             vec![_1_2, _1_2],
-            CENT,
+            CENT_BASE,
         );
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 _2,
                 vec![_1_2, _1_2],
-                CENT,
+                CENT_BASE,
             ),
             Error::<Runtime>::DuplicatePool,
         );
@@ -242,14 +267,14 @@ fn deploy_pool_fails_on_duplicate_pool() {
 #[test_case(ScoringRule::Parimutuel)]
 fn deploy_pool_fails_on_invalid_trading_mechanism(scoring_rule: ScoringRule) {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id = create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), scoring_rule);
+        let market_id = create_market(alice(), BASE_ASSET, MarketType::Scalar(0..=1), scoring_rule);
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 _10,
                 vec![_1_4, _3_4],
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::InvalidTradingMechanism
         );
@@ -261,14 +286,14 @@ fn deploy_pool_fails_on_asset_count_above_max() {
     ExtBuilder::default().build().execute_with(|| {
         let category_count = MAX_ASSETS + 1;
         let market_id = create_market(
-            ALICE,
+            alice(),
             BASE_ASSET,
             MarketType::Categorical(category_count),
             ScoringRule::AmmCdaHybrid,
         );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
@@ -278,11 +303,11 @@ fn deploy_pool_fails_on_asset_count_above_max() {
         spot_prices.push(_1 - spot_prices.iter().sum::<u128>());
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 spot_prices,
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::AssetCountAboveMax
         );
@@ -292,17 +317,21 @@ fn deploy_pool_fails_on_asset_count_above_max() {
 #[test]
 fn deploy_pool_fails_on_swap_fee_below_min() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 vec![_1_4, _3_4],
@@ -316,17 +345,21 @@ fn deploy_pool_fails_on_swap_fee_below_min() {
 #[test]
 fn deploy_pool_fails_on_swap_fee_above_max() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 vec![_1_4, _3_4],
@@ -341,21 +374,25 @@ fn deploy_pool_fails_on_swap_fee_above_max() {
 #[test_case(vec![_1_4 + 1, _3_4])]
 fn deploy_pool_fails_on_invalid_spot_prices(spot_prices: Vec<BalanceOf<Runtime>>) {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 spot_prices,
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::InvalidSpotPrices
         );
@@ -365,22 +402,26 @@ fn deploy_pool_fails_on_invalid_spot_prices(spot_prices: Vec<BalanceOf<Runtime>>
 #[test]
 fn deploy_pool_fails_on_spot_price_below_min() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
         let spot_price = MIN_SPOT_PRICE - 1;
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 vec![spot_price, _1 - spot_price],
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::SpotPriceBelowMin
         );
@@ -390,22 +431,26 @@ fn deploy_pool_fails_on_spot_price_below_min() {
 #[test]
 fn deploy_pool_fails_on_spot_price_above_max() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity,
         ));
         let spot_price = MAX_SPOT_PRICE + 1;
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 vec![spot_price, _1 - spot_price],
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::SpotPriceAboveMax
         );
@@ -415,21 +460,25 @@ fn deploy_pool_fails_on_spot_price_above_max() {
 #[test]
 fn deploy_pool_fails_on_insufficient_funds() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Categorical(2), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Categorical(2),
+            ScoringRule::AmmCdaHybrid,
+        );
         let liquidity = _10;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             liquidity - 1,
         ));
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 liquidity,
                 vec![_3_4, _1_4],
-                CENT
+                CENT_BASE
             ),
             orml_tokens::Error::<Runtime>::BalanceTooLow
         );
@@ -439,21 +488,25 @@ fn deploy_pool_fails_on_insufficient_funds() {
 #[test]
 fn deploy_pool_fails_on_liquidity_too_low() {
     ExtBuilder::default().build().execute_with(|| {
-        let market_id =
-            create_market(ALICE, BASE_ASSET, MarketType::Scalar(0..=1), ScoringRule::AmmCdaHybrid);
+        let market_id = create_market(
+            alice(),
+            BASE_ASSET,
+            MarketType::Scalar(0..=1),
+            ScoringRule::AmmCdaHybrid,
+        );
         let amount = _1_2;
         assert_ok!(PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(ALICE),
+            RuntimeOrigin::signed(alice()),
             market_id,
             amount,
         ));
         assert_noop!(
             NeoSwaps::deploy_pool(
-                RuntimeOrigin::signed(ALICE),
+                RuntimeOrigin::signed(alice()),
                 market_id,
                 amount,
                 vec![_1_2, _1_2],
-                CENT
+                CENT_BASE
             ),
             Error::<Runtime>::LiquidityTooLow
         );

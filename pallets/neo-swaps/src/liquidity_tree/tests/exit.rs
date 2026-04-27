@@ -29,7 +29,7 @@ fn exit_root_works(withdraw_all: bool) {
 
     let mut nodes = tree.nodes.clone().into_inner();
     let amount = if withdraw_all { _1 } else { _1_2 };
-    let account = 3;
+    let account = get_account(3);
     nodes[0].stake -= amount;
     let mut account_to_index = tree.account_to_index.clone().into_inner();
     let mut abandoned_nodes = tree.abandoned_nodes.clone().into_inner();
@@ -55,7 +55,7 @@ fn exit_middle_works(withdraw_all: bool) {
 
     let mut nodes = tree.nodes.clone().into_inner();
     let amount = if withdraw_all { _3 } else { _1 };
-    let account = 5;
+    let account = get_account(5);
     nodes[0].descendant_stake -= amount;
     nodes[1].descendant_stake -= amount;
     nodes[3].stake -= amount;
@@ -84,7 +84,7 @@ fn exit_leaf_works(withdraw_all: bool) {
 
     let mut nodes = tree.nodes.clone().into_inner();
     let amount = if withdraw_all { _12 } else { _1 };
-    let account = 6;
+    let account = get_account(6);
     nodes[0].descendant_stake -= amount;
     nodes[1].descendant_stake -= amount;
     nodes[3].descendant_stake -= amount;
@@ -107,7 +107,8 @@ fn exit_leaf_works(withdraw_all: bool) {
 #[test_case(7, _1 + 1)]
 #[test_case(6, _12 + 1)]
 #[test_case(8, _4 + 1)]
-fn exit_fails_on_insufficient_stake(account: AccountIdOf<Runtime>, amount: BalanceOf<Runtime>) {
+fn exit_fails_on_insufficient_stake(account_index: u8, amount: BalanceOf<Runtime>) {
+    let account: AccountIdOf<Runtime> = get_account(account_index);
     let mut tree = utility::create_test_tree();
     // Clear unclaimed fees.
     for node in tree.nodes.iter_mut() {
@@ -129,7 +130,7 @@ fn exit_fails_on_unclaimed_fees_at_root() {
     tree.nodes[3].fees = Zero::zero();
     tree.nodes[3].lazy_fees = Zero::zero();
     assert_err!(
-        tree.exit(&5, 1),
+        tree.exit(&get_account(5), 1),
         LiquidityTreeError::UnwithdrawnFees.into_dispatch_error::<Runtime>()
     );
 }
@@ -141,7 +142,7 @@ fn exit_fails_on_unclaimed_fees_on_middle_of_path() {
     tree.nodes[3].fees = Zero::zero();
     tree.nodes[3].lazy_fees = Zero::zero();
     assert_err!(
-        tree.exit(&5, 1),
+        tree.exit(&get_account(5), 1),
         LiquidityTreeError::UnwithdrawnFees.into_dispatch_error::<Runtime>()
     );
 }
@@ -154,7 +155,7 @@ fn exit_fails_on_unclaimed_fees_at_last_node_due_to_lazy_fees() {
     // This ensures that the error is caused by propagated lazy fees sitting in the node.
     tree.nodes[3].fees = Zero::zero();
     assert_err!(
-        tree.exit(&5, 1),
+        tree.exit(&get_account(5), 1),
         LiquidityTreeError::UnwithdrawnFees.into_dispatch_error::<Runtime>()
     );
 }
@@ -167,7 +168,7 @@ fn exit_fails_on_unclaimed_fees_at_last_node_due_to_fees() {
     // This ensures that the error is caused by normal fees.
     tree.nodes[3].lazy_fees = Zero::zero();
     assert_err!(
-        tree.exit(&5, 1),
+        tree.exit(&get_account(5), 1),
         LiquidityTreeError::UnwithdrawnFees.into_dispatch_error::<Runtime>()
     );
 }

@@ -20,10 +20,10 @@ use super::*;
 #[test]
 fn shares_of_works() {
     let tree = utility::create_test_tree();
-    assert_eq!(tree.shares_of(&3).unwrap(), _1);
-    assert_eq!(tree.shares_of(&9).unwrap(), _3);
-    assert_eq!(tree.shares_of(&5).unwrap(), _3);
-    assert_eq!(tree.shares_of(&7).unwrap(), _1);
-    assert_eq!(tree.shares_of(&6).unwrap(), _12);
-    assert_eq!(tree.shares_of(&8).unwrap(), _4);
+    assert_eq!(tree.shares_of(&get_account(3)).unwrap(), _1);
+    assert_eq!(tree.shares_of(&get_account(9)).unwrap(), _3);
+    assert_eq!(tree.shares_of(&get_account(5)).unwrap(), _3);
+    assert_eq!(tree.shares_of(&get_account(7)).unwrap(), _1);
+    assert_eq!(tree.shares_of(&get_account(6)).unwrap(), _12);
+    assert_eq!(tree.shares_of(&get_account(8)).unwrap(), _4);
 }
