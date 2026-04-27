@@ -32,6 +32,7 @@ use crate::{
     YearlyInflation,
 };
 use alloc::collections::BTreeMap;
+use common_primitives::constants::currency::BASE;
 use frame_support::{
     assert_noop, assert_ok,
     storage::child::StateVersion,
@@ -43,20 +44,11 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_balances::{BalanceLock, NegativeImbalance};
-use rand::seq::SliceRandom;
-use sp_io::storage::root as storage_root;
-use sp_runtime::{
-    traits::{BlakeTwo256, Hash, Zero},
-    Perbill, Perquintill,
-};
-use test_case::test_case;
-use zeitgeist_primitives::{
-    constants::{
-        mock::{
-            AggregationPeriod, AppealBond, AppealPeriod, InflationPeriod, LockId, MaxAppeals,
-            MaxCourtParticipants, MaxYearlyInflation, MinJurorStake, RequestInterval, VotePeriod,
-        },
-        BASE,
+use pallet_pm_market_commons::{Error as MError, MarketCommonsPalletApi};
+use prediction_market_primitives::{
+    constants::mock::{
+        AggregationPeriod, AppealBond, AppealPeriod, InflationPeriod, LockId, MaxAppeals,
+        MaxCourtParticipants, MaxYearlyInflation, MinJurorStake, RequestInterval, VotePeriod,
     },
     traits::DisputeApi,
     types::{
@@ -65,13 +57,19 @@ use zeitgeist_primitives::{
         ScoringRule,
     },
 };
-use zrml_market_commons::{Error as MError, MarketCommonsPalletApi};
+use rand::seq::SliceRandom;
+use sp_io::storage::root as storage_root;
+use sp_runtime::{
+    traits::{BlakeTwo256, Hash, Zero},
+    Perbill, Perquintill,
+};
+use test_case::test_case;
 
 const ORACLE_REPORT: OutcomeReport = OutcomeReport::Scalar(u128::MAX);
 
 const DEFAULT_MARKET: MarketOf<Runtime> = Market {
     market_id: 0,
-    base_asset: Asset::Ztg,
+    base_asset: Asset::Tru,
     creation: MarketCreation::Permissionless,
     creator_fee: sp_runtime::Perbill::zero(),
     creator: 0,
@@ -80,7 +78,7 @@ const DEFAULT_MARKET: MarketOf<Runtime> = Market {
     metadata: vec![],
     oracle: 0,
     period: MarketPeriod::Block(0..100),
-    deadlines: Deadlines { grace_period: 1_u64, oracle_duration: 1_u64, dispute_duration: 1_u64 },
+    deadlines: Deadlines { grace_period: 1_u32, oracle_duration: 1_u32, dispute_duration: 1_u32 },
     report: None,
     resolved_outcome: None,
     status: MarketStatus::Disputed,
@@ -799,8 +797,9 @@ fn vote_works() {
             Court::necessary_draws_weight(0usize)
         );
         let slashable = MinJurorStake::get();
-        let alice_index =
-            draws.binary_search_by_key(&ALICE, |draw| draw.court_participant).unwrap_or_else(|j| j);
+        let alice_index = draws
+            .binary_search_by_key(&ALICE, |draw| draw.court_participant)
+            .unwrap_or_else(|j| j);
         draws[alice_index] =
             Draw { court_participant: ALICE, weight: 1, vote: Vote::Drawn, slashable };
         <SelectedDraws<Runtime>>::insert(court_id, draws);
@@ -827,7 +826,7 @@ fn vote_works() {
         let new_draws = <SelectedDraws<Runtime>>::get(court_id);
         for (i, (old_draw, new_draw)) in old_draws.iter().zip(new_draws.iter()).enumerate() {
             if i == alice_index {
-                continue;
+                continue
             } else {
                 assert_eq!(old_draw, new_draw);
             }
@@ -992,8 +991,9 @@ fn reveal_vote_works() {
             Court::necessary_draws_weight(0usize)
         );
         let slashable = MinJurorStake::get();
-        let alice_index =
-            draws.binary_search_by_key(&ALICE, |draw| draw.court_participant).unwrap_or_else(|j| j);
+        let alice_index = draws
+            .binary_search_by_key(&ALICE, |draw| draw.court_participant)
+            .unwrap_or_else(|j| j);
         draws[alice_index] =
             Draw { court_participant: ALICE, weight: 1, vote: Vote::Drawn, slashable };
         <SelectedDraws<Runtime>>::insert(court_id, draws);
@@ -1041,7 +1041,7 @@ fn reveal_vote_works() {
         let new_draws = <SelectedDraws<Runtime>>::get(court_id);
         for (i, (old_draw, new_draw)) in old_draws.iter().zip(new_draws.iter()).enumerate() {
             if i == alice_index {
-                continue;
+                continue
             }
             assert_eq!(old_draw, new_draw);
         }
@@ -1895,10 +1895,10 @@ fn reassign_court_stakes_slashes_tardy_jurors_and_rewards_winners() {
         assert_eq!(free_bob_after, free_bob_before - old_draws[BOB as usize].slashable);
 
         let free_charlie_after = Balances::free_balance(CHARLIE);
-        let full_slashes = old_draws[ALICE as usize].slashable
-            + old_draws[BOB as usize].slashable
-            + old_draws[DAVE as usize].slashable
-            + old_draws[EVE as usize].slashable;
+        let full_slashes = old_draws[ALICE as usize].slashable +
+            old_draws[BOB as usize].slashable +
+            old_draws[DAVE as usize].slashable +
+            old_draws[EVE as usize].slashable;
         assert_eq!(free_charlie_after, free_charlie_before + full_slashes);
 
         let free_dave_after = Balances::free_balance(DAVE);
@@ -2306,19 +2306,19 @@ fn reassign_court_stakes_works_for_delegations() {
             delegated_stakes_charlie.iter().find(|(acc, _)| *acc == BOB).unwrap().1;
         let dave_delegated_bob_slashed =
             delegated_stakes_dave.iter().find(|(acc, _)| *acc == BOB).unwrap().1;
-        let slashed = bob_slashed
-            + charlie_delegated_bob_slashed
-            + dave_delegated_bob_slashed
-            + tardy_or_denounced_value;
+        let slashed = bob_slashed +
+            charlie_delegated_bob_slashed +
+            dave_delegated_bob_slashed +
+            tardy_or_denounced_value;
 
         let charlie_delegated_alice_slashable =
             delegated_stakes_charlie.iter().find(|(acc, _)| *acc == ALICE).unwrap().1;
         let dave_delegated_alice_slashable =
             delegated_stakes_dave.iter().find(|(acc, _)| *acc == ALICE).unwrap().1;
-        let winners_risked_amount = charlie_delegated_alice_slashable
-            + dave_delegated_alice_slashable
-            + alice_slashable
-            + eve_slashable;
+        let winners_risked_amount = charlie_delegated_alice_slashable +
+            dave_delegated_alice_slashable +
+            alice_slashable +
+            eve_slashable;
 
         let alice_share = Perquintill::from_rational(alice_slashable, winners_risked_amount);
         let free_alice_after = Balances::free_balance(ALICE);

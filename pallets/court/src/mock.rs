@@ -18,7 +18,8 @@
 
 #![cfg(test)]
 
-use crate::{self as zrml_court, mock_storage::pallet as mock_storage};
+use crate::{self as pallet_pm_court, mock_storage::pallet as mock_storage};
+use common_primitives::types::{Balance, BlockNumber, Hash, Moment};
 use frame_support::{
     construct_runtime, ord_parameter_types,
     pallet_prelude::{DispatchError, Weight},
@@ -29,12 +30,8 @@ use frame_support::{
     },
     PalletId,
 };
-use frame_system::{mocking::MockBlock, EnsureRoot, EnsureSignedBy};
-use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup},
-    BuildStorage,
-};
-use zeitgeist_primitives::{
+use frame_system::{mocking::MockBlockU32, EnsureRoot, EnsureSignedBy};
+use prediction_market_primitives::{
     constants::mock::{
         AggregationPeriod, AppealBond, AppealPeriod, BlockHashCount, BlocksPerYear, CourtPalletId,
         ExistentialDeposit, InflationPeriod, LockId, MaxAppeals, MaxApprovals,
@@ -42,7 +39,11 @@ use zeitgeist_primitives::{
         MaxYearlyInflation, MinJurorStake, MinimumPeriod, RequestInterval, VotePeriod, BASE,
     },
     traits::{DisputeResolutionApi, MarketOfDisputeResolutionApi},
-    types::{AccountIdTest, Balance, BlockNumber, Hash, MarketId, Moment},
+    types::{AccountIdTest, MarketId},
+};
+use sp_runtime::{
+    traits::{BlakeTwo256, IdentityLookup},
+    BuildStorage,
 };
 
 pub const ALICE: AccountIdTest = 0;
@@ -66,8 +67,8 @@ parameter_types! {
 construct_runtime!(
     pub enum Runtime {
         Balances: pallet_balances,
-        Court: zrml_court,
-        MarketCommons: zrml_market_commons,
+        Court: pallet_pm_court,
+        MarketCommons: pallet_pm_market_commons,
         System: frame_system,
         Timestamp: pallet_timestamp,
         Treasury: pallet_treasury,
@@ -157,7 +158,7 @@ impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
     type AccountId = AccountIdTest;
     type BaseCallFilter = Everything;
-    type Block = MockBlock<Runtime>;
+    type Block = MockBlockU32<Runtime>;
     type BlockHashCount = BlockHashCount;
     type BlockLength = ();
     type BlockWeights = ();
@@ -201,7 +202,7 @@ impl pallet_balances::Config for Runtime {
     type WeightInfo = ();
 }
 
-impl zrml_market_commons::Config for Runtime {
+impl pallet_pm_market_commons::Config for Runtime {
     type Balance = Balance;
     type MarketId = MarketId;
     type Timestamp = Timestamp;

@@ -10,9 +10,9 @@ rand_chacha = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 sp-arithmetic = { workspace = true }
 sp-runtime = { workspace = true }
-zeitgeist-macros = { workspace = true }
-zeitgeist-primitives = { workspace = true }
-zrml-market-commons = { workspace = true }
+node-macros = { workspace = true }
+prediction-market-primitives = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
 
 [dev-dependencies]
 env_logger = { workspace = true }
@@ -21,8 +21,8 @@ pallet-insecure-randomness-collective-flip = { workspace = true, features = ["de
 pallet-timestamp = { workspace = true, features = ["default"] }
 pallet-treasury = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
-zeitgeist-primitives = { workspace = true, features = ["mock", "default"] }
-
+prediction-market-primitives = { workspace = true, features = ["mock", "default"] }
+common-primitives = { workspace = true }
 test-case = { workspace = true }
 
 [features]
@@ -38,8 +38,8 @@ std = [
     "frame-system/std",
     "parity-scale-codec/std",
     "sp-runtime/std",
-    "zeitgeist-primitives/std",
-    "zrml-market-commons/std",
+    "prediction-market-primitives/std",
+    "pallet-pm-market-commons/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
@@ -48,5 +48,6 @@ try-runtime = [
 [package]
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
 edition.workspace = true
-name = "zrml-court"
-version = "0.6.1"
+name = "pallet-pm-court"
+
+version = { workspace = true }
