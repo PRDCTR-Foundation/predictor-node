@@ -18,8 +18,8 @@
 extern crate alloc;
 
 use crate::types::InitialItem;
+use prediction_market_primitives::types::OutcomeReport;
 use sp_runtime::DispatchError;
-use zeitgeist_primitives::types::OutcomeReport;
 
 /// The trait to initiate and resolve the global disputes.
 pub trait GlobalDisputesPalletApi<MarketId, AccountId, Balance, BlockNumber> {
@@ -33,12 +33,11 @@ pub trait GlobalDisputesPalletApi<MarketId, AccountId, Balance, BlockNumber> {
     ///
     /// # Arguments
     /// - `market_id` - The id of the market.
-    /// - `initial_items` - The initial vote options (outcome, owner, amount)
-    ///   to add to the global dispute. One initial item consists of the vote outcome,
-    ///   the owner of the outcome who is rewarded in case of a win,
-    ///   and the initial vote amount for this outcome.
-    ///   It is required to add at least two unique outcomes.
-    ///   In case of a duplicated outcome, the owner and amount is added to the pre-existing outcome.
+    /// - `initial_items` - The initial vote options (outcome, owner, amount) to add to the global
+    ///   dispute. One initial item consists of the vote outcome, the owner of the outcome who is
+    ///   rewarded in case of a win, and the initial vote amount for this outcome. It is required to
+    ///   add at least two unique outcomes. In case of a duplicated outcome, the owner and amount is
+    ///   added to the pre-existing outcome.
     fn start_global_dispute(
         market_id: &MarketId,
         initial_items: &[InitialItem<AccountId, Balance>],

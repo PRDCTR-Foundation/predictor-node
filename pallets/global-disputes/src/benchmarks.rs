@@ -35,10 +35,10 @@ use frame_support::{
 };
 use frame_system::RawOrigin;
 use num_traits::ops::checked::CheckedRem;
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use prediction_market_primitives::types::OutcomeReport;
 use sp_runtime::traits::{Bounded, SaturatedConversion, Saturating};
 use sp_std::prelude::*;
-use zeitgeist_primitives::types::OutcomeReport;
-use zrml_market_commons::MarketCommonsPalletApi;
 
 fn deposit<T>(caller: &T::AccountId)
 where

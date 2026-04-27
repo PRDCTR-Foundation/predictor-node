@@ -54,13 +54,13 @@ mod pallet {
         ensure_signed,
         pallet_prelude::{BlockNumberFor, OriginFor},
     };
+    use pallet_pm_market_commons::MarketCommonsPalletApi;
+    use prediction_market_primitives::{traits::DisputeResolutionApi, types::OutcomeReport};
     use sp_runtime::{
         traits::{AccountIdConversion, CheckedDiv, Saturating, Zero},
         DispatchError, DispatchResult,
     };
     use sp_std::{vec, vec::Vec};
-    use zeitgeist_primitives::{traits::DisputeResolutionApi, types::OutcomeReport};
-    use zrml_market_commons::MarketCommonsPalletApi;
 
     pub(crate) type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountIdOf<T>>>::Balance;
     pub(crate) type MomentOf<T> = <<T as Config>::MarketCommons as MarketCommonsPalletApi>::Moment;
@@ -80,7 +80,7 @@ mod pallet {
 
     /// The current storage version.
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
-    const LOG_TARGET: &str = "runtime::zrml-global-disputes";
+    const LOG_TARGET: &str = "runtime::pallet-pm-global-disputes";
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -279,7 +279,7 @@ mod pallet {
             if let GdStatus::Active { add_outcome_end, vote_end: _ } = gd_info.status {
                 ensure!(now <= add_outcome_end, Error::<T>::AddOutcomePeriodIsOver);
             } else {
-                return Err(Error::<T>::InvalidGlobalDisputeStatus.into());
+                return Err(Error::<T>::InvalidGlobalDisputeStatus.into())
             }
 
             ensure!(
@@ -350,10 +350,10 @@ mod pallet {
                             ExistenceRequirement::AllowDeath,
                         );
                         debug_assert!(res.is_ok());
-                    }
+                    },
                     Possession::Shared { owners } => {
                         owners_len = owners_len.saturating_add(owners.len() as u32);
-                    }
+                    },
                 }
                 removed_keys_amount = removed_keys_amount.saturating_add(1u32);
             }
@@ -514,7 +514,7 @@ mod pallet {
             if let GdStatus::Active { add_outcome_end, vote_end } = gd_info.status {
                 ensure!(add_outcome_end < now && now <= vote_end, Error::<T>::NotInGdVotingPeriod);
             } else {
-                return Err(Error::<T>::InvalidGlobalDisputeStatus.into());
+                return Err(Error::<T>::InvalidGlobalDisputeStatus.into())
             }
 
             let mut outcome_info =
@@ -547,14 +547,14 @@ mod pallet {
                     add_to_outcome_sum(amount);
                     lock_info[i].1 = new_amount_acc;
                     new_amount_acc
-                }
+                },
                 Err(i) => {
                     lock_info
                         .try_insert(i, (market_id, amount))
                         .map_err(|_| Error::<T>::MaxVotesReached)?;
                     add_to_outcome_sum(amount);
                     amount
-                }
+                },
             };
 
             T::Currency::extend_lock(
@@ -621,7 +621,7 @@ mod pallet {
                             lock_needed = lock_needed.max(locked_balance);
                             true
                         }
-                    }
+                    },
                     None => {
                         log::warn!(
                             target: LOG_TARGET,
@@ -631,7 +631,7 @@ mod pallet {
                         debug_assert!(false);
                         // unlock these funds
                         false
-                    }
+                    },
                 }
             });
 
@@ -777,7 +777,7 @@ mod pallet {
                         market_id: *market_id,
                     });
                     Some(winner_outcome)
-                }
+                },
                 _ => None,
             }
         }
@@ -789,7 +789,7 @@ mod pallet {
         fn is_active(market_id: &MarketIdOf<T>) -> bool {
             if let Some(gd_info) = <GlobalDisputesInfo<T>>::get(market_id) {
                 if let GdStatus::Active { add_outcome_end: _, vote_end: _ } = gd_info.status {
-                    return true;
+                    return true
                 }
             }
             false
@@ -821,7 +821,7 @@ mod pallet {
                         outcome_info.possession = Possession::Shared { owners };
                         Self::update_winner(market_id, outcome, outcome_info.clone());
                         <Outcomes<T>>::insert(market_id, outcome, outcome_info);
-                    }
+                    },
                     None => {
                         // adding one item to BoundedVec can not fail
                         if let Ok(owners) = BoundedVec::try_from(vec![owner.clone()]) {
@@ -836,7 +836,7 @@ mod pallet {
                             );
                             debug_assert!(false);
                         }
-                    }
+                    },
                 }
             }
 

@@ -24,21 +24,22 @@ use crate::{
     utils::market_mock,
     BalanceOf, Error, Event, GlobalDisputesInfo, InitialItemOf, Locks, MarketIdOf, Outcomes,
 };
+use common_primitives::types::BlockNumber;
 use frame_support::{
     assert_noop, assert_ok,
     traits::{Currency, ReservableCurrency},
     BoundedVec,
 };
 use pallet_balances::BalanceLock;
-use sp_runtime::{traits::Zero, DispatchError, SaturatedConversion, TokenError};
-use test_case::test_case;
-use zeitgeist_primitives::{
+use pallet_pm_market_commons::{Error as MarketError, Markets};
+use prediction_market_primitives::{
     constants::mock::{
         GlobalDisputeLockId, MinOutcomeVoteAmount, RemoveKeysLimit, VotingOutcomeFee, BASE,
     },
-    types::{BlockNumber, OutcomeReport},
+    types::OutcomeReport,
 };
-use zrml_market_commons::{Error as MarketError, Markets};
+use sp_runtime::{traits::Zero, DispatchError, SaturatedConversion, TokenError};
+use test_case::test_case;
 
 const SETUP_AMOUNT: u128 = 100 * BASE;
 

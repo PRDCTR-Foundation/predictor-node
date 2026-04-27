@@ -20,7 +20,7 @@
 use crate::*;
 use frame_system::pallet_prelude::BlockNumberFor;
 
-type MarketOf<T> = zeitgeist_primitives::types::Market<
+type MarketOf<T> = prediction_market_primitives::types::Market<
     <T as frame_system::Config>::AccountId,
     BalanceOf<T>,
     BlockNumberFor<T>,
@@ -33,21 +33,23 @@ where
     T: crate::Config,
 {
     use frame_support::traits::Get;
+    use prediction_market_primitives::types::ScoringRule;
     use sp_runtime::traits::AccountIdConversion;
-    use zeitgeist_primitives::types::ScoringRule;
 
-    zeitgeist_primitives::types::Market {
+    prediction_market_primitives::types::Market {
         market_id: Default::default(),
-        base_asset: zeitgeist_primitives::types::Asset::Ztg,
-        creation: zeitgeist_primitives::types::MarketCreation::Permissionless,
+        base_asset: prediction_market_primitives::types::Asset::Tru,
+        creation: prediction_market_primitives::types::MarketCreation::Permissionless,
         creator_fee: sp_runtime::Perbill::zero(),
         creator: T::GlobalDisputesPalletId::get().into_account_truncating(),
-        market_type: zeitgeist_primitives::types::MarketType::Scalar(0..=u128::MAX),
-        dispute_mechanism: Some(zeitgeist_primitives::types::MarketDisputeMechanism::Authorized),
+        market_type: prediction_market_primitives::types::MarketType::Scalar(0..=u128::MAX),
+        dispute_mechanism: Some(
+            prediction_market_primitives::types::MarketDisputeMechanism::Authorized,
+        ),
         metadata: Default::default(),
         oracle: T::GlobalDisputesPalletId::get().into_account_truncating(),
-        period: zeitgeist_primitives::types::MarketPeriod::Block(Default::default()),
-        deadlines: zeitgeist_primitives::types::Deadlines {
+        period: prediction_market_primitives::types::MarketPeriod::Block(Default::default()),
+        deadlines: prediction_market_primitives::types::Deadlines {
             grace_period: 1_u32.into(),
             oracle_duration: 1_u32.into(),
             dispute_duration: 1_u32.into(),
@@ -55,7 +57,7 @@ where
         report: None,
         resolved_outcome: None,
         scoring_rule: ScoringRule::AmmCdaHybrid,
-        status: zeitgeist_primitives::types::MarketStatus::Disputed,
+        status: prediction_market_primitives::types::MarketStatus::Disputed,
         bonds: Default::default(),
         early_close: None,
     }

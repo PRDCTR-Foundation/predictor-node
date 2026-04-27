@@ -7,8 +7,8 @@ parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
 sp-std = { workspace = true }
-zeitgeist-primitives = { workspace = true }
-zrml-market-commons = { workspace = true }
+prediction-market-primitives = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
 
 # Benchmark
 num-traits = { workspace = true, optional = true }
@@ -19,8 +19,8 @@ env_logger = { workspace = true }
 pallet-balances = { workspace = true, features = ["default", "insecure_zero_ed"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
-zeitgeist-primitives = { workspace = true, features = ["mock", "default"] }
-
+prediction-market-primitives = { workspace = true, features = ["mock", "default"] }
+common-primitives = { workspace = true }
 test-case = { workspace = true }
 
 [features]
@@ -37,7 +37,7 @@ std = [
     "frame-system/std",
     "parity-scale-codec/std",
     "sp-runtime/std",
-    "zeitgeist-primitives/std",
+    "prediction-market-primitives/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
@@ -46,5 +46,6 @@ try-runtime = [
 [package]
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
 edition.workspace = true
-name = "zrml-global-disputes"
-version = "0.6.1"
+name = "pallet-pm-global-disputes"
+version = { workspace = true }
+

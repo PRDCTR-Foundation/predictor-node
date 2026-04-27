@@ -16,8 +16,8 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use frame_support::pallet_prelude::{Decode, Encode, MaxEncodedLen, TypeInfo};
+use prediction_market_primitives::types::OutcomeReport;
 use sp_runtime::traits::Saturating;
-use zeitgeist_primitives::types::OutcomeReport;
 
 /// The original voting outcome owner information.
 #[derive(Debug, TypeInfo, Decode, Encode, MaxEncodedLen, Clone, PartialEq, Eq)]
