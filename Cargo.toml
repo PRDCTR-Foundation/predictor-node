@@ -105,21 +105,22 @@ xcm-builder = { version = "17.0.5", package = "staging-xcm-builder", default-fea
 xcm-executor = { version = "17.0.3", package = "staging-xcm-executor", default-features = false }
 
 predictor-runtime = { path = "./runtime", default-features = false }
-zeitgeist-macros = { path = "./macros", default-features = false }
+node-macros = { path = "./macros", default-features = false }
 
 common-primitives = { path = "./primitives/common", default-features = false }
 prediction-market-primitives = { path = "./primitives/prediction-market", default-features = false }
 zeitgeist-primitives = { path = "./primitives/prediction-market", default-features = false }
-zrml-market-commons = { path = "./pallets/market-commons", default-features = false }
-zrml-authorized = { path = "./pallets/authorized", default-features = false }
-zrml-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
-zrml-court = { path = "pallets/court", default-features = false }
-zrml-global-disputes = { path = "pallets/global-disputes", default-features = false }
-zrml-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
-zrml-orderbook = { path = "pallets/orderbook", default-features = false }
-zrml-prediction-markets = { path = "pallets/prediction-markets", default-features = false }
-zrml-prediction-markets-runtime-api = { path = "pallets/prediction-markets/runtime-api", default-features = false }
-zrml-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
+pallet-pm-market-commons = { path = "./pallets/market-commons", default-features = false }
+pallet-pm-authorized = { path = "./pallets/authorized", default-features = false }
+pallet-pm-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
+pallet-pm-court = { path = "pallets/court", default-features = false }
+pallet-pm-eth-asset-registry = { path = "pallets/eth-asset-registry", default-features = false }
+pallet-pm-global-disputes = { path = "pallets/global-disputes", default-features = false }
+pallet-pm-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
+pallet-pm-order-book = { path = "pallets/orderbook", default-features = false }
+pallet-prediction-markets = { path = "pallets/prediction-markets", default-features = false }
+pallet-prediction-markets-runtime-api = { path = "pallets/prediction-markets/runtime-api", default-features = false }
+pallet-pm-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
 
 # ORML (wasm)
 orml-benchmarking = { version = "=1.1.0", default-features = false }
@@ -132,6 +133,7 @@ orml-asset-registry = { version = "=1.1.0", default-features = false }
 # AvN (tracking stable2409 branch in avn-parachain — no release tag on that SDK line)
 pallet-summary = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-avn = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
+pallet-avn-proxy = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-authors-manager = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-eth-bridge = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-eth-bridge-runtime-api = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }

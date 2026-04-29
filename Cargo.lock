@@ -2173,6 +2173,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 
 [[package]]
+name = "common-primitives"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "fixed",
+ "frame-support",
+ "frame-system",
+ "more-asserts",
+ "num-traits",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-arithmetic 26.1.0",
+ "sp-avn-common",
+ "sp-core",
+ "sp-runtime",
+ "test-case",
+ "typenum",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5323,7 +5347,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6601,6 +6625,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b93853da6d84c2e3c7d730d6473e8817692dd89be387eb01b94d7f108ecb5b8c"
 
 [[package]]
+name = "node-macros"
+version = "0.1.0"
+
+[[package]]
 name = "node-primitives"
 version = "2.0.0"
 source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
@@ -7185,6 +7213,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-avn-proxy"
+version = "8.5.0"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-avn-common",
+ "sp-core",
+ "sp-runtime",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "pallet-babe"
 version = "38.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7450,6 +7494,313 @@ dependencies = [
  "serde",
  "sp-runtime",
  "sp-staking",
+]
+
+[[package]]
+name = "pallet-pm-authorized"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-pm-market-commons",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-pm-combinatorial-tokens"
+version = "0.6.1"
+dependencies = [
+ "ark-bn254",
+ "ark-ff 0.5.0",
+ "cfg-if",
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-asset-registry",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-balances",
+ "pallet-pm-combinatorial-tokens",
+ "pallet-pm-market-commons",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "rstest",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-pm-court"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "node-macros",
+ "pallet-balances",
+ "pallet-insecure-randomness-collective-flip",
+ "pallet-pm-market-commons",
+ "pallet-timestamp",
+ "pallet-treasury",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "scale-info",
+ "sp-arithmetic 26.1.0",
+ "sp-io",
+ "sp-runtime",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-pm-eth-asset-registry"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "orml-traits",
+ "pallet-balances",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "pallet-pm-global-disputes"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "num-traits",
+ "pallet-balances",
+ "pallet-pm-market-commons",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-pm-hybrid-router"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-avn",
+ "pallet-balances",
+ "pallet-insecure-randomness-collective-flip",
+ "pallet-pm-authorized",
+ "pallet-pm-combinatorial-tokens",
+ "pallet-pm-court",
+ "pallet-pm-eth-asset-registry",
+ "pallet-pm-global-disputes",
+ "pallet-pm-hybrid-router",
+ "pallet-pm-market-commons",
+ "pallet-pm-neo-swaps",
+ "pallet-pm-order-book",
+ "pallet-prediction-markets",
+ "pallet-timestamp",
+ "pallet-treasury",
+ "pallet-xcm",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "serde",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-keystore",
+ "sp-runtime",
+ "staging-xcm",
+ "staging-xcm-builder",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-pm-market-commons"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-arithmetic 26.1.0",
+ "sp-io",
+ "sp-runtime",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-pm-neo-swaps"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "common-primitives",
+ "env_logger 0.11.10",
+ "fixed",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hydra-dx-math",
+ "log",
+ "more-asserts",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-avn",
+ "pallet-avn-proxy",
+ "pallet-balances",
+ "pallet-insecure-randomness-collective-flip",
+ "pallet-pm-authorized",
+ "pallet-pm-combinatorial-tokens",
+ "pallet-pm-court",
+ "pallet-pm-eth-asset-registry",
+ "pallet-pm-global-disputes",
+ "pallet-pm-market-commons",
+ "pallet-pm-neo-swaps",
+ "pallet-prediction-markets",
+ "pallet-prediction-markets-runtime-api",
+ "pallet-timestamp",
+ "pallet-treasury",
+ "pallet-xcm",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-keystore",
+ "sp-runtime",
+ "staging-xcm",
+ "staging-xcm-builder",
+ "test-case",
+ "typenum",
+]
+
+[[package]]
+name = "pallet-pm-order-book"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-balances",
+ "pallet-pm-market-commons",
+ "pallet-pm-order-book",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-io",
+ "sp-runtime",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-prediction-markets"
+version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "more-asserts",
+ "orml-asset-registry",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "pallet-avn",
+ "pallet-balances",
+ "pallet-insecure-randomness-collective-flip",
+ "pallet-pm-authorized",
+ "pallet-pm-court",
+ "pallet-pm-eth-asset-registry",
+ "pallet-pm-global-disputes",
+ "pallet-pm-market-commons",
+ "pallet-prediction-markets",
+ "pallet-prediction-markets-runtime-api",
+ "pallet-timestamp",
+ "pallet-treasury",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "serde",
+ "sp-api",
+ "sp-arithmetic 26.1.0",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-keystore",
+ "sp-runtime",
+ "staging-xcm",
+ "test-case",
+]
+
+[[package]]
+name = "pallet-prediction-markets-runtime-api"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "sp-api",
 ]
 
 [[package]]
@@ -8395,6 +8746,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "prediction-market-primitives"
+version = "0.1.0"
+dependencies = [
+ "arbitrary",
+ "common-primitives",
+ "fixed",
+ "frame-support",
+ "frame-system",
+ "hex-literal",
+ "more-asserts",
+ "num-traits",
+ "orml-currencies",
+ "orml-tokens",
+ "orml-traits",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-arithmetic 26.1.0",
+ "sp-avn-common",
+ "sp-core",
+ "sp-runtime",
+ "test-case",
+ "typenum",
+]
+
+[[package]]
 name = "predictor-node"
 version = "0.1.0"
 dependencies = [
@@ -8741,7 +9118,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools 0.12.1",
  "log",
  "multimap 0.10.0",
@@ -14103,7 +14480,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -14591,34 +14968,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zeitgeist-macros"
-version = "0.6.1"
-
-[[package]]
-name = "zeitgeist-primitives"
-version = "0.6.1"
-dependencies = [
- "arbitrary",
- "fixed",
- "frame-support",
- "frame-system",
- "hex-literal",
- "more-asserts",
- "num-traits",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-arithmetic 26.1.0",
- "sp-core",
- "sp-runtime",
- "test-case",
- "typenum",
-]
-
-[[package]]
 name = "zerocopy"
 version = "0.7.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14700,274 +15049,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.98",
-]
-
-[[package]]
-name = "zrml-authorized"
-version = "0.6.1"
-dependencies = [
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "pallet-balances",
- "pallet-timestamp",
- "parity-scale-codec",
- "scale-info",
- "sp-io",
- "sp-runtime",
- "zeitgeist-primitives",
- "zrml-market-commons",
-]
-
-[[package]]
-name = "zrml-combinatorial-tokens"
-version = "0.6.1"
-dependencies = [
- "ark-bn254",
- "ark-ff 0.5.0",
- "cfg-if",
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "orml-asset-registry",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "pallet-balances",
- "pallet-timestamp",
- "parity-scale-codec",
- "rstest",
- "scale-info",
- "sp-io",
- "sp-runtime",
- "test-case",
- "zeitgeist-primitives",
- "zrml-combinatorial-tokens",
- "zrml-market-commons",
-]
-
-[[package]]
-name = "zrml-court"
-version = "0.6.1"
-dependencies = [
- "arrayvec",
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "pallet-insecure-randomness-collective-flip",
- "pallet-timestamp",
- "pallet-treasury",
- "parity-scale-codec",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "scale-info",
- "sp-arithmetic 26.1.0",
- "sp-io",
- "sp-runtime",
- "test-case",
- "zeitgeist-macros",
- "zeitgeist-primitives",
- "zrml-market-commons",
-]
-
-[[package]]
-name = "zrml-global-disputes"
-version = "0.6.1"
-dependencies = [
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "num-traits",
- "pallet-balances",
- "pallet-timestamp",
- "parity-scale-codec",
- "scale-info",
- "sp-io",
- "sp-runtime",
- "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "test-case",
- "zeitgeist-primitives",
- "zrml-market-commons",
-]
-
-[[package]]
-name = "zrml-hybrid-router"
-version = "0.6.1"
-dependencies = [
- "cfg-if",
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "orml-asset-registry",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "pallet-balances",
- "pallet-insecure-randomness-collective-flip",
- "pallet-timestamp",
- "pallet-treasury",
- "pallet-xcm",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "staging-xcm",
- "staging-xcm-builder",
- "test-case",
- "zeitgeist-primitives",
- "zrml-authorized",
- "zrml-combinatorial-tokens",
- "zrml-court",
- "zrml-global-disputes",
- "zrml-hybrid-router",
- "zrml-market-commons",
- "zrml-neo-swaps",
- "zrml-orderbook",
- "zrml-prediction-markets",
-]
-
-[[package]]
-name = "zrml-market-commons"
-version = "0.6.1"
-dependencies = [
- "env_logger 0.11.10",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "pallet-timestamp",
- "parity-scale-codec",
- "scale-info",
- "sp-arithmetic 26.1.0",
- "sp-io",
- "sp-runtime",
- "test-case",
- "zeitgeist-primitives",
-]
-
-[[package]]
-name = "zrml-neo-swaps"
-version = "0.6.1"
-dependencies = [
- "cfg-if",
- "env_logger 0.11.10",
- "fixed",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "hydra-dx-math",
- "log",
- "more-asserts",
- "orml-asset-registry",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "pallet-balances",
- "pallet-insecure-randomness-collective-flip",
- "pallet-timestamp",
- "pallet-treasury",
- "pallet-xcm",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-api",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "staging-xcm",
- "staging-xcm-builder",
- "test-case",
- "typenum",
- "zeitgeist-primitives",
- "zrml-authorized",
- "zrml-combinatorial-tokens",
- "zrml-court",
- "zrml-global-disputes",
- "zrml-market-commons",
- "zrml-neo-swaps",
- "zrml-prediction-markets",
- "zrml-prediction-markets-runtime-api",
-]
-
-[[package]]
-name = "zrml-orderbook"
-version = "0.6.1"
-dependencies = [
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "pallet-balances",
- "pallet-timestamp",
- "parity-scale-codec",
- "scale-info",
- "sp-io",
- "sp-runtime",
- "test-case",
- "zeitgeist-primitives",
- "zrml-market-commons",
- "zrml-orderbook",
-]
-
-[[package]]
-name = "zrml-prediction-markets"
-version = "0.6.1"
-dependencies = [
- "cfg-if",
- "env_logger 0.11.10",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "more-asserts",
- "orml-asset-registry",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
- "pallet-balances",
- "pallet-insecure-randomness-collective-flip",
- "pallet-timestamp",
- "pallet-treasury",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-api",
- "sp-arithmetic 26.1.0",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "staging-xcm",
- "test-case",
- "zeitgeist-primitives",
- "zrml-authorized",
- "zrml-court",
- "zrml-global-disputes",
- "zrml-market-commons",
- "zrml-prediction-markets",
- "zrml-prediction-markets-runtime-api",
-]
-
-[[package]]
-name = "zrml-prediction-markets-runtime-api"
-version = "0.6.1"
-dependencies = [
- "parity-scale-codec",
- "sp-api",
- "zeitgeist-primitives",
 ]
 
 [[package]]
