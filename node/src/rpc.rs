@@ -5,12 +5,16 @@
 
 #![warn(missing_docs)]
 
+mod ross;
+
 use std::sync::Arc;
 
 use jsonrpsee::RpcModule;
 use predictor_runtime::{opaque::Block, AccountId, Balance, Nonce};
+use ross::{RossApiServer, RossRpc};
+use sc_client_api::{Backend as ClientBackend, StorageProvider};
 use sc_transaction_pool_api::TransactionPool;
-use sp_api::ProvideRuntimeApi;
+use sp_api::{CallApiAt, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 
@@ -23,17 +27,23 @@ pub struct FullDeps<C, P> {
 }
 
 /// Instantiate all full RPC extensions.
-pub fn create_full<C, P>(
+pub fn create_full<C, P, BE>(
     deps: FullDeps<C, P>,
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
-    C: ProvideRuntimeApi<Block>,
-    C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
-    C: Send + Sync + 'static,
-    C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Nonce>,
-    C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
-    C::Api: BlockBuilder<Block>,
-    P: TransactionPool + 'static,
+    C: HeaderBackend<Block>
+        + HeaderMetadata<Block, Error = BlockChainError>
+        + CallApiAt<Block>
+        + ProvideRuntimeApi<Block>
+        + StorageProvider<Block, BE>
+        + Send
+        + Sync
+        + 'static,
+    C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Nonce>
+        + pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>
+        + BlockBuilder<Block>,
+    BE: ClientBackend<Block> + 'static,
+    P: TransactionPool<Block = Block> + Send + Sync + 'static,
 {
     use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
     use substrate_frame_rpc_system::{System, SystemApiServer};
@@ -41,8 +51,9 @@ where
     let mut module = RpcModule::new(());
     let FullDeps { client, pool } = deps;
 
-    module.merge(System::new(client.clone(), pool).into_rpc())?;
-    module.merge(TransactionPayment::new(client).into_rpc())?;
+    module.merge(System::new(client.clone(), pool.clone()).into_rpc())?;
+    module.merge(TransactionPayment::new(client.clone()).into_rpc())?;
+    module.merge(RossRpc::<_, _, BE>::new(client.clone(), pool.clone()).into_rpc())?;
 
     // Extend this RPC with a custom API by using the following syntax.
     // `YourRpcStruct` should have a reference to a client, which is needed
