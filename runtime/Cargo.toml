@@ -74,9 +74,10 @@ pallet-avn.workspace = true
 pallet-authors-manager.workspace = true
 pallet-eth-bridge.workspace = true
 pallet-eth-bridge-runtime-api.workspace = true
+pallet-token-manager.workspace = true
+pallet-avn-proxy.workspace = true
 sp-avn-common.workspace = true
 sp-watchtower.workspace = true
-pallet-token-manager.workspace = true
 sp-application-crypto.workspace = true
 sp-staking.workspace = true
 
@@ -145,6 +146,7 @@ std = [
 
 	"pallet-summary/std",
 	"pallet-avn/std",
+	"pallet-avn-proxy/std",
 	"pallet-authors-manager/std",
 	"pallet-eth-bridge/std",
 	"pallet-eth-bridge-runtime-api/std",

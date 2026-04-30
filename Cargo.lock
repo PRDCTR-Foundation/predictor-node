@@ -7236,6 +7236,7 @@ name = "pallet-avn-proxy"
 version = "8.5.0"
 source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex-literal",
@@ -8962,6 +8963,7 @@ dependencies = [
  "pallet-authors-manager",
  "pallet-authorship",
  "pallet-avn",
+ "pallet-avn-proxy",
  "pallet-balances",
  "pallet-collective",
  "pallet-config",

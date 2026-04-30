@@ -259,6 +259,9 @@ mod runtime {
     #[runtime::pallet_index(34)]
     pub type Summary = pallet_summary;
 
+    #[runtime::pallet_index(35)]
+    pub type AvnProxy = pallet_avn_proxy;
+
     // ORML pallets
     #[runtime::pallet_index(50)]
     pub type AssetManager = orml_currencies;

@@ -78,6 +78,9 @@ use sp_watchtower::NoopWatchtower;
 
 mod proxy_config;
 use proxy_config::ProxyType;
+// TODO uncomment to enable avn-proxy configuration
+// mod avn_proxy_config;
+// use avn_proxy_config::AvnProxyConfig;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -423,6 +426,18 @@ impl pallet_token_manager::Config for Runtime {
     type BridgeInterface = EthBridge;
     type OnIdleHandler = ();
     type AccountToBytesConvert = Avn;
+}
+
+impl pallet_avn_proxy::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type ProxyConfig = AvnProxyConfig;
+    type WeightInfo = pallet_avn_proxy::default_weights::SubstrateWeight<Runtime>;
+    type FeeHandler = TokenManager;
+    type Token = EthAddress;
 }
 
 parameter_type_with_key! {
