@@ -7321,6 +7321,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-collective"
+version = "38.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e149f1aefd444c9a1da6ec5a94bc8a7671d7a33078f85dd19ae5b06e3438e60"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-election-provider-multi-phase"
 version = "37.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8940,12 +8956,20 @@ dependencies = [
  "pallet-authorship",
  "pallet-avn",
  "pallet-balances",
+ "pallet-collective",
  "pallet-eth-bridge",
  "pallet-eth-bridge-runtime-api",
  "pallet-grandpa",
  "pallet-im-online",
+ "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
  "pallet-offences",
+ "pallet-pm-authorized",
+ "pallet-pm-court",
+ "pallet-pm-global-disputes",
+ "pallet-pm-market-commons",
+ "pallet-pm-neo-swaps",
+ "pallet-prediction-markets",
  "pallet-preimage",
  "pallet-proxy",
  "pallet-scheduler",
@@ -8958,6 +8982,7 @@ dependencies = [
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-utility",
  "parity-scale-codec",
+ "prediction-market-primitives",
  "scale-info",
  "serde",
  "sp-api",

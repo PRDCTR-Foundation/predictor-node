@@ -79,6 +79,17 @@ sp-staking.workspace = true
 
 common-primitives.workspace = true
 
+# Prediction market
+prediction-market-primitives = { workspace = true }
+pallet-pm-authorized = { workspace = true }
+pallet-pm-court = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
+pallet-prediction-markets = { workspace = true }
+pallet-pm-global-disputes = { workspace = true, optional = true }
+pallet-pm-neo-swaps = { workspace = true }
+pallet-collective = { workspace = true }
+pallet-insecure-randomness-collective-flip = { workspace = true }
+
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
 
@@ -148,6 +159,18 @@ std = [
 	"sp-version/std",
 
 	"common-primitives/std",
+
+	# Prediction market pallets
+	"prediction-market-primitives/std",
+    "pallet-pm-market-commons/std",
+    # "pallet-pm-authorized/std",
+    # "pallet-pm-court/std",
+    # "pallet-prediction-markets/std",
+    # "pallet-pm-global-disputes/std",
+	# "pallet-insecure-randomness-collective-flip/std",
+	# "pallet-pm-neo-swaps/std",
+	# "eth-asset-registry/std",
+
 
 	"substrate-wasm-builder",
 ]

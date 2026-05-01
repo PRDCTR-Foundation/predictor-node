@@ -95,6 +95,7 @@ pallet-authority-discovery = { version = "38.0.0", default-features = false }
 pallet-authorship = { version = "38.0.0", default-features = false }
 pallet-multisig = { version = "38.0.0", default-features = false }
 pallet-proxy = { version = "38.0.0", default-features = false }
+pallet-collective = { version = "38.0.0", default-features = false }
 
 sp-application-crypto = { version = "38.0.0", default-features = false }
 sp-staking = { version = "36.0.0", default-features = false }

@@ -445,3 +445,10 @@ impl orml_currencies::Config for Runtime {
     type GetNativeCurrencyId = GetNativeCurrencyId;
     type WeightInfo = ();
 }
+
+// Prediction market runtime API implementations would go here.
+impl pallet_pm_market_commons::Config for Runtime {
+    type Balance = Balance;
+    type MarketId = MarketId;
+    type Timestamp = Timestamp;
+}
