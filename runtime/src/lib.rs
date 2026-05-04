@@ -10,6 +10,7 @@ pub mod asset_registry;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarks;
 pub mod configs;
+pub mod fees;
 
 extern crate alloc;
 use alloc::vec::Vec;
