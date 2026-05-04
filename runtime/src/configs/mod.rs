@@ -43,6 +43,9 @@ use sp_runtime::{traits::One, transaction_validity::TransactionPriority, Perbill
 use sp_version::RuntimeVersion;
 
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use common_primitives::constants::BLOCKS_PER_DAY;
+use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
+use frame_system::EnsureRoot;
 
 // Local module imports
 use super::{
@@ -446,9 +449,31 @@ impl orml_currencies::Config for Runtime {
     type WeightInfo = ();
 }
 
-// Prediction market runtime API implementations would go here.
-impl pallet_pm_market_commons::Config for Runtime {
-    type Balance = Balance;
-    type MarketId = MarketId;
-    type Timestamp = Timestamp;
+type AdvisoryCommitteeInstance = pallet_collective::Instance1;
+
+// Prediction market
+impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
+
+parameter_types! {
+    // Note: MaxMembers does not influence the pallet logic, but the worst-case weight
+    // estimation.     
+    pub const AdvisoryCommitteeMaxMembers: u32 = 100;
+    // The maximum of proposals is currently u8::MAX otherwise the pallet_collective benchmark
+    // fails
+    pub const AdvisoryCommitteeMaxProposals: u32 = 255;
+    pub const AdvisoryCommitteeMotionDuration: BlockNumber = 3 * BLOCKS_PER_DAY;
+    pub MaxProposalWeight: Weight = Perbill::from_percent(50) *
+RuntimeBlockWeights::get().max_block; }
+
+impl pallet_collective::Config<AdvisoryCommitteeInstance> for Runtime {
+    type DefaultVote = PrimeDefaultVote;
+    type RuntimeEvent = RuntimeEvent;
+    type MaxMembers = AdvisoryCommitteeMaxMembers;
+    type MaxProposals = AdvisoryCommitteeMaxProposals;
+    type MaxProposalWeight = MaxProposalWeight;
+    type MotionDuration = AdvisoryCommitteeMotionDuration;
+    type RuntimeOrigin = RuntimeOrigin;
+    type SetMembersOrigin = EnsureRoot<AccountId>;
+    type Proposal = RuntimeCall;
+    type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 }

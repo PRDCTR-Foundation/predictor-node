@@ -296,19 +296,12 @@ mod runtime {
 
     // Prediction market pallets
     #[runtime::pallet_index(70)]
-    pub type MarketCommons = pallet_pm_market_commons;
+    pub type AdvisoryCommittee = pallet_collective<Instance1>;
 
-}
+    // #[runtime::pallet_index(71)]
+    // pub type AssetRegistry = pallet_pm_eth_asset_registry;
 
-
-    // MarketCommons: pallet_pm_market_commons::{Pallet, Storage} = 40,
-    // Authorized: pallet_pm_authorized::{Call, Event<T>, Pallet, Storage} = 41,
-    // Court: pallet_pm_court::{Call, Event<T>, Pallet, Storage} = 42,
-    // PredictionMarkets: pallet_prediction_markets::{Call, Config<T>, Event<T>, Pallet, Storage} = 43,
-    // GlobalDisputes: pallet_pm_global_disputes::{Call, Event<T>, Pallet, Storage} = 44,
-    // NeoSwaps: pallet_pm_neo_swaps::{Call, Config<T>, Event<T>, Pallet, Storage} = 45,
-    // Orderbook: pallet_pm_order_book::{Call, Event<T>, Pallet, Storage} = 46,
-    // HybridRouter: pallet_pm_hybrid_router::{Call, Event<T>, Pallet, Storage} = 47,
-
+    #[runtime::pallet_index(72)]
+    pub type RandomnessCollectiveFlip = pallet_insecure_randomness_collective_flip;
 
 }

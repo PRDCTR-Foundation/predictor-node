@@ -127,6 +127,8 @@ std = [
 	"pallet-preimage/std",
 	"pallet-multisig/std",
 	"pallet-proxy/std",
+	"pallet-collective/std",
+	"pallet-insecure-randomness-collective-flip/std",
 
 	"orml-currencies/std",
 	"orml-tokens/std",
@@ -167,9 +169,9 @@ std = [
     # "pallet-pm-court/std",
     # "pallet-prediction-markets/std",
     # "pallet-pm-global-disputes/std",
-	# "pallet-insecure-randomness-collective-flip/std",
+	"pallet-insecure-randomness-collective-flip/std",
 	# "pallet-pm-neo-swaps/std",
-	# "eth-asset-registry/std",
+	"pallet-pm-eth-asset-registry/std",
 
 
 	"substrate-wasm-builder",
