@@ -813,3 +813,9 @@ impl pallet_pm_hybrid_router::Config for Runtime {
     type Signature = Signature;
     type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
 }
+
+impl pallet_config::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type WeightInfo = pallet_config::default_weights::SubstrateWeight<Runtime>;
+}

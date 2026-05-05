@@ -81,6 +81,7 @@ common-primitives.workspace = true
 
 # Prediction market
 prediction-market-primitives = { workspace = true }
+pallet-config = { workspace = true }
 pallet-pm-authorized = { workspace = true }
 pallet-pm-court = { workspace = true }
 pallet-pm-market-commons = { workspace = true }
@@ -166,6 +167,7 @@ std = [
 	"common-primitives/std",
 
 	# Prediction market pallets
+	"pallet-config/std",
 	"prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
     "pallet-pm-authorized/std",
@@ -193,6 +195,8 @@ runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
 
 	"orml-benchmarking",
+	"pallet-config/runtime-benchmarks",
+
 ]
 
 try-runtime = [
@@ -209,6 +213,7 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 	"orml-currencies/try-runtime",
 	"orml-tokens/try-runtime",
+	"pallet-config/try-runtime",
 ]
 
 # Enable the metadata hash generation.
