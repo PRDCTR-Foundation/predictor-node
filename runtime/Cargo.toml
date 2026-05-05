@@ -89,6 +89,7 @@ pallet-pm-global-disputes = { workspace = true, optional = true }
 pallet-pm-neo-swaps = { workspace = true }
 pallet-collective = { workspace = true }
 pallet-insecure-randomness-collective-flip = { workspace = true }
+pallet-pm-eth-asset-registry = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }

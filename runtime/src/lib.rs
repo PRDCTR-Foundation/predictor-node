@@ -298,8 +298,8 @@ mod runtime {
     #[runtime::pallet_index(70)]
     pub type AdvisoryCommittee = pallet_collective<Instance1>;
 
-    // #[runtime::pallet_index(71)]
-    // pub type AssetRegistry = pallet_pm_eth_asset_registry;
+    #[runtime::pallet_index(71)]
+    pub type AssetRegistry = pallet_pm_eth_asset_registry;
 
     #[runtime::pallet_index(72)]
     pub type RandomnessCollectiveFlip = pallet_insecure_randomness_collective_flip;

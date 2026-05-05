@@ -15,18 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Balance, CurrencyId};
-use frame_support::parameter_types;
+use crate::{configs::AssetRegistryStringLimit, Balance, CurrencyId};
 use orml_traits::asset_registry::{AssetMetadata, AssetProcessor};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use prediction_market_primitives::types::CustomMetadata;
 use scale_info::TypeInfo;
 use sp_runtime::DispatchError;
-
-parameter_types! {
-    // Asset registry
-    pub const AssetRegistryStringLimit: u32 = 1024;
-}
 
 #[derive(
     Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Debug, Encode, Decode, TypeInfo, MaxEncodedLen,

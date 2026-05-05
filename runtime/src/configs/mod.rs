@@ -46,6 +46,8 @@ use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use common_primitives::constants::BLOCKS_PER_DAY;
 use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
 use frame_system::EnsureRoot;
+use crate::asset_registry::CustomAssetProcessor;
+use pallet_prediction_markets::CustomMetadata;
 
 // Local module imports
 use super::{
