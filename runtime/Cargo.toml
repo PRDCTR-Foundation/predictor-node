@@ -87,9 +87,11 @@ pallet-pm-market-commons = { workspace = true }
 pallet-prediction-markets = { workspace = true }
 pallet-pm-global-disputes = { workspace = true, optional = true }
 pallet-pm-neo-swaps = { workspace = true }
+pallet-pm-hybrid-router = { workspace = true }
 pallet-collective = { workspace = true }
 pallet-insecure-randomness-collective-flip = { workspace = true }
 pallet-pm-eth-asset-registry = { workspace = true }
+pallet-pm-order-book = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
@@ -166,14 +168,15 @@ std = [
 	# Prediction market pallets
 	"prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
-    # "pallet-pm-authorized/std",
-    # "pallet-pm-court/std",
-    # "pallet-prediction-markets/std",
-    # "pallet-pm-global-disputes/std",
+    "pallet-pm-authorized/std",
+    "pallet-pm-court/std",
+    "pallet-prediction-markets/std",
+    "pallet-pm-global-disputes/std",
 	"pallet-insecure-randomness-collective-flip/std",
-	# "pallet-pm-neo-swaps/std",
+	"pallet-pm-neo-swaps/std",
 	"pallet-pm-eth-asset-registry/std",
-
+	"pallet-pm-hybrid-router/std",
+	"pallet-pm-order-book/std",
 
 	"substrate-wasm-builder",
 ]
@@ -188,6 +191,7 @@ runtime-benchmarks = [
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+
 	"orml-benchmarking",
 ]
 

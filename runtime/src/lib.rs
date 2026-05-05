@@ -304,4 +304,27 @@ mod runtime {
     #[runtime::pallet_index(72)]
     pub type RandomnessCollectiveFlip = pallet_insecure_randomness_collective_flip;
 
+    #[runtime::pallet_index(75)]
+    pub type MarketCommons = pallet_pm_market_commons;
+
+    #[runtime::pallet_index(76)]
+    pub type Authorized = pallet_pm_authorized;
+
+    #[runtime::pallet_index(77)]
+    pub type Court = pallet_pm_court;
+
+    #[runtime::pallet_index(78)]
+    pub type PredictionMarkets = pallet_prediction_markets;
+
+    #[runtime::pallet_index(79)]
+    pub type GlobalDisputes = pallet_pm_global_disputes;
+
+    #[runtime::pallet_index(80)]
+    pub type NeoSwaps = pallet_pm_neo_swaps;
+
+    #[runtime::pallet_index(81)]
+    pub type Orderbook = pallet_pm_order_book;
+
+    #[runtime::pallet_index(82)]
+    pub type HybridRouter = pallet_pm_hybrid_router;
 }
