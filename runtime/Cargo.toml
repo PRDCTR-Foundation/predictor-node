@@ -20,6 +20,8 @@ scale-info = { features = [
 	"derive",
 	"serde",
 ], workspace = true }
+smallvec = "1.15.0"
+
 serde = { workspace = true }
 frame-support = { features = ["experimental"], workspace = true }
 frame-system.workspace = true
@@ -53,6 +55,7 @@ sp-inherents.workspace = true
 sp-offchain.workspace = true
 sp-runtime = { features = ["serde"], workspace = true }
 sp-session.workspace = true
+sp-std.workspace = true
 sp-storage.workspace = true
 sp-transaction-pool.workspace = true
 sp-version = { features = ["serde"], workspace = true }
@@ -93,6 +96,7 @@ pallet-collective = { workspace = true }
 pallet-insecure-randomness-collective-flip = { workspace = true }
 pallet-pm-eth-asset-registry = { workspace = true }
 pallet-pm-order-book = { workspace = true }
+pallet-pm-combinatorial-tokens = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
@@ -160,6 +164,7 @@ std = [
 	"sp-offchain/std",
 	"sp-runtime/std",
 	"sp-session/std",
+	"sp-std/std",
 	"sp-storage/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
@@ -179,6 +184,7 @@ std = [
 	"pallet-pm-eth-asset-registry/std",
 	"pallet-pm-hybrid-router/std",
 	"pallet-pm-order-book/std",
+	"pallet-pm-combinatorial-tokens/std",
 
 	"substrate-wasm-builder",
 ]
@@ -196,6 +202,7 @@ runtime-benchmarks = [
 
 	"orml-benchmarking",
 	"pallet-config/runtime-benchmarks",
+	"pallet-pm-combinatorial-tokens/runtime-benchmarks",
 
 ]
 
@@ -214,6 +221,7 @@ try-runtime = [
 	"orml-currencies/try-runtime",
 	"orml-tokens/try-runtime",
 	"pallet-config/try-runtime",
+	"pallet-pm-combinatorial-tokens/try-runtime",
 ]
 
 # Enable the metadata hash generation.

@@ -120,34 +120,6 @@ pub fn native_version() -> NativeVersion {
     NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
 }
 
-/// Currency identifier used by orml-tokens. `Native` aliases the chain's balances
-/// token; additional variants represent other fungible tokens managed by orml-tokens.
-#[derive(
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Debug,
-    parity_scale_codec::Encode,
-    parity_scale_codec::Decode,
-    parity_scale_codec::MaxEncodedLen,
-    scale_info::TypeInfo,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-pub enum CurrencyId {
-    Native,
-    Token(u32),
-}
-
-impl Default for CurrencyId {
-    fn default() -> Self {
-        CurrencyId::Native
-    }
-}
-
 /// The address format for describing accounts.
 pub type Address = MultiAddress<AccountId, ()>;
 
@@ -289,7 +261,7 @@ mod runtime {
 
     // ORML pallets
     #[runtime::pallet_index(50)]
-    pub type Currencies = orml_currencies;
+    pub type AssetManager = orml_currencies;
 
     #[runtime::pallet_index(51)]
     pub type Tokens = orml_tokens;
@@ -330,4 +302,7 @@ mod runtime {
 
     #[runtime::pallet_index(82)]
     pub type HybridRouter = pallet_pm_hybrid_router;
+
+    #[runtime::pallet_index(83)]
+    pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
 }

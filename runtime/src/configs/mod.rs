@@ -27,41 +27,54 @@
 use frame_support::{
     derive_impl, parameter_types,
     traits::{
-        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, VariantCountOf,
+        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, EitherOfDiverse, KeyOwnerProofSystem,
+        VariantCountOf,
     },
     weights::{
-        constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
-        IdentityFee, Weight,
+        constants::{ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
+        IdentityFee, Weight, WeightToFeeCoefficient,
     },
+    Blake2_256, PalletId,
 };
+use frame_system::EnsureRoot;
+
+use frame_support::weights::WeightToFeeCoefficients;
 use frame_system::limits::{BlockLength, BlockWeights};
 use pallet_grandpa::AuthorityId as GrandpaId;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::crypto::KeyTypeId;
-use sp_runtime::{traits::One, transaction_validity::TransactionPriority, Perbill};
+use sp_runtime::{
+    traits::One, transaction_validity::TransactionPriority, FixedU128, Perbill, Percent,
+};
 use sp_version::RuntimeVersion;
 
-use crate::asset_registry::CustomAssetProcessor;
-use common_primitives::constants::BLOCKS_PER_DAY;
-use frame_system::EnsureRoot;
+pub use prediction_market_primitives::{constants::*, types::*};
+
+pub use common_primitives::constants::{
+    currency::*, BLOCKS_PER_DAY, BLOCKS_PER_HOUR, BLOCKS_PER_YEAR, MILLISECS_PER_BLOCK,
+    NODE_MANAGER_PALLET_ID,
+};
+
+use crate::{asset_registry::CustomAssetProcessor, BlakeTwo256};
 use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 use pallet_prediction_markets::CustomMetadata;
-
 // Local module imports
 use super::{
-    AccountId, Amount, Aura, AuthorsManager, Avn, Balance, Balances, Block, BlockNumber,
-    CurrencyId, EthBridge, Hash, Historical, ImOnline, Nonce, Offences, OriginCaller, PalletInfo,
-    Preimage, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason,
-    RuntimeOrigin, RuntimeTask, Scheduler, SessionKeys, Signature, Summary, System, Timestamp,
-    TokenManager, Tokens, UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, MINUTES, SLOT_DURATION, VERSION,
+    AccountId, Amount, AssetManager, AssetRegistry, Aura, Authorized, AuthorsManager, Avn, Balance,
+    Balances, Block, BlockNumber, CombinatorialTokens, Court, EthBridge, GlobalDisputes, Hash,
+    Historical, ImOnline, MarketCommons, NeoSwaps, Nonce, Offences, Orderbook, OriginCaller,
+    PalletConfig, PalletInfo, PredictionMarkets, Preimage, RandomnessCollectiveFlip, Runtime,
+    RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
+    Scheduler, SessionKeys, Signature, Summary, System, Timestamp, TokenManager, Tokens,
+    UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, MINUTES, SLOT_DURATION, VERSION,
 };
-use orml_traits::parameter_type_with_key;
+use orml_traits::{parameter_type_with_key, LockIdentifier};
+use smallvec::smallvec;
 use sp_runtime::traits::{ConvertInto, OpaqueKeys};
 use sp_watchtower::NoopWatchtower;
-
-use crate::BlakeTwo256;
 
 mod proxy_config;
 use proxy_config::ProxyType;
@@ -767,13 +780,20 @@ parameter_types! {
     pub const NeoSwapsMaxSwapFee: Balance = 10 * CENT_BASE;
     pub const NeoSwapsPalletId: PalletId = NS_PALLET_ID;
     pub const MaxLiquidityTreeDepth: u32 = 9u32;
+    pub const MaxSplits: u16 = 128u16;
+
 }
 
 impl pallet_pm_neo_swaps::Config for Runtime {
+    type CombinatorialId = CombinatorialId;
+    type CombinatorialTokens = CombinatorialTokens;
+    type CombinatorialTokensUnsafe = CombinatorialTokens;
     type CompleteSetOperations = PredictionMarkets;
     type ExternalFees = AdditionalSwapFee;
     type MarketCommons = MarketCommons;
     type MultiCurrency = AssetManager;
+    type PoolId = MarketId;
+    type MaxSplits = MaxSplits;
     type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
@@ -818,4 +838,106 @@ impl pallet_config::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_config::default_weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+        // CombinatorialTokens
+        pub const CombinatorialTokensPalletId: PalletId = COMBINATORIAL_TOKENS_PALLET_ID;
+}
+
+impl pallet_pm_combinatorial_tokens::Config for Runtime {
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = PredictionMarketsCombinatorialTokensBenchmarkHelper<Runtime>;
+    type CombinatorialIdManager = CryptographicIdManager<MarketId, Blake2_256>;
+    type Fuel = Fuel;
+    type MarketCommons = MarketCommons;
+    type MultiCurrency = AssetManager;
+    type Payout = PredictionMarkets;
+    type RuntimeEvent = RuntimeEvent;
+    type PalletId = CombinatorialTokensPalletId;
+    type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
+}
+
+// To split to another file
+use crate::impl_fee_types;
+impl_fee_types!();
+
+/// ORML adapter
+pub type BasicCurrencyAdapter<R, B> =
+    orml_currencies::BasicCurrencyAdapter<R, B, OrmlAmount, Balance>;
+pub type CurrencyId = Asset<MarketId>;
+
+pub type NegativeImbalance<T> = <pallet_balances::Pallet<T> as Currency<
+    <T as frame_system::Config>::AccountId,
+>>::NegativeImbalance;
+
+pub struct Treasury<R>(sp_std::marker::PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for Treasury<R>
+where
+    R: pallet_balances::Config + pallet_token_manager::Config,
+    <R as frame_system::Config>::AccountId: From<AccountId>,
+    <R as frame_system::Config>::AccountId: Into<AccountId>,
+    <R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+{
+    fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
+        let recipient: <R as frame_system::Config>::AccountId = PalletConfig::gas_fee_recipient()
+            .map(Into::into)
+            .unwrap_or_else(|_| <pallet_token_manager::Pallet<R>>::compute_treasury_account_id());
+
+        <pallet_balances::Pallet<R>>::resolve_creating(&recipient, amount);
+    }
+}
+
+pub struct DealWithFees<R>(sp_std::marker::PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for DealWithFees<R>
+where
+    R: pallet_balances::Config + pallet_token_manager::Config,
+    <R as frame_system::Config>::AccountId: From<AccountId>,
+    <R as frame_system::Config>::AccountId: Into<AccountId>,
+    <R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+{
+    fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance<R>>) {
+        if let Some(mut fees) = fees_then_tips.next() {
+            if let Some(tips) = fees_then_tips.next() {
+                tips.merge_into(&mut fees);
+            }
+
+            // 100% of fees + tips goes to the treasury
+            <Treasury<R> as OnUnbalanced<_>>::on_unbalanced(fees);
+        }
+    }
+}
+
+/// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
+/// node's balance type.
+///
+/// This should typically create a mapping between the following ranges:
+///   - `[0, MAXIMUM_BLOCK_WEIGHT]`
+///   - `[Balance::min, Balance::max]`
+///
+/// Yet, it can be used for any other sort of change to weight-fee. Some examples being:
+///   - Setting it to `0` will essentially disable the weight fee.
+///   - Setting it to `1` will cause the literal `#[weight = x]` values to be charged.
+pub struct WeightToFee;
+impl WeightToFeePolynomial for WeightToFee {
+    type Balance = Balance;
+    fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
+        // We adjust the fee conversion so that a simple token transfer
+        // direct to chain costs base_fee TRUU.
+        let base_fee = PalletConfig::base_gas_fee();
+
+        // The magic number (2.380951) is the result of :
+        // setting p = 50 * MILLI_BASE, the cost of a simple transfer was 119.04775 milli TRUU
+        // (visual observation on polkadot.js). magic_number = 119.04775 / 50 = 2.380951
+        let factor = FixedU128::saturating_from_rational(1_000_000u128, 2_380_951u128);
+
+        let p = factor.saturating_mul_int(base_fee);
+        let q = Balance::from(ExtrinsicBaseWeight::get().ref_time());
+        smallvec![WeightToFeeCoefficient {
+            degree: 1,
+            negative: false,
+            coeff_frac: Perbill::from_rational(p % q, q),
+            coeff_integer: p / q,
+        }]
+    }
 }
