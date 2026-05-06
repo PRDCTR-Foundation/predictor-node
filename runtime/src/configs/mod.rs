@@ -27,12 +27,12 @@
 use frame_support::{
     derive_impl, parameter_types,
     traits::{
-        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, EitherOfDiverse, KeyOwnerProofSystem,
-        VariantCountOf,
+        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse,
+        KeyOwnerProofSystem, OnUnbalanced, VariantCountOf,
     },
     weights::{
         constants::{ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
-        IdentityFee, Weight, WeightToFeeCoefficient,
+        IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeePolynomial,
     },
     Blake2_256, PalletId,
 };
