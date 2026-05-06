@@ -2177,24 +2177,10 @@ checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 name = "common-primitives"
 version = "0.1.0"
 dependencies = [
- "arbitrary",
- "fixed",
  "frame-support",
- "frame-system",
- "more-asserts",
- "num-traits",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
  "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-arithmetic 26.1.0",
- "sp-avn-common",
  "sp-core",
  "sp-runtime",
- "test-case",
- "typenum",
 ]
 
 [[package]]
@@ -7326,6 +7312,7 @@ version = "38.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e149f1aefd444c9a1da6ec5a94bc8a7671d7a33078f85dd19ae5b06e3438e60"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "log",
@@ -7334,6 +7321,26 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-config"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "log",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -8957,6 +8964,7 @@ dependencies = [
  "pallet-avn",
  "pallet-balances",
  "pallet-collective",
+ "pallet-config",
  "pallet-eth-bridge",
  "pallet-eth-bridge-runtime-api",
  "pallet-grandpa",
@@ -8965,10 +8973,14 @@ dependencies = [
  "pallet-multisig",
  "pallet-offences",
  "pallet-pm-authorized",
+ "pallet-pm-combinatorial-tokens",
  "pallet-pm-court",
+ "pallet-pm-eth-asset-registry",
  "pallet-pm-global-disputes",
+ "pallet-pm-hybrid-router",
  "pallet-pm-market-commons",
  "pallet-pm-neo-swaps",
+ "pallet-pm-order-book",
  "pallet-prediction-markets",
  "pallet-preimage",
  "pallet-proxy",
@@ -8985,6 +8997,7 @@ dependencies = [
  "prediction-market-primitives",
  "scale-info",
  "serde",
+ "smallvec",
  "sp-api",
  "sp-application-crypto",
  "sp-avn-common",
@@ -8998,6 +9011,7 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-storage",
  "sp-transaction-pool",
  "sp-version",
@@ -11923,9 +11937,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.13.2"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 dependencies = [
  "serde",
 ]
