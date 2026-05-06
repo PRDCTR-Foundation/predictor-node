@@ -88,6 +88,14 @@ pallet-session = { version = "38.0.0", default-features = false, features = ["hi
 pallet-offences = { version = "37.0.0", default-features = false }
 pallet-scheduler = { version = "39.1.0", default-features = false }
 pallet-preimage = { version = "38.0.0", default-features = false }
+
+pallet-im-online = { version = "37.0.0", default-features = false }
+pallet-utility = { version = "38.0.0", default-features = false }
+pallet-authority-discovery = { version = "38.0.0", default-features = false }
+pallet-authorship = { version = "38.0.0", default-features = false }
+pallet-multisig = { version = "38.0.0", default-features = false }
+pallet-proxy = { version = "38.0.0", default-features = false }
+
 sp-application-crypto = { version = "38.0.0", default-features = false }
 sp-staking = { version = "36.0.0", default-features = false }
 sp-genesis-builder = { version = "0.15.1", default-features = false }
@@ -109,17 +117,17 @@ node-macros = { path = "./macros", default-features = false }
 
 common-primitives = { path = "./primitives/common", default-features = false }
 prediction-market-primitives = { path = "./primitives/prediction-market", default-features = false }
-zeitgeist-primitives = { path = "./primitives/prediction-market", default-features = false }
-pallet-pm-market-commons = { path = "./pallets/market-commons", default-features = false }
+
+pallet-pm-market-commons = { path = "pallets/market-commons", default-features = false }
 pallet-pm-authorized = { path = "./pallets/authorized", default-features = false }
-pallet-pm-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
 pallet-pm-court = { path = "pallets/court", default-features = false }
-pallet-pm-eth-asset-registry = { path = "pallets/eth-asset-registry", default-features = false }
 pallet-pm-global-disputes = { path = "pallets/global-disputes", default-features = false }
-pallet-pm-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
-pallet-pm-order-book = { path = "pallets/orderbook", default-features = false }
+pallet-pm-eth-asset-registry = { path = "pallets/eth-asset-registry", default-features = false }
 pallet-prediction-markets = { path = "pallets/prediction-markets", default-features = false }
 pallet-prediction-markets-runtime-api = { path = "pallets/prediction-markets/runtime-api", default-features = false }
+pallet-pm-order-book = { path = "pallets/orderbook", default-features = false }
+pallet-pm-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
+pallet-pm-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
 pallet-pm-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
 
 # ORML (wasm)

@@ -1,4 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+// #[frame_support::runtime] does a lot of recursion and requires us to increase the limit to 256.
+#![recursion_limit = "256"]
 
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
@@ -11,9 +13,7 @@ pub mod configs;
 extern crate alloc;
 use alloc::vec::Vec;
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys,
-    traits::{BlakeTwo256, IdentifyAccount, Verify},
-    MultiAddress, MultiSignature,
+    create_runtime_str, generic, impl_opaque_keys, traits::BlakeTwo256, MultiAddress,
 };
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -27,6 +27,10 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_avn::sr25519::AuthorityId as AvnId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+
+pub use common_primitives::types::{
+    AccountId, Amount, Balance, BlockNumber, Hash, Nonce, Signature,
+};
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -114,19 +118,6 @@ pub fn native_version() -> NativeVersion {
     NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
 }
 
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
-
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
-
-/// Balance of an account.
-pub type Balance = u128;
-
-/// Signed balance amount used by orml-tokens.
-pub type Amount = i128;
-
 /// Currency identifier used by orml-tokens. `Native` aliases the chain's balances
 /// token; additional variants represent other fungible tokens managed by orml-tokens.
 #[derive(
@@ -154,15 +145,6 @@ impl Default for CurrencyId {
         CurrencyId::Native
     }
 }
-
-/// Index of a transaction in the chain.
-pub type Nonce = u32;
-
-/// A hash of some data used by the chain.
-pub type Hash = sp_core::H256;
-
-/// An index to a block.
-pub type BlockNumber = u32;
 
 /// The address format for describing accounts.
 pub type Address = MultiAddress<AccountId, ()>;
@@ -253,39 +235,60 @@ mod runtime {
     #[runtime::pallet_index(6)]
     pub type Sudo = pallet_sudo;
 
-    #[runtime::pallet_index(8)]
-    pub type Tokens = orml_tokens;
-
-    #[runtime::pallet_index(9)]
-    pub type Currencies = orml_currencies;
-
-    #[runtime::pallet_index(10)]
+    #[runtime::pallet_index(7)]
     pub type Session = pallet_session;
 
-    #[runtime::pallet_index(11)]
+    #[runtime::pallet_index(8)]
     pub type Historical = pallet_session::historical;
 
-    #[runtime::pallet_index(12)]
-    pub type Avn = pallet_avn;
+    #[runtime::pallet_index(9)]
+    pub type ImOnline = pallet_im_online;
 
-    #[runtime::pallet_index(13)]
-    pub type Summary = pallet_summary;
+    #[runtime::pallet_index(10)]
+    pub type AuthorityDiscovery = pallet_authority_discovery;
 
-    #[runtime::pallet_index(14)]
-    pub type AuthorsManager = pallet_authors_manager;
+    #[runtime::pallet_index(11)]
+    pub type Authorship = pallet_authorship;
 
-    #[runtime::pallet_index(15)]
-    pub type EthBridge = pallet_eth_bridge;
-
-    #[runtime::pallet_index(16)]
+    // Polkadot-SDK Additional pallets
+    #[runtime::pallet_index(20)]
     pub type Offences = pallet_offences;
 
-    #[runtime::pallet_index(17)]
+    #[runtime::pallet_index(21)]
     pub type Scheduler = pallet_scheduler;
 
-    #[runtime::pallet_index(18)]
+    #[runtime::pallet_index(22)]
     pub type Preimage = pallet_preimage;
 
-    #[runtime::pallet_index(19)]
+    #[runtime::pallet_index(23)]
+    pub type Utility = pallet_utility;
+
+    #[runtime::pallet_index(24)]
+    pub type Multisig = pallet_multisig;
+
+    #[runtime::pallet_index(25)]
+    pub type Proxy = pallet_proxy;
+
+    // AvN pallets
+    #[runtime::pallet_index(30)]
+    pub type Avn = pallet_avn;
+
+    #[runtime::pallet_index(31)]
+    pub type EthBridge = pallet_eth_bridge;
+
+    #[runtime::pallet_index(32)]
+    pub type AuthorsManager = pallet_authors_manager;
+
+    #[runtime::pallet_index(33)]
     pub type TokenManager = pallet_token_manager;
+
+    #[runtime::pallet_index(34)]
+    pub type Summary = pallet_summary;
+
+    // ORML pallets
+    #[runtime::pallet_index(50)]
+    pub type Currencies = orml_currencies;
+
+    #[runtime::pallet_index(51)]
+    pub type Tokens = orml_tokens;
 }
