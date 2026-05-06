@@ -2,7 +2,7 @@
 //!
 //! ROSS = Runtime-based Optimistic State Simulation.
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc, time::Instant};
 
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use sc_block_builder::BlockBuilderBuilder;
@@ -18,6 +18,15 @@ use sp_runtime::{traits::Block as BlockT, SaturatedConversion};
 
 const MAX_STORAGE_KEYS: usize = 100;
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SimulationStopReason {
+    AllProcessed,
+    MaxTxsReached,
+    BlockLimitReached,
+    SimulationError,
+}
+
 /// Response returned by `ross_readyTxs`
 #[derive(Debug, Clone, Serialize)]
 pub struct ReadyTxsResponse {
@@ -32,6 +41,9 @@ pub struct ReadyTxsResponse {
 pub struct SimulateQuery {
     /// Raw storage keys to query after simulation.
     pub keys: Vec<String>,
+    /// Optional maximum number of READY transactions to simulate.
+    #[serde(default)]
+    pub max_txs: Option<usize>,
 }
 
 /// Storage value returned after optimistic simulation
@@ -50,6 +62,9 @@ pub struct SimulateResponse {
     pub ready_tx_count: usize,
     pub applied_count: usize,
     pub failed_count: usize,
+    pub skipped_count: usize,
+    pub execution_ms: u128,
+    pub stop_reason: SimulationStopReason,
     pub values: Vec<SimulatedStorageValue>,
 }
 
@@ -112,6 +127,8 @@ where
     }
 
     async fn simulate(&self, query: SimulateQuery) -> RpcResult<SimulateResponse> {
+        let started_at = Instant::now();
+
         if query.keys.len() > MAX_STORAGE_KEYS {
             return Err(rpc_err(-32602, format!("Too many storage keys (max {MAX_STORAGE_KEYS})")))
         }
@@ -149,15 +166,37 @@ where
             builder.push(inherent).map_err(|e| rpc_err(-32004, format!("{e:?}")))?;
         }
 
+        let ready_txs = ready.collect::<Vec<_>>();
+        let ready_tx_count = ready_txs.len();
+        let max_txs = query.max_txs.unwrap_or(usize::MAX);
+
         let mut applied = 0usize;
         let mut failed = 0usize;
+        let mut stop_reason = SimulationStopReason::AllProcessed;
 
-        for tx in ready {
+        for tx in ready_txs.iter().take(max_txs) {
             match builder.push(tx.data().clone()) {
                 Ok(_) => applied += 1,
-                Err(_) => failed += 1,
+                Err(e) if is_block_limit_error(&e) => {
+                    failed += 1;
+                    stop_reason = SimulationStopReason::BlockLimitReached;
+                    break
+                },
+                Err(_) => {
+                    failed += 1;
+                    stop_reason = SimulationStopReason::SimulationError;
+                    break
+                },
             }
         }
+
+        if matches!(stop_reason, SimulationStopReason::AllProcessed) &&
+            applied + failed < ready_tx_count
+        {
+            stop_reason = SimulationStopReason::MaxTxsReached;
+        }
+
+        let skipped_count = ready_tx_count.saturating_sub(applied + failed);
 
         let built_block = builder.build().map_err(|e| rpc_err(-32005, format!("{e:?}")))?;
 
@@ -196,9 +235,12 @@ where
         Ok(SimulateResponse {
             parent_hash: format!("{:?}", best_hash),
             parent_number: best_number.saturated_into::<u64>(),
-            ready_tx_count: applied + failed,
+            ready_tx_count,
             applied_count: applied,
             failed_count: failed,
+            skipped_count,
+            execution_ms: started_at.elapsed().as_millis(),
+            stop_reason,
             values,
         })
     }
@@ -226,6 +268,16 @@ fn encode_hex(bytes: &[u8]) -> String {
         out.push_str(&format!("{b:02x}"));
     }
     out
+}
+
+fn is_block_limit_error<E: core::fmt::Debug>(err: &E) -> bool {
+    let err = format!("{err:?}");
+
+    err.contains("ExhaustsResources") ||
+        err.contains("BlockFull") ||
+        err.contains("block limit") ||
+        err.contains("block weight") ||
+        err.contains("MaximumBlockWeight")
 }
 
 fn rpc_err(code: i32, msg: impl Into<String>) -> jsonrpsee::types::ErrorObjectOwned {
