@@ -32,7 +32,7 @@ use frame_support::{
     },
     weights::{
         constants::{ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
-        IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeePolynomial,
+        IdentityFee, Imbalance, Weight, WeightToFeeCoefficient, WeightToFeePolynomial,
     },
     Blake2_256, PalletId,
 };
@@ -45,7 +45,8 @@ use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::crypto::KeyTypeId;
 use sp_runtime::{
-    traits::One, transaction_validity::TransactionPriority, FixedU128, Perbill, Percent,
+    traits::One, transaction_validity::TransactionPriority, FixedPointNumber, FixedU128, Perbill,
+    Percent,
 };
 use sp_version::RuntimeVersion;
 
