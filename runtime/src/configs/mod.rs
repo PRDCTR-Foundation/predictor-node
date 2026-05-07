@@ -62,15 +62,17 @@ use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 use pallet_prediction_markets::CustomMetadata;
+use sp_avn_common::event_discovery::filters::AllPrimaryEventsFilter;
 // Local module imports
 use super::{
-    AccountId, Amount, AssetManager, AssetRegistry, Aura, Authorized, AuthorsManager, Avn, Balance,
-    Balances, Block, BlockNumber, CombinatorialTokens, Court, EthBridge, GlobalDisputes, Hash,
-    Historical, ImOnline, MarketCommons, NeoSwaps, Nonce, Offences, Orderbook, OriginCaller,
-    PalletConfig, PalletInfo, PredictionMarkets, Preimage, RandomnessCollectiveFlip, Runtime,
-    RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
-    Scheduler, SessionKeys, Signature, Summary, System, Timestamp, TokenManager, Tokens,
-    UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, MINUTES, SLOT_DURATION, VERSION,
+    opaque::SessionKeys, AccountId, Amount, AssetManager, AssetRegistry, Aura, Authorized,
+    AuthorsManager, Avn, Balance, Balances, Block, BlockNumber, CombinatorialTokens, Court,
+    EthBridge, GlobalDisputes, Hash, Historical, ImOnline, MarketCommons, NeoSwaps, Nonce,
+    Offences, Orderbook, OriginCaller, PalletConfig, PalletInfo, PredictionMarkets, Preimage,
+    RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+    RuntimeHoldReason, RuntimeOrigin, RuntimeTask, Scheduler, Signature, Summary, System,
+    Timestamp, TokenManager, Tokens, UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES,
+    NATIVE_EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
 };
 use orml_traits::{parameter_type_with_key, LockIdentifier};
 use smallvec::smallvec;
@@ -134,7 +136,7 @@ impl frame_system::Config for Runtime {
 impl pallet_aura::Config for Runtime {
     type AuthorityId = AuraId;
     type DisabledValidators = ();
-    type MaxAuthorities = ConstU32<32>;
+    type MaxAuthorities = MaxAuthorities;
     type AllowMultipleBlocksPerSlot = ConstBool<false>;
     type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
@@ -165,14 +167,14 @@ impl pallet_timestamp::Config for Runtime {
 
 impl pallet_balances::Config for Runtime {
     type MaxLocks = ConstU32<50>;
-    type MaxReserves = ();
+    type MaxReserves = MaxReserves;
     type ReserveIdentifier = [u8; 8];
     /// The type for recording an account's balance.
     type Balance = Balance;
     /// The ubiquitous event type.
     type RuntimeEvent = RuntimeEvent;
     type DustRemoval = ();
-    type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+    type ExistentialDeposit = ConstU128<NATIVE_EXISTENTIAL_DEPOSIT>;
     type AccountStore = System;
     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
     type FreezeIdentifier = RuntimeFreezeReason;
@@ -185,6 +187,7 @@ parameter_types! {
     pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
+// TODO update this config to use the upgraded ROOT
 impl pallet_transaction_payment::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type OnChargeTransaction = FungibleAdapter<Balances, ()>;
@@ -397,9 +400,9 @@ impl pallet_eth_bridge::Config for Runtime {
     type AccountToBytesConvert = Avn;
     type BridgeInterfaceNotification = (Summary, AuthorsManager, TokenManager);
     type ReportCorroborationOffence = Offences;
-    type ProcessedEventsChecker = ();
+    type ProcessedEventsChecker = EthBridge;
     type EthereumEventsMigration = ();
-    type ProcessedEventsHandler = ();
+    type ProcessedEventsHandler = AllPrimaryEventsFilter;
     type Quorum = Avn;
     type WeightInfo = pallet_eth_bridge::default_weights::SubstrateWeight<Runtime>;
 }
@@ -414,8 +417,8 @@ impl pallet_token_manager::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type Currency = Balances;
     type TokenBalance = Balance;
-    type TokenId = sp_core::H160;
-    type ProcessedEventsChecker = ();
+    type TokenId = EthAddress;
+    type ProcessedEventsChecker = EthBridge;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
     type OnGrowthLiftedHandler = ();
@@ -443,11 +446,29 @@ impl pallet_avn_proxy::Config for Runtime {
 }
 
 parameter_type_with_key! {
-    pub ExistentialDeposits: |_currency_id: CurrencyId| -> Balance {
-        EXISTENTIAL_DEPOSIT
+    pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
+        match currency_id {
+            Asset::Tru => NATIVE_EXISTENTIAL_DEPOSIT,
+            Asset::ForeignAsset(id) => {
+                let maybe_metadata = <
+                pallet_pm_eth_asset_registry::Pallet<Runtime> as prediction_market_primitives::traits::InspectEthAsset
+                >::metadata(&Asset::ForeignAsset(*id));
+
+                if let Some(metadata) = maybe_metadata {
+                    return metadata.existential_deposit;
+                }
+
+                1
+            },
+            Asset::CategoricalOutcome(_,_) => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::CombinatorialOutcomeLegacy => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::PoolShare(_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::ScalarOutcome(_,_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::ParimutuelShare(_,_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::CombinatorialToken(_) => DEFAULT_EXISTENTIAL_DEPOSIT,
+        }
     };
 }
-
 pub struct CurrencyHooks<R>(sp_std::marker::PhantomData<R>);
 impl<C: orml_tokens::Config> orml_traits::currency::MutationHooks<AccountId, CurrencyId, Balance>
     for CurrencyHooks<C>

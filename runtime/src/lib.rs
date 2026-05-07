@@ -34,6 +34,8 @@ pub use common_primitives::types::{
     AccountId, Amount, Balance, BlockNumber, Hash, Nonce, Signature,
 };
 
+use common_primitives::constants::currency::MICRO_BASE;
+
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
@@ -55,13 +57,15 @@ pub mod opaque {
     pub type BlockId = generic::BlockId<Block>;
     /// Opaque block hash type.
     pub type Hash = <BlakeTwo256 as HashT>::Output;
-}
 
-impl_opaque_keys! {
-    pub struct SessionKeys {
-        pub aura: Aura,
-        pub grandpa: Grandpa,
-        pub avn: Avn,
+    impl_opaque_keys! {
+        pub struct SessionKeys {
+            pub aura: Aura,
+            pub grandpa: Grandpa,
+            pub authority_discovery: AuthorityDiscovery,
+            pub im_online: ImOnline,
+            pub avn: Avn,
+        }
     }
 }
 
@@ -106,13 +110,9 @@ pub const DAYS: BlockNumber = HOURS * 24;
 
 pub const BLOCK_HASH_COUNT: BlockNumber = 2400;
 
-// Unit = the base number of indivisible units for balances
-pub const UNIT: Balance = 1_000_000_000_000;
-pub const MILLI_UNIT: Balance = 1_000_000_000;
-pub const MICRO_UNIT: Balance = 1_000_000;
-
 /// Existential deposit.
-pub const EXISTENTIAL_DEPOSIT: Balance = MILLI_UNIT;
+pub const NATIVE_EXISTENTIAL_DEPOSIT: Balance = 0;
+pub const DEFAULT_EXISTENTIAL_DEPOSIT: Balance = 10 * MICRO_BASE;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
