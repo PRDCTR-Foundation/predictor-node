@@ -81,6 +81,8 @@ mod proxy_config;
 use proxy_config::ProxyType;
 mod avn_proxy_config;
 use avn_proxy_config::AvnProxyConfig;
+mod misc;
+use misc::{MinimumPeriod, MinimumPeriodValue};
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -155,9 +157,9 @@ impl pallet_grandpa::Config for Runtime {
 
 impl pallet_timestamp::Config for Runtime {
     /// A timestamp: milliseconds since the unix epoch.
-    type Moment = u64;
+    type Moment = Moment;
     type OnTimestampSet = Aura;
-    type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
+    type MinimumPeriod = MinimumPeriod; //ConstU64<{ SLOT_DURATION / 2 }>
     type WeightInfo = ();
 }
 
