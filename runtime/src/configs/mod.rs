@@ -446,37 +446,62 @@ parameter_type_with_key! {
     };
 }
 
+pub struct CurrencyHooks<R>(sp_std::marker::PhantomData<R>);
+impl<C: orml_tokens::Config> orml_traits::currency::MutationHooks<AccountId, CurrencyId, Balance>
+    for CurrencyHooks<C>
+{
+    type OnDust = orml_tokens::TransferDust<Runtime, TnfTreasuryAccount>;
+    type OnKilledTokenAccount = ();
+    type OnNewTokenAccount = ();
+    type OnSlash = ();
+    type PostDeposit = ();
+    type PostTransfer = ();
+    type PreDeposit = ();
+    type PreTransfer = ();
+}
+
 pub struct DustRemovalWhitelist;
 impl frame_support::traits::Contains<AccountId> for DustRemovalWhitelist {
     fn contains(_a: &AccountId) -> bool {
         false
     }
 }
-// TODO update me
+
+// Shared within tests
+// Balance
+parameter_types! {
+    pub const MaxLocks: u32 = 50;
+    pub const MaxReserves: u32 = 50;
+}
+
 impl orml_tokens::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
+    type Amount = OrmlAmount;
     type Balance = Balance;
-    type Amount = Amount;
+    type CurrencyHooks = CurrencyHooks<Runtime>;
     type CurrencyId = CurrencyId;
-    type WeightInfo = ();
-    type ExistentialDeposits = ExistentialDeposits;
-    type CurrencyHooks = ();
-    type MaxLocks = ConstU32<50>;
-    type MaxReserves = ConstU32<50>;
-    type ReserveIdentifier = [u8; 8];
     type DustRemovalWhitelist = DustRemovalWhitelist;
+    type RuntimeEvent = RuntimeEvent;
+    type ExistentialDeposits = ExistentialDeposits;
+    type MaxLocks = MaxLocks;
+    type MaxReserves = MaxReserves;
+    type ReserveIdentifier = [u8; 8];
+    // TODO update me
+    // type WeightInfo = third_party_weights::orml_tokens::WeightInfo<Runtime>;
+    type WeightInfo = ();
 }
 
 parameter_types! {
-    pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
+    pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
+        pub const TreasuryPalletId: PalletId = TREASURY_PALLET_ID;
+    pub TnfTreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
 }
 
-// TODO update me
 impl orml_currencies::Config for Runtime {
-    type MultiCurrency = Tokens;
-    type NativeCurrency =
-        orml_currencies::BasicCurrencyAdapter<Runtime, Balances, Amount, BlockNumber>;
     type GetNativeCurrencyId = GetNativeCurrencyId;
+    type MultiCurrency = Tokens;
+    type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances>;
+    // TODO update me
+    // type WeightInfo = third_party_weights::orml_currencies::WeightInfo<Runtime>;
     type WeightInfo = ();
 }
 

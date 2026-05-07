@@ -1,6 +1,7 @@
 use super::{AccountId, Runtime, RuntimeCall, Signature};
 pub use pallet_avn_proxy::ProvableProxy;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
+use scale_info::TypeInfo;
 use sp_avn_common::{
     event_discovery::{AdditionalEvents, EthBridgeEventsFilter, EthereumEventsFilterTrait},
     event_types::ValidEvents,
@@ -8,10 +9,21 @@ use sp_avn_common::{
 };
 pub use sp_runtime::RuntimeDebug;
 use sp_std::boxed::Box;
-use scale_info::TypeInfo;
 
 // Avn proxy configuration logic
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+#[derive(
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Encode,
+    Decode,
+    RuntimeDebug,
+    TypeInfo,
+    MaxEncodedLen,
+)]
 pub struct AvnProxyConfig {}
 impl Default for AvnProxyConfig {
     fn default() -> Self {
