@@ -1,19 +1,17 @@
+use super::{AccountId, Runtime, RuntimeCall, Signature};
+pub use pallet_avn_proxy::ProvableProxy;
+use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use sp_avn_common::{
     event_discovery::{AdditionalEvents, EthBridgeEventsFilter, EthereumEventsFilterTrait},
     event_types::ValidEvents,
     InnerCallValidator, Proof,
 };
-use super::{
-    AccountId, Box, Decode, Encode,  Runtime, RuntimeCall,
-    RuntimeDebug, Signature, TypeInfo,
-};
-
-// use frame_system::Call;
-pub use pallet_avn_proxy::ProvableProxy;
-
+pub use sp_runtime::RuntimeDebug;
+use sp_std::boxed::Box;
+use scale_info::TypeInfo;
 
 // Avn proxy configuration logic
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, TypeInfo)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct AvnProxyConfig {}
 impl Default for AvnProxyConfig {
     fn default() -> Self {
@@ -24,13 +22,6 @@ impl Default for AvnProxyConfig {
 impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
     fn get_proof(call: &RuntimeCall) -> Option<Proof<Signature, AccountId>> {
         match call {
-            // RuntimeCall::EthereumEvents(
-            //     pallet_ethereum_events::Call::signed_add_ethereum_log {
-            //         proof,
-            //         event_type: _,
-            //         tx_hash: _,
-            //     },
-            // ) => return Some(proof.clone()),
             RuntimeCall::TokenManager(pallet_token_manager::pallet::Call::signed_transfer {
                 proof,
                 from: _,
@@ -47,48 +38,6 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     t1_recipient: _,
                 },
             ) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_mint_single_nft {
-            //     proof,
-            //     unique_external_ref: _,
-            //     royalties: _,
-            //     t1_authority: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_list_nft_open_for_sale {
-            //     proof,
-            //     nft_id: _,
-            //     market: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_transfer_fiat_nft {
-            //     proof,
-            //     nft_id: _,
-            //     t2_transfer_to_public_key: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_cancel_list_fiat_nft {
-            //     proof,
-            //     nft_id: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_create_batch {
-            //     proof,
-            //     total_supply: _,
-            //     royalties: _,
-            //     t1_authority: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_mint_batch_nft {
-            //     proof,
-            //     batch_id: _,
-            //     index: _,
-            //     owner: _,
-            //     unique_external_ref: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_list_batch_for_sale {
-            //     proof,
-            //     batch_id: _,
-            //     market: _,
-            // }) => return Some(proof.clone()),
-            // RuntimeCall::NftManager(pallet_nft_manager::Call::signed_end_batch_sale {
-            //     proof,
-            //     batch_id: _,
-            // }) => return Some(proof.clone()),
             RuntimeCall::PredictionMarkets(
                 pallet_prediction_markets::Call::signed_create_market_and_deploy_pool {
                     proof,
@@ -155,13 +104,13 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 orders: _,
                 strategy: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::NodeManager(pallet_node_manager::Call::signed_register_node {
-                proof,
-                node: _,
-                owner: _,
-                signing_key: _,
-                block_number: _,
-            }) => return Some(proof.clone()),
+            // RuntimeCall::NodeManager(pallet_node_manager::Call::signed_register_node {
+            //     proof,
+            //     node: _,
+            //     owner: _,
+            //     signing_key: _,
+            //     block_number: _,
+            // }) => return Some(proof.clone()),
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,
@@ -181,12 +130,12 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 market_id: _,
                 block_number: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::NodeManager(pallet_node_manager::Call::signed_deregister_nodes {
-                proof,
-                owner: _,
-                nodes_to_deregister: _,
-                block_number: _,
-            }) => return Some(proof.clone()),
+            // RuntimeCall::NodeManager(pallet_node_manager::Call::signed_deregister_nodes {
+            //     proof,
+            //     owner: _,
+            //     nodes_to_deregister: _,
+            //     block_number: _,
+            // }) => return Some(proof.clone()),
             _ => None,
         }
     }
@@ -197,18 +146,14 @@ impl InnerCallValidator for AvnProxyConfig {
 
     fn signature_is_valid(call: &Box<Self::Call>) -> bool {
         match **call {
-            RuntimeCall::EthereumEvents(..) =>
-                return pallet_ethereum_events::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::TokenManager(..) =>
                 return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::NftManager(..) =>
-                return pallet_nft_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::PredictionMarkets(..) =>
                 return pallet_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::HybridRouter(..) =>
                 return pallet_pm_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::NodeManager(..) =>
-                return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
+            // RuntimeCall::NodeManager(..) =>
+            //     return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NeoSwaps(..) =>
                 return pallet_pm_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,

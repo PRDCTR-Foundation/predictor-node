@@ -27,12 +27,12 @@
 use frame_support::{
     derive_impl, parameter_types,
     traits::{
-        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse,
+        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse, Imbalance,
         KeyOwnerProofSystem, OnUnbalanced, VariantCountOf,
     },
     weights::{
         constants::{ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
-        IdentityFee, Imbalance, Weight, WeightToFeeCoefficient, WeightToFeePolynomial,
+        IdentityFee, Weight, WeightToFeeCoefficient, WeightToFeePolynomial,
     },
     Blake2_256, PalletId,
 };
@@ -79,9 +79,8 @@ use sp_watchtower::NoopWatchtower;
 
 mod proxy_config;
 use proxy_config::ProxyType;
-// TODO uncomment to enable avn-proxy configuration
-// mod avn_proxy_config;
-// use avn_proxy_config::AvnProxyConfig;
+mod avn_proxy_config;
+use avn_proxy_config::AvnProxyConfig;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -904,25 +903,25 @@ where
     }
 }
 
-pub struct DealWithFees<R>(sp_std::marker::PhantomData<R>);
-impl<R> OnUnbalanced<NegativeImbalance<R>> for DealWithFees<R>
-where
-    R: pallet_balances::Config + pallet_token_manager::Config,
-    <R as frame_system::Config>::AccountId: From<AccountId>,
-    <R as frame_system::Config>::AccountId: Into<AccountId>,
-    <R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
-{
-    fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance<R>>) {
-        if let Some(mut fees) = fees_then_tips.next() {
-            if let Some(tips) = fees_then_tips.next() {
-                tips.merge_into(&mut fees);
-            }
+// pub struct DealWithFees<R>(sp_std::marker::PhantomData<R>);
+// impl<R> OnUnbalanced<NegativeImbalance<R>> for DealWithFees<R>
+// where
+//     R: pallet_balances::Config + pallet_token_manager::Config,
+//     <R as frame_system::Config>::AccountId: From<AccountId>,
+//     <R as frame_system::Config>::AccountId: Into<AccountId>,
+//     <R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+// {
+//     fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance<R>>) {
+//         if let Some(mut fees) = fees_then_tips.next() {
+//             if let Some(tips) = fees_then_tips.next() {
+//                 tips.merge_into(&mut fees);
+//             }
 
-            // 100% of fees + tips goes to the treasury
-            <Treasury<R> as OnUnbalanced<_>>::on_unbalanced(fees);
-        }
-    }
-}
+//             // 100% of fees + tips goes to the treasury
+//             <Treasury<R> as OnUnbalanced<_>>::on_unbalanced(fees);
+//         }
+//     }
+// }
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
 /// node's balance type.
