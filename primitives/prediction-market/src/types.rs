@@ -23,9 +23,7 @@ pub use crate::{
 };
 pub use common_primitives::types::Balance;
 
-#[cfg(feature = "arbitrary")]
 use alloc::vec::Vec;
-use arbitrary::{Arbitrary, Result, Unstructured};
 use core::marker::PhantomData;
 use frame_support::{dispatch::PostDispatchInfo, weights::Weight};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
