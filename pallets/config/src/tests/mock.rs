@@ -3,7 +3,7 @@
 #![cfg(test)]
 
 use crate::{self as pallet_config, *};
-use frame_support::{parameter_types, weights::Weight};
+use frame_support::{derive_impl, parameter_types, weights::Weight};
 use frame_system as system;
 pub use prediction_market_primitives::test_helper::TestAccount;
 pub use sp_core::{sr25519, H256};
@@ -39,30 +39,13 @@ parameter_types! {
     pub const ChallengePeriod: u64 = 2;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for TestRuntime {
-    type BaseCallFilter = frame_support::traits::Everything;
-    type BlockWeights = ();
-    type BlockLength = ();
-    type DbWeight = ();
-    type RuntimeOrigin = RuntimeOrigin;
     type Nonce = u64;
-    type RuntimeCall = RuntimeCall;
-    type Hash = H256;
-    type Hashing = BlakeTwo256;
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Block = Block;
-    type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
-    type Version = ();
-    type PalletInfo = PalletInfo;
-    type AccountData = ();
-    type OnNewAccount = ();
-    type OnKilledAccount = ();
-    type SystemWeightInfo = ();
-    type SS58Prefix = ();
-    type OnSetCode = ();
-    type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 pub fn gas_fee_recipient() -> AccountId {
