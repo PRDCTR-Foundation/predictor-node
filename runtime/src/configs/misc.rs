@@ -4,7 +4,7 @@ use frame_support::{
 };
 
 use crate::{
-    configs::{Asset, Currency, ExtrinsicBaseWeight, MarketId, OnUnbalanced, OrmlAmount},
+    configs::{Currency, ExtrinsicBaseWeight, OnUnbalanced},
     AccountId, Balance, PalletConfig, SLOT_DURATION,
 };
 use smallvec::smallvec;
@@ -81,10 +81,6 @@ impl WeightToFeePolynomial for WeightToFee {
 }
 
 /// ORML adapter
-pub type BasicCurrencyAdapter<R, B> =
-    orml_currencies::BasicCurrencyAdapter<R, B, OrmlAmount, Balance>;
-pub type CurrencyId = Asset<MarketId>;
-
 pub type NegativeImbalance<T> = <pallet_balances::Pallet<T> as Currency<
     <T as frame_system::Config>::AccountId,
 >>::NegativeImbalance;
