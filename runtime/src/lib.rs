@@ -6,9 +6,11 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 pub mod apis;
+pub mod asset_registry;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarks;
 pub mod configs;
+pub mod fees;
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -32,6 +34,8 @@ pub use common_primitives::types::{
     AccountId, Amount, Balance, BlockNumber, Hash, Nonce, Signature,
 };
 
+use common_primitives::constants::currency::MICRO_BASE;
+
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
@@ -53,13 +57,15 @@ pub mod opaque {
     pub type BlockId = generic::BlockId<Block>;
     /// Opaque block hash type.
     pub type Hash = <BlakeTwo256 as HashT>::Output;
-}
 
-impl_opaque_keys! {
-    pub struct SessionKeys {
-        pub aura: Aura,
-        pub grandpa: Grandpa,
-        pub avn: Avn,
+    impl_opaque_keys! {
+        pub struct SessionKeys {
+            pub aura: Aura,
+            pub grandpa: Grandpa,
+            pub authority_discovery: AuthorityDiscovery,
+            pub im_online: ImOnline,
+            pub avn: Avn,
+        }
     }
 }
 
@@ -104,46 +110,14 @@ pub const DAYS: BlockNumber = HOURS * 24;
 
 pub const BLOCK_HASH_COUNT: BlockNumber = 2400;
 
-// Unit = the base number of indivisible units for balances
-pub const UNIT: Balance = 1_000_000_000_000;
-pub const MILLI_UNIT: Balance = 1_000_000_000;
-pub const MICRO_UNIT: Balance = 1_000_000;
-
 /// Existential deposit.
-pub const EXISTENTIAL_DEPOSIT: Balance = MILLI_UNIT;
+pub const NATIVE_EXISTENTIAL_DEPOSIT: Balance = 0;
+pub const DEFAULT_EXISTENTIAL_DEPOSIT: Balance = 10 * MICRO_BASE;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
     NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
-}
-
-/// Currency identifier used by orml-tokens. `Native` aliases the chain's balances
-/// token; additional variants represent other fungible tokens managed by orml-tokens.
-#[derive(
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Debug,
-    parity_scale_codec::Encode,
-    parity_scale_codec::Decode,
-    parity_scale_codec::MaxEncodedLen,
-    scale_info::TypeInfo,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-pub enum CurrencyId {
-    Native,
-    Token(u32),
-}
-
-impl Default for CurrencyId {
-    fn default() -> Self {
-        CurrencyId::Native
-    }
 }
 
 /// The address format for describing accounts.
@@ -285,10 +259,53 @@ mod runtime {
     #[runtime::pallet_index(34)]
     pub type Summary = pallet_summary;
 
+    #[runtime::pallet_index(35)]
+    pub type AvnProxy = pallet_avn_proxy;
+
     // ORML pallets
     #[runtime::pallet_index(50)]
-    pub type Currencies = orml_currencies;
+    pub type AssetManager = orml_currencies;
 
     #[runtime::pallet_index(51)]
     pub type Tokens = orml_tokens;
+
+    // Prediction market pallets
+    #[runtime::pallet_index(70)]
+    pub type PalletConfig = pallet_config;
+
+    #[runtime::pallet_index(71)]
+    pub type AdvisoryCommittee = pallet_collective<Instance1>;
+
+    #[runtime::pallet_index(72)]
+    pub type AssetRegistry = pallet_pm_eth_asset_registry;
+
+    #[runtime::pallet_index(73)]
+    pub type RandomnessCollectiveFlip = pallet_insecure_randomness_collective_flip;
+
+    #[runtime::pallet_index(75)]
+    pub type MarketCommons = pallet_pm_market_commons;
+
+    #[runtime::pallet_index(76)]
+    pub type Authorized = pallet_pm_authorized;
+
+    #[runtime::pallet_index(77)]
+    pub type Court = pallet_pm_court;
+
+    #[runtime::pallet_index(78)]
+    pub type PredictionMarkets = pallet_prediction_markets;
+
+    #[runtime::pallet_index(79)]
+    pub type GlobalDisputes = pallet_pm_global_disputes;
+
+    #[runtime::pallet_index(80)]
+    pub type NeoSwaps = pallet_pm_neo_swaps;
+
+    #[runtime::pallet_index(81)]
+    pub type Orderbook = pallet_pm_order_book;
+
+    #[runtime::pallet_index(82)]
+    pub type HybridRouter = pallet_pm_hybrid_router;
+
+    #[runtime::pallet_index(83)]
+    pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
 }
