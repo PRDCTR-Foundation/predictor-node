@@ -2,11 +2,7 @@ use super::{AccountId, Runtime, RuntimeCall, Signature};
 pub use pallet_avn_proxy::ProvableProxy;
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
-use sp_avn_common::{
-    event_discovery::{AdditionalEvents, EthBridgeEventsFilter, EthereumEventsFilterTrait},
-    event_types::ValidEvents,
-    InnerCallValidator, Proof,
-};
+use sp_avn_common::{InnerCallValidator, Proof};
 pub use sp_runtime::RuntimeDebug;
 use sp_std::boxed::Box;
 
