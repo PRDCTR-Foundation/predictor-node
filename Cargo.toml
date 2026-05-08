@@ -95,6 +95,7 @@ pallet-authority-discovery = { version = "38.0.0", default-features = false }
 pallet-authorship = { version = "38.0.0", default-features = false }
 pallet-multisig = { version = "38.0.0", default-features = false }
 pallet-proxy = { version = "38.0.0", default-features = false }
+pallet-collective = { version = "38.0.0", default-features = false }
 
 sp-application-crypto = { version = "38.0.0", default-features = false }
 sp-staking = { version = "36.0.0", default-features = false }
@@ -118,6 +119,7 @@ node-macros = { path = "./macros", default-features = false }
 common-primitives = { path = "./primitives/common", default-features = false }
 prediction-market-primitives = { path = "./primitives/prediction-market", default-features = false }
 
+pallet-config = { path = "pallets/config", default-features = false }
 pallet-pm-market-commons = { path = "pallets/market-commons", default-features = false }
 pallet-pm-authorized = { path = "./pallets/authorized", default-features = false }
 pallet-pm-court = { path = "pallets/court", default-features = false }

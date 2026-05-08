@@ -27,39 +27,61 @@
 use frame_support::{
     derive_impl, parameter_types,
     traits::{
-        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, KeyOwnerProofSystem, VariantCountOf,
+        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse,
+        KeyOwnerProofSystem, OnUnbalanced, VariantCountOf,
     },
     weights::{
-        constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
+        constants::{ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
         IdentityFee, Weight,
     },
+    Blake2_256, PalletId,
 };
+use frame_system::EnsureRoot;
+
 use frame_system::limits::{BlockLength, BlockWeights};
 use pallet_grandpa::AuthorityId as GrandpaId;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::crypto::KeyTypeId;
-use sp_runtime::{traits::One, transaction_validity::TransactionPriority, Perbill};
+use sp_runtime::{traits::One, transaction_validity::TransactionPriority, Perbill, Percent};
 use sp_version::RuntimeVersion;
 
-use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+pub use prediction_market_primitives::{constants::*, types::*};
 
+pub use common_primitives::constants::{
+    currency::*, BLOCKS_PER_DAY, BLOCKS_PER_HOUR, BLOCKS_PER_YEAR, MILLISECS_PER_BLOCK,
+    NODE_MANAGER_PALLET_ID,
+};
+
+use crate::{asset_registry::CustomAssetProcessor, impl_fee_types, BlakeTwo256};
+
+use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
+use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
+use pallet_prediction_markets::CustomMetadata;
+use sp_avn_common::event_discovery::filters::AllPrimaryEventsFilter;
 // Local module imports
 use super::{
-    AccountId, Amount, Aura, AuthorsManager, Avn, Balance, Balances, Block, BlockNumber,
-    CurrencyId, EthBridge, Hash, Historical, ImOnline, Nonce, Offences, OriginCaller, PalletInfo,
-    Preimage, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason,
-    RuntimeOrigin, RuntimeTask, Scheduler, SessionKeys, Signature, Summary, System, Timestamp,
-    TokenManager, Tokens, UncheckedExtrinsic, EXISTENTIAL_DEPOSIT, MINUTES, SLOT_DURATION, VERSION,
+    opaque::SessionKeys, AccountId, Amount, AssetManager, AssetRegistry, Aura, Authorized,
+    AuthorsManager, Avn, Balance, Balances, Block, BlockNumber, CombinatorialTokens, Court,
+    EthBridge, GlobalDisputes, Hash, Historical, ImOnline, MarketCommons, NeoSwaps, Nonce,
+    Offences, Orderbook, OriginCaller, PalletConfig, PalletInfo, PredictionMarkets, Preimage,
+    RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+    RuntimeHoldReason, RuntimeOrigin, RuntimeTask, Scheduler, Signature, Summary, System,
+    Timestamp, TokenManager, Tokens, UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES,
+    NATIVE_EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
 };
-use orml_traits::parameter_type_with_key;
+use crate::configs::misc::Treasury;
+use orml_traits::{parameter_type_with_key, LockIdentifier};
 use sp_runtime::traits::{ConvertInto, OpaqueKeys};
 use sp_watchtower::NoopWatchtower;
 
-use crate::BlakeTwo256;
-
 mod proxy_config;
 use proxy_config::ProxyType;
+mod avn_proxy_config;
+use avn_proxy_config::AvnProxyConfig;
+mod misc;
+use misc::MinimumPeriod;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
@@ -75,8 +97,6 @@ parameter_types! {
     pub RuntimeBlockLength: BlockLength = BlockLength::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
     pub const SS58Prefix: u8 = 42;
 }
-
-pub use common_primitives::constants::currency::*;
 
 /// The default types are being injected by [`derive_impl`](`frame_support::derive_impl`) from
 /// [`SoloChainDefaultConfig`](`struct@frame_system::config_preludes::SolochainDefaultConfig`),
@@ -111,7 +131,7 @@ impl frame_system::Config for Runtime {
 impl pallet_aura::Config for Runtime {
     type AuthorityId = AuraId;
     type DisabledValidators = ();
-    type MaxAuthorities = ConstU32<32>;
+    type MaxAuthorities = MaxAuthorities;
     type AllowMultipleBlocksPerSlot = ConstBool<false>;
     type SlotDuration = pallet_aura::MinimumPeriodTimesTwo<Runtime>;
 }
@@ -134,22 +154,22 @@ impl pallet_grandpa::Config for Runtime {
 
 impl pallet_timestamp::Config for Runtime {
     /// A timestamp: milliseconds since the unix epoch.
-    type Moment = u64;
+    type Moment = Moment;
     type OnTimestampSet = Aura;
-    type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
+    type MinimumPeriod = MinimumPeriod; //ConstU64<{ SLOT_DURATION / 2 }>
     type WeightInfo = ();
 }
 
 impl pallet_balances::Config for Runtime {
     type MaxLocks = ConstU32<50>;
-    type MaxReserves = ();
+    type MaxReserves = MaxReserves;
     type ReserveIdentifier = [u8; 8];
     /// The type for recording an account's balance.
     type Balance = Balance;
     /// The ubiquitous event type.
     type RuntimeEvent = RuntimeEvent;
     type DustRemoval = ();
-    type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+    type ExistentialDeposit = ConstU128<NATIVE_EXISTENTIAL_DEPOSIT>;
     type AccountStore = System;
     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
     type FreezeIdentifier = RuntimeFreezeReason;
@@ -162,6 +182,8 @@ parameter_types! {
     pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
+// TODO update this config to use the upgraded Fungible Adapter, in collaboration with
+// avn-transaction-payment pallet
 impl pallet_transaction_payment::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type OnChargeTransaction = FungibleAdapter<Balances, ()>;
@@ -374,9 +396,9 @@ impl pallet_eth_bridge::Config for Runtime {
     type AccountToBytesConvert = Avn;
     type BridgeInterfaceNotification = (Summary, AuthorsManager, TokenManager);
     type ReportCorroborationOffence = Offences;
-    type ProcessedEventsChecker = ();
+    type ProcessedEventsChecker = EthBridge;
     type EthereumEventsMigration = ();
-    type ProcessedEventsHandler = ();
+    type ProcessedEventsHandler = AllPrimaryEventsFilter;
     type Quorum = Avn;
     type WeightInfo = pallet_eth_bridge::default_weights::SubstrateWeight<Runtime>;
 }
@@ -391,8 +413,8 @@ impl pallet_token_manager::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type Currency = Balances;
     type TokenBalance = Balance;
-    type TokenId = sp_core::H160;
-    type ProcessedEventsChecker = ();
+    type TokenId = EthAddress;
+    type ProcessedEventsChecker = EthBridge;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
     type OnGrowthLiftedHandler = ();
@@ -407,10 +429,54 @@ impl pallet_token_manager::Config for Runtime {
     type AccountToBytesConvert = Avn;
 }
 
+impl pallet_avn_proxy::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type ProxyConfig = AvnProxyConfig;
+    type WeightInfo = pallet_avn_proxy::default_weights::SubstrateWeight<Runtime>;
+    type FeeHandler = TokenManager;
+    type Token = EthAddress;
+}
+
 parameter_type_with_key! {
-    pub ExistentialDeposits: |_currency_id: CurrencyId| -> Balance {
-        EXISTENTIAL_DEPOSIT
+    pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
+        match currency_id {
+            Asset::Tru => NATIVE_EXISTENTIAL_DEPOSIT,
+            Asset::ForeignAsset(id) => {
+                let maybe_metadata = <
+                pallet_pm_eth_asset_registry::Pallet<Runtime> as prediction_market_primitives::traits::InspectEthAsset
+                >::metadata(&Asset::ForeignAsset(*id));
+
+                if let Some(metadata) = maybe_metadata {
+                    return metadata.existential_deposit;
+                }
+
+                1
+            },
+            Asset::CategoricalOutcome(_,_) => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::CombinatorialOutcomeLegacy => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::PoolShare(_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::ScalarOutcome(_,_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::ParimutuelShare(_,_)  => DEFAULT_EXISTENTIAL_DEPOSIT,
+            Asset::CombinatorialToken(_) => DEFAULT_EXISTENTIAL_DEPOSIT,
+        }
     };
+}
+pub struct CurrencyHooks<R>(sp_std::marker::PhantomData<R>);
+impl<C: orml_tokens::Config> orml_traits::currency::MutationHooks<AccountId, CurrencyId, Balance>
+    for CurrencyHooks<C>
+{
+    type OnDust = orml_tokens::TransferDust<Runtime, TnfTreasuryAccount>;
+    type OnKilledTokenAccount = ();
+    type OnNewTokenAccount = ();
+    type OnSlash = ();
+    type PostDeposit = ();
+    type PostTransfer = ();
+    type PreDeposit = ();
+    type PreTransfer = ();
 }
 
 pub struct DustRemovalWhitelist;
@@ -420,28 +486,435 @@ impl frame_support::traits::Contains<AccountId> for DustRemovalWhitelist {
     }
 }
 
+// Shared within tests
+// Balance
+parameter_types! {
+    pub const MaxLocks: u32 = 50;
+    pub const MaxReserves: u32 = 50;
+}
+
 impl orml_tokens::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
+    type Amount = OrmlAmount;
     type Balance = Balance;
-    type Amount = Amount;
+    type CurrencyHooks = CurrencyHooks<Runtime>;
     type CurrencyId = CurrencyId;
-    type WeightInfo = ();
-    type ExistentialDeposits = ExistentialDeposits;
-    type CurrencyHooks = ();
-    type MaxLocks = ConstU32<50>;
-    type MaxReserves = ConstU32<50>;
-    type ReserveIdentifier = [u8; 8];
     type DustRemovalWhitelist = DustRemovalWhitelist;
+    type RuntimeEvent = RuntimeEvent;
+    type ExistentialDeposits = ExistentialDeposits;
+    type MaxLocks = MaxLocks;
+    type MaxReserves = MaxReserves;
+    type ReserveIdentifier = [u8; 8];
+    // TODO update me
+    // type WeightInfo = third_party_weights::orml_tokens::WeightInfo<Runtime>;
+    type WeightInfo = ();
 }
 
 parameter_types! {
-    pub const GetNativeCurrencyId: CurrencyId = CurrencyId::Native;
+    pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
+        pub const TreasuryPalletId: PalletId = TREASURY_PALLET_ID;
+    pub TnfTreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
 }
 
 impl orml_currencies::Config for Runtime {
-    type MultiCurrency = Tokens;
-    type NativeCurrency =
-        orml_currencies::BasicCurrencyAdapter<Runtime, Balances, Amount, BlockNumber>;
     type GetNativeCurrencyId = GetNativeCurrencyId;
+    type MultiCurrency = Tokens;
+    type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances>;
+    // TODO update me
+    // type WeightInfo = third_party_weights::orml_currencies::WeightInfo<Runtime>;
     type WeightInfo = ();
 }
+
+type AdvisoryCommitteeInstance = pallet_collective::Instance1;
+
+// Prediction market
+impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
+
+parameter_types! {
+    // Note: MaxMembers does not influence the pallet logic, but the worst-case weight
+    // estimation.
+    pub const AdvisoryCommitteeMaxMembers: u32 = 100;
+    // The maximum of proposals is currently u8::MAX otherwise the pallet_collective benchmark
+    // fails
+    pub const AdvisoryCommitteeMaxProposals: u32 = 255;
+    pub const AdvisoryCommitteeMotionDuration: BlockNumber = 3 * BLOCKS_PER_DAY;
+    pub MaxProposalWeight: Weight = Perbill::from_percent(50) *
+RuntimeBlockWeights::get().max_block; }
+
+impl pallet_collective::Config<AdvisoryCommitteeInstance> for Runtime {
+    type DefaultVote = PrimeDefaultVote;
+    type RuntimeEvent = RuntimeEvent;
+    type MaxMembers = AdvisoryCommitteeMaxMembers;
+    type MaxProposals = AdvisoryCommitteeMaxProposals;
+    type MaxProposalWeight = MaxProposalWeight;
+    type MotionDuration = AdvisoryCommitteeMotionDuration;
+    type RuntimeOrigin = RuntimeOrigin;
+    type SetMembersOrigin = EnsureRoot<AccountId>;
+    type Proposal = RuntimeCall;
+    type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
+}
+
+type EnsureRootOrMoreThanHalfAdvisoryCommittee = EitherOfDiverse<
+    EnsureRoot<AccountId>,
+    EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 1, 2>,
+>;
+
+type EnsureRootOrMoreThanOneThirdAdvisoryCommittee = EitherOfDiverse<
+    EnsureRoot<AccountId>,
+    EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 1, 3>,
+>;
+
+// More than 66%
+type EnsureRootOrMoreThanTwoThirdsAdvisoryCommittee = EitherOfDiverse<
+    EnsureRoot<AccountId>,
+    EnsureProportionMoreThan<AccountId, AdvisoryCommitteeInstance, 2, 3>,
+>;
+
+use crate::impl_market_creator_fees;
+impl_market_creator_fees!();
+
+// Prediction market runtime API implementations would go here.
+impl pallet_pm_market_commons::Config for Runtime {
+    type Balance = Balance;
+    type MarketId = MarketId;
+    type Timestamp = Timestamp;
+}
+
+parameter_types! {
+    // Asset registry
+    pub const AssetRegistryStringLimit: u32 = 1024;
+}
+
+impl pallet_pm_eth_asset_registry::Config for Runtime {
+    type AssetId = CurrencyId;
+    type AuthorityOrigin = EnsureRoot<AccountId>;
+    type Balance = Balance;
+    type CustomMetadata = CustomMetadata;
+    type RuntimeEvent = RuntimeEvent;
+    type StringLimit = AssetRegistryStringLimit;
+    type AssetProcessor = CustomAssetProcessor;
+    type WeightInfo = ();
+}
+
+// Prediction Market parameters
+parameter_types! {
+    /// (Slashable) Bond that is provided for creating an advised market that needs approval.
+    /// Slashed in case the market is rejected.
+    pub const AdvisoryBond: Balance = 100 * BASE;
+    /// The percentage of the advisory bond that gets slashed when a market is rejected.
+    pub const AdvisoryBondSlashPercentage: Percent = Percent::from_percent(0);
+    /// (Slashable) Bond that is provided for disputing an early market close by the market creator.
+    pub const CloseEarlyDisputeBond: Balance = 2_000 * BASE;
+    // Fat-finger protection for the advisory committe to reject
+    // the early market schedule.
+    pub const CloseEarlyProtectionTimeFramePeriod: Moment = CloseEarlyProtectionBlockPeriod::get() as u64 * MILLISECS_PER_BLOCK as u64;
+    // Fat-finger protection for the advisory committe to reject
+    // the early market schedule.
+    pub const CloseEarlyProtectionBlockPeriod: BlockNumber = 12 * BLOCKS_PER_HOUR;
+    /// (Slashable) Bond that is provided for scheduling an early market close.
+    pub const CloseEarlyRequestBond: Balance = 2_000 * BASE;
+    /// (Slashable) Bond that is provided for disputing the outcome.
+    /// Unreserved in case the dispute was justified otherwise slashed.
+    /// This is when the resolved outcome is different to the default (reported) outcome.
+    pub const DisputeBond: Balance = 2_000 * BASE;
+    /// Maximum number of disputes.
+    pub const MaxDisputes: u16 = 1;
+    /// The dispute_duration is time where users can dispute the outcome.
+    /// Minimum block period for a dispute.
+    pub const MinDisputeDuration: BlockNumber = MIN_DISPUTE_DURATION;
+    /// Maximum block period for a dispute.
+    pub const MaxDisputeDuration: BlockNumber = MAX_DISPUTE_DURATION;
+    /// Maximum Categories a prediciton market can have (excluding base asset).
+    pub const MaxCategories: u16 = MAX_CATEGORIES;
+    /// Max creator fee, bounds the fraction per trade volume that is moved to the market creator.
+    pub const MaxCreatorFee: Perbill = Perbill::from_percent(1);
+    /// Maximum string length for edit reason.
+    pub const MaxEditReasonLen: u32 = 1024;
+    /// Maximum block period for a grace_period.
+    /// The grace_period is a delay between the point where the market closes and the point where the oracle may report.
+    pub const MaxGracePeriod: BlockNumber = MAX_GRACE_PERIOD;
+    /// The maximum allowed duration of a market from creation to market close in blocks.
+    pub const MaxMarketLifetime: BlockNumber = MAX_MARKET_LIFETIME;
+    /// Maximum block period for an oracle_duration.
+    /// The oracle_duration is a duration where the oracle has to submit its report.
+    pub const MaxOracleDuration: BlockNumber = MAX_ORACLE_DURATION;
+    /// Maximum string length allowed for reject reason.
+    pub const MaxRejectReasonLen: u32 = 1024;
+    /// Minimum number of categories. The trivial minimum is 2, which represents a binary market.
+    pub const MinCategories: u16 = 2;
+    /// Minimum block period for an oracle_duration.
+    pub const MinOracleDuration: BlockNumber = MIN_ORACLE_DURATION;
+    /// (Slashable) The orcale bond. Slashed in case the final outcome does not match the
+    /// outcome the oracle reported.
+    pub const OracleBond: Balance = 100 * BASE;
+    /// (Slashable) A bond for an outcome reporter, who is not the oracle.
+    /// Slashed in case the final outcome does not match the outcome by the outsider.
+    // If we remove the whitelist restriction for market creation, review this figure and ensure its > OracleBond
+    pub const OutsiderBond: Balance = 2000 * BASE;
+    /// Pallet identifier, mainly used for named balance reserves. DO NOT CHANGE.
+    pub const PmPalletId: PalletId = PM_PALLET_ID;
+    // Waiting time for market creator to close the market after an early close schedule.
+    pub const CloseEarlyBlockPeriod: BlockNumber = 5 * BLOCKS_PER_DAY;
+    pub const CloseEarlyTimeFramePeriod: Moment = CloseEarlyBlockPeriod::get() as u64 * MILLISECS_PER_BLOCK as u64;
+    /// (Slashable) A bond for creation markets that do not require approval. Slashed in case
+    /// the market is forcefully destroyed.
+    // The low amount is assuming only whitelisted accounts can create a market
+    pub const ValidityBond: Balance = 100 * BASE;
+    // Orderbook parameters
+    pub const OrderbookPalletId: PalletId = ORDERBOOK_PALLET_ID;
+    // Hybrid Router parameters
+    pub const HybridRouterPalletId: PalletId = HYBRID_ROUTER_PALLET_ID;
+    /// Maximum number of orders that can be placed in a single trade transaction.
+    pub const MaxOrders: u32 = 100;
+    /// The percentage of winning we deduct from the winner.
+    pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
+}
+
+use crate::impl_winner_fees;
+impl_winner_fees!();
+
+impl pallet_prediction_markets::Config for Runtime {
+    type AdvisoryBond = AdvisoryBond;
+    type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
+    type ApproveOrigin = EnsureRootOrMoreThanOneThirdAdvisoryCommittee;
+    type Authorized = Authorized;
+    type Currency = Balances;
+    type Court = Court;
+    type CloseEarlyDisputeBond = CloseEarlyDisputeBond;
+    type CloseMarketEarlyOrigin = EnsureRootOrMoreThanOneThirdAdvisoryCommittee;
+    type CloseOrigin = EnsureRoot<AccountId>;
+    type CloseEarlyProtectionTimeFramePeriod = CloseEarlyProtectionTimeFramePeriod;
+    type CloseEarlyProtectionBlockPeriod = CloseEarlyProtectionBlockPeriod;
+    type CloseEarlyRequestBond = CloseEarlyRequestBond;
+    type DeployPool = NeoSwaps;
+    type DisputeBond = DisputeBond;
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type GlobalDisputes = GlobalDisputes;
+    type MaxCategories = MaxCategories;
+    type MaxCreatorFee = MaxCreatorFee;
+    type MaxDisputes = MaxDisputes;
+    type MaxMarketLifetime = MaxMarketLifetime;
+    type MinDisputeDuration = MinDisputeDuration;
+    type MaxDisputeDuration = MaxDisputeDuration;
+    type MaxGracePeriod = MaxGracePeriod;
+    type MaxOracleDuration = MaxOracleDuration;
+    type MinOracleDuration = MinOracleDuration;
+    type MinCategories = MinCategories;
+    type MaxEditReasonLen = MaxEditReasonLen;
+    type MaxRejectReasonLen = MaxRejectReasonLen;
+    type OracleBond = OracleBond;
+    type OutsiderBond = OutsiderBond;
+    type PalletId = PmPalletId;
+    type CloseEarlyBlockPeriod = CloseEarlyBlockPeriod;
+    type CloseEarlyTimeFramePeriod = CloseEarlyTimeFramePeriod;
+    type RejectOrigin = EnsureRootOrMoreThanTwoThirdsAdvisoryCommittee;
+    type RequestEditOrigin = EnsureRootOrMoreThanOneThirdAdvisoryCommittee;
+    type ResolveOrigin = EnsureRoot<AccountId>;
+    type AssetManager = AssetManager;
+    type Slash = Treasury<Runtime>;
+    type ValidityBond = ValidityBond;
+    type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
+    type AssetRegistry = AssetRegistry;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type TokenInterface = TokenManager;
+    type WinnerFeePercentage = WinnerFeePercentage;
+    type WinnerFeeHandler = WinnerFee;
+}
+
+parameter_types! {
+    // Authorized
+    pub const AuthorizedPalletId: PalletId = AUTHORIZED_PALLET_ID;
+    pub const CorrectionPeriod: BlockNumber = BLOCKS_PER_DAY;
+
+}
+
+impl pallet_pm_authorized::Config for Runtime {
+    type AuthorizedDisputeResolutionOrigin = EnsureRootOrMoreThanHalfAdvisoryCommittee;
+    type Currency = Balances;
+    type CorrectionPeriod = CorrectionPeriod;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
+    type RuntimeEvent = RuntimeEvent;
+    type MarketCommons = MarketCommons;
+    type PalletId = AuthorizedPalletId;
+    type WeightInfo = pallet_pm_authorized::weights::WeightInfo<Runtime>;
+}
+
+parameter_types! {
+    // Court
+    /// (Slashable) Bond that is provided for overriding the last appeal.
+    /// This bond increases exponentially with the number of appeals.
+    /// Slashed in case the final outcome does match the appealed outcome for which the `AppealBond`
+    /// was deposited.
+    pub const AppealBond: Balance = 2000 * BASE;
+    /// The blocks per year required to calculate the yearly inflation for court incentivisation.
+    pub const BlocksPerYear: BlockNumber = BLOCKS_PER_YEAR;
+    /// Pallet identifier, mainly used for named balance reserves. DO NOT CHANGE.
+    pub const CourtPalletId: PalletId = COURT_PALLET_ID;
+    /// The time in which the jurors can cast their secret vote.
+    pub const CourtVotePeriod: BlockNumber = 3 * BLOCKS_PER_DAY;
+    /// The time in which the jurors should reveal their secret vote.
+    pub const CourtAggregationPeriod: BlockNumber = 3 * BLOCKS_PER_DAY;
+    /// The time in which a court case can get appealed.
+    pub const CourtAppealPeriod: BlockNumber = BLOCKS_PER_DAY;
+    /// The lock identifier for the court votes.
+    pub const CourtLockId: LockIdentifier = COURT_LOCK_ID;
+    /// The time in which the inflation is periodically issued.
+    pub const InflationPeriod: BlockNumber = 30 * BLOCKS_PER_DAY;
+    /// The maximum number of appeals until the court fails.
+    pub const MaxAppeals: u32 = 4;
+    /// The maximum number of delegations per juror account.
+    pub const MaxDelegations: u32 = 5;
+    /// The maximum number of randomly selected `MinJurorStake` draws / atoms of jurors for a dispute.
+    pub const MaxSelectedDraws: u32 = 510;
+    /// The maximum number of jurors / delegators that can be registered.
+    pub const MaxCourtParticipants: u32 = 1_000;
+    /// The maximum yearly inflation for court incentivisation.
+    pub const MaxYearlyInflation: Perbill = Perbill::from_percent(10);
+    /// The minimum stake a user needs to reserve to become a juror.
+    pub const MinJurorStake: Balance = 500 * BASE;
+    /// The interval for requesting multiple court votes at once.
+    pub const RequestInterval: BlockNumber = 7 * BLOCKS_PER_DAY;
+}
+
+impl pallet_pm_court::Config for Runtime {
+    type AppealBond = AppealBond;
+    type BlocksPerYear = BlocksPerYear;
+    type VotePeriod = CourtVotePeriod;
+    type AggregationPeriod = CourtAggregationPeriod;
+    type AppealPeriod = CourtAppealPeriod;
+    type LockId = CourtLockId;
+    type PalletId = CourtPalletId;
+    type Currency = Balances;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
+    type RuntimeEvent = RuntimeEvent;
+    type InflationPeriod = InflationPeriod;
+    type MarketCommons = MarketCommons;
+    type MaxAppeals = MaxAppeals;
+    type MaxDelegations = MaxDelegations;
+    type MaxSelectedDraws = MaxSelectedDraws;
+    type MaxCourtParticipants = MaxCourtParticipants;
+    type MaxYearlyInflation = MaxYearlyInflation;
+    type MinJurorStake = MinJurorStake;
+    type MonetaryGovernanceOrigin = EnsureRoot<AccountId>;
+    type Random = RandomnessCollectiveFlip;
+    type RequestInterval = RequestInterval;
+    type Slash = Treasury<Runtime>;
+    type TreasuryPalletId = AvnTreasuryPotId;
+    type WeightInfo = pallet_pm_court::weights::WeightInfo<Runtime>;
+}
+
+// Global disputes parameters
+parameter_types! {
+    pub const AddOutcomePeriod: BlockNumber = 20;
+    pub const GlobalDisputeLockId: LockIdentifier = GLOBAL_DISPUTES_LOCK_ID;
+    pub const GlobalDisputesPalletId: PalletId = GLOBAL_DISPUTES_PALLET_ID;
+    pub const MaxGlobalDisputeVotes: u32 = 50;
+    pub const MaxOwners: u32 = 10;
+    pub const MinOutcomeVoteAmount: Balance = 10 * CENT_BASE;
+    pub const RemoveKeysLimit: u32 = 250;
+    pub const GdVotingPeriod: BlockNumber = 140;
+    pub const VotingOutcomeFee: Balance = 100 * CENT_BASE;
+}
+
+impl pallet_pm_global_disputes::Config for Runtime {
+    type AddOutcomePeriod = AddOutcomePeriod;
+    type Currency = Balances;
+    type DisputeResolution = pallet_prediction_markets::Pallet<Runtime>;
+    type RuntimeEvent = RuntimeEvent;
+    type GlobalDisputeLockId = GlobalDisputeLockId;
+    type GlobalDisputesPalletId = GlobalDisputesPalletId;
+    type MarketCommons = MarketCommons;
+    type MaxGlobalDisputeVotes = MaxGlobalDisputeVotes;
+    type MaxOwners = MaxOwners;
+    type MinOutcomeVoteAmount = MinOutcomeVoteAmount;
+    type RemoveKeysLimit = RemoveKeysLimit;
+    type GdVotingPeriod = GdVotingPeriod;
+    type VotingOutcomeFee = VotingOutcomeFee;
+    type WeightInfo = pallet_pm_global_disputes::weights::WeightInfo<Runtime>;
+}
+
+parameter_types! {
+    // NeoSwaps
+    pub const NeoSwapsMaxSwapFee: Balance = 10 * CENT_BASE;
+    pub const NeoSwapsPalletId: PalletId = NS_PALLET_ID;
+    pub const MaxLiquidityTreeDepth: u32 = 9u32;
+    pub const MaxSplits: u16 = 128u16;
+
+}
+
+impl pallet_pm_neo_swaps::Config for Runtime {
+    type CombinatorialId = CombinatorialId;
+    type CombinatorialTokens = CombinatorialTokens;
+    type CombinatorialTokensUnsafe = CombinatorialTokens;
+    type CompleteSetOperations = PredictionMarkets;
+    type ExternalFees = AdditionalSwapFee;
+    type MarketCommons = MarketCommons;
+    type MultiCurrency = AssetManager;
+    type PoolId = MarketId;
+    type MaxSplits = MaxSplits;
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
+    type MaxLiquidityTreeDepth = MaxLiquidityTreeDepth;
+    type MaxSwapFee = NeoSwapsMaxSwapFee;
+    type PalletId = NeoSwapsPalletId;
+    type SignedTxLifetime = ConstU32<16>;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type PalletAdminGetter = PredictionMarkets;
+    type OnLiquidityProvided = PredictionMarkets;
+}
+
+impl pallet_pm_order_book::Config for Runtime {
+    type AssetManager = AssetManager;
+    type ExternalFees = AdditionalSwapFee;
+    type RuntimeEvent = RuntimeEvent;
+    type MarketCommons = MarketCommons;
+    type PalletId = OrderbookPalletId;
+    type WeightInfo = pallet_pm_order_book::weights::WeightInfo<Runtime>;
+}
+
+impl pallet_pm_hybrid_router::Config for Runtime {
+    type AssetManager = AssetManager;
+    #[cfg(feature = "runtime-benchmarks")]
+    type AmmPoolDeployer = NeoSwaps;
+    #[cfg(feature = "runtime-benchmarks")]
+    type CompleteSetOperations = PredictionMarkets;
+    type MarketCommons = MarketCommons;
+    type Amm = NeoSwaps;
+    type Orderbook = Orderbook;
+    type MaxOrders = MaxOrders;
+    type RuntimeEvent = RuntimeEvent;
+    type PalletId = HybridRouterPalletId;
+    type RuntimeCall = RuntimeCall;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+}
+
+impl pallet_config::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type WeightInfo = pallet_config::default_weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+        // CombinatorialTokens
+        pub const CombinatorialTokensPalletId: PalletId = COMBINATORIAL_TOKENS_PALLET_ID;
+}
+
+impl pallet_pm_combinatorial_tokens::Config for Runtime {
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = PredictionMarketsCombinatorialTokensBenchmarkHelper<Runtime>;
+    type CombinatorialIdManager = CryptographicIdManager<MarketId, Blake2_256>;
+    type Fuel = Fuel;
+    type MarketCommons = MarketCommons;
+    type MultiCurrency = AssetManager;
+    type Payout = PredictionMarkets;
+    type RuntimeEvent = RuntimeEvent;
+    type PalletId = CombinatorialTokensPalletId;
+    type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
+}
+
+impl_fee_types!();
