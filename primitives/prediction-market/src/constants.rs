@@ -31,14 +31,14 @@ use common_primitives::{
     constants::{BLOCKS_PER_DAY, BLOCKS_PER_HOUR, BLOCKS_PER_YEAR},
     types::BlockNumber,
 };
-use frame_support::{parameter_types, PalletId};
+use frame_support::PalletId;
 
 // Authorized
 /// Pallet identifier, mainly used for named balance reserves.
 pub const AUTHORIZED_PALLET_ID: PalletId = PalletId(*b"tnf/atzd");
 
 // Combinatorial Tokens
-pub const COMBINATORIAL_TOKENS_PALLET_ID: PalletId = PalletId(*b"zge/coto");
+pub const COMBINATORIAL_TOKENS_PALLET_ID: PalletId = PalletId(*b"tnf/coto");
 
 // Court
 /// Pallet identifier, mainly used for named balance reserves.
