@@ -1,5 +1,7 @@
-use predictor_runtime::{AccountId, AvnId, SessionKeys, Signature, WASM_BINARY};
+use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+use predictor_runtime::{opaque::SessionKeys, AccountId, AvnId, Signature, WASM_BINARY};
 use sc_service::ChainType;
+use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
@@ -28,12 +30,17 @@ where
     AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/// Generate the full set of session keys used by the runtime (aura + grandpa + avn).
-pub fn authority_keys_from_seed(s: &str) -> (AccountId, AuraId, GrandpaId, AvnId) {
+/// Generate the full set of session keys used by the runtime
+/// (aura + grandpa + im-online + authority-discovery + avn).
+pub fn authority_keys_from_seed(
+    s: &str,
+) -> (AccountId, AuraId, GrandpaId, ImOnlineId, AuthorityDiscoveryId, AvnId) {
     (
         get_account_id_from_seed::<sr25519::Public>(s),
         get_from_seed::<AuraId>(s),
         get_from_seed::<GrandpaId>(s),
+        get_from_seed::<ImOnlineId>(s),
+        get_from_seed::<AuthorityDiscoveryId>(s),
         get_from_seed::<AvnId>(s),
     )
 }
@@ -98,18 +105,31 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 /// Configure initial storage state for FRAME modules.
 fn testnet_genesis(
-    initial_authorities: Vec<(AccountId, AuraId, GrandpaId, AvnId)>,
+    initial_authorities: Vec<(
+        AccountId,
+        AuraId,
+        GrandpaId,
+        ImOnlineId,
+        AuthorityDiscoveryId,
+        AvnId,
+    )>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
 ) -> serde_json::Value {
     let session_keys = initial_authorities
         .iter()
-        .map(|(account, aura, grandpa, avn)| {
+        .map(|(account, aura, grandpa, im_online, authority_discovery, avn)| {
             (
                 account.clone(),
                 account.clone(),
-                SessionKeys { aura: aura.clone(), grandpa: grandpa.clone(), avn: avn.clone() },
+                SessionKeys {
+                    aura: aura.clone(),
+                    grandpa: grandpa.clone(),
+                    im_online: im_online.clone(),
+                    authority_discovery: authority_discovery.clone(),
+                    avn: avn.clone(),
+                },
             )
         })
         .collect::<Vec<_>>();
