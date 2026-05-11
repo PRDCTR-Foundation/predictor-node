@@ -202,10 +202,40 @@ runtime-benchmarks = [
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 
-	"orml-benchmarking",
-	"pallet-config/runtime-benchmarks",
-	"pallet-pm-combinatorial-tokens/runtime-benchmarks",
+	# SDK pallets used by the runtime that gate `try_successful_origin`
+	# behind their own `runtime-benchmarks` feature.
+	"pallet-collective/runtime-benchmarks",
+	"pallet-im-online/runtime-benchmarks",
+	"pallet-multisig/runtime-benchmarks",
+	"pallet-offences/runtime-benchmarks",
+	"pallet-preimage/runtime-benchmarks",
+	"pallet-proxy/runtime-benchmarks",
+	"pallet-scheduler/runtime-benchmarks",
+	"pallet-utility/runtime-benchmarks",
 
+	# AvN-fork pallets. `pallet-eth-bridge/runtime-benchmarks` is omitted
+	# to match Truth (its benchmarks are known-broken upstream).
+	"pallet-authors-manager/runtime-benchmarks",
+	"pallet-avn/runtime-benchmarks",
+	"pallet-avn-proxy/runtime-benchmarks",
+	"pallet-summary/runtime-benchmarks",
+	"pallet-token-manager/runtime-benchmarks",
+
+	# ORML
+	"orml-benchmarking",
+	"orml-tokens/runtime-benchmarks",
+
+	# Prediction-market customisations
+	"pallet-config/runtime-benchmarks",
+	"pallet-prediction-markets/runtime-benchmarks",
+	"pallet-pm-authorized/runtime-benchmarks",
+	"pallet-pm-combinatorial-tokens/runtime-benchmarks",
+	"pallet-pm-court/runtime-benchmarks",
+	"pallet-pm-eth-asset-registry/runtime-benchmarks",
+	"pallet-pm-global-disputes/runtime-benchmarks",
+	"pallet-pm-hybrid-router/runtime-benchmarks",
+	"pallet-pm-neo-swaps/runtime-benchmarks",
+	"pallet-pm-order-book/runtime-benchmarks",
 ]
 
 try-runtime = [

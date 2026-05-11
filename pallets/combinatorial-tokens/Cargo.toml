@@ -59,6 +59,13 @@ std = [
     "parity-scale-codec/std",
     "sp-runtime/std",
     "prediction-market-primitives/std",
+    # Optional deps activated by `runtime-benchmarks` / mock.
+    "orml-asset-registry?/std",
+    "orml-currencies?/std",
+    "orml-tokens?/std",
+    "pallet-balances?/std",
+    "pallet-timestamp?/std",
+    "sp-io?/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
