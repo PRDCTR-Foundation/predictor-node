@@ -15,11 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
+use pallet_pm_combinatorial_tokens::{AssetOf, Config, MarketIdOf};
 use prediction_market_primitives::{
     traits::MarketOf,
     types::{Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
-use pallet_pm_combinatorial_tokens::{AssetOf, Config, MarketIdOf};
 
 pub(crate) fn market<T>(
     market_id: MarketIdOf<T>,

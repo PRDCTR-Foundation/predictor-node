@@ -13,6 +13,22 @@ members = [
     "macros",
     "primitives/*",
     "pallets/*",
+    "pallets/combinatorial-tokens/fuzz",
+    "pallets/neo-swaps/fuzz",
+    "pallets/orderbook/fuzz",
+    "pallets/prediction-markets/fuzz",
+]
+# Fuzz crates are members so they can inherit workspace deps via
+# `workspace = true`, but they are excluded from the default member set so a
+# bare `cargo build` does not pull in libfuzzer-sys (which only links cleanly
+# under cargo-fuzz). Run them with
+# `cd pallets/<x>/fuzz && cargo +nightly fuzz run <target>`.
+default-members = [
+    "node",
+    "runtime",
+    "macros",
+    "primitives/*",
+    "pallets/*",
 ]
 resolver = "2"
 
@@ -154,6 +170,7 @@ external-service = { git = "https://github.com/Galactic-Media-Management/avn-par
 
 # Other (wasm)
 arbitrary = { version = "1.3.2", default-features = false }
+libfuzzer-sys = { version = "0.4.7" }
 ark-bn254 = { version = "0.5.0", default-features = false, features = ["curve"] }
 ark-ff = { version = "0.5.0", default-features = false }
 fixed = { version = "=1.15.0", default-features = false, features = ["num-traits"] }

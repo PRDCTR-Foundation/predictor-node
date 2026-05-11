@@ -22,18 +22,18 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use rand::seq::SliceRandom;
-use sp_runtime::traits::Zero;
-use zeitgeist_primitives::{
-    constants::base_multiples::*,
-    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
-    types::{Asset, MarketType},
-};
-use zrml_neo_swaps::{
+use pallet_pm_neo_swaps::{
     mock::{ExtBuilder, NeoSwaps, Runtime, RuntimeOrigin},
     AccountIdOf, BalanceOf, Config, FuelOf, MarketIdOf, MAX_SPOT_PRICE, MIN_SPOT_PRICE,
     MIN_SWAP_FEE,
 };
+use prediction_market_primitives::{
+    constants::base_multiples::*,
+    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
+    types::{Asset, MarketType, TestAccountIdPK},
+};
+use rand::seq::SliceRandom;
+use sp_runtime::traits::Zero;
 
 #[derive(Debug)]
 struct ComboBuyFuzzParams {
@@ -54,7 +54,7 @@ struct ComboBuyFuzzParams {
 
 impl<'a> Arbitrary<'a> for ComboBuyFuzzParams {
     fn arbitrary(u: &mut Unstructured<'a>) -> ArbitraryResult<Self> {
-        let account_id = u128::arbitrary(u)?;
+        let account_id = TestAccountIdPK::from_raw(<[u8; 32]>::arbitrary(u)?);
         let pool_id = 0;
         let market_ids = vec![0, 1, 2];
 
@@ -129,7 +129,7 @@ fuzz_target!(|params: ComboBuyFuzzParams| {
 
     ext.execute_with(|| {
         // We create the required markets and deposit collateral in the user's account.
-        let collateral = Asset::Ztg;
+        let collateral = Asset::Tru;
         for (market_id, &category_count) in params.category_counts.iter().enumerate() {
             let market = common::market::<Runtime>(
                 market_id as u128,
