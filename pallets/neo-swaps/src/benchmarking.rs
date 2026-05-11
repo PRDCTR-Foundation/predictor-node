@@ -37,13 +37,13 @@ use orml_traits::MultiCurrency;
 use pallet_pm_market_commons::MarketCommonsPalletApi;
 use parity_scale_codec::{Decode, Encode};
 use prediction_market_primitives::{
-    constants::{base_multiples::*, BASE_CENT},
+    constants::base_multiples::*,
     math::fixed::{BaseProvider, FixedDiv, FixedMul, PredictionMarketBase},
     traits::{CombinatorialTokensFuel, CompleteSetOperationsApi, FutarchyOracle},
     types::{Asset, Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
 use sp_avn_common::Proof;
-use sp_core::{crypto::DEV_PHRASE, H256};
+use sp_core::{crypto::DEV_PHRASE, ByteArray, H256};
 use sp_runtime::{
     traits::{Get, Zero},
     Perbill, RuntimeAppPublic, SaturatedConversion,
@@ -128,8 +128,8 @@ impl<T: Config> BenchmarkHelper<T> {
         let max_node_count = LiquidityTreeOf::<T>::max_node_count();
 
         assert!(
-            pool.liquidity_shares_manager.nodes.len() >= (max_node_count as usize - 1) &&
-                pool.liquidity_shares_manager.nodes.len() <= max_node_count as usize,
+            pool.liquidity_shares_manager.nodes.len() >= (max_node_count as usize - 1)
+                && pool.liquidity_shares_manager.nodes.len() <= max_node_count as usize,
             "Expected node count to be between {} and {}, but was {}",
             max_node_count - 1,
             max_node_count,
@@ -290,7 +290,7 @@ where
     let bytes = account.encode();
     let mut vector: [u8; 32] = Default::default();
     vector.copy_from_slice(&bytes[0..32]);
-    return vector
+    return vector;
 }
 
 fn get_user_account<T: Config>() -> (<T as pallet_avn::Config>::AuthorityId, T::AccountId)
@@ -302,12 +302,12 @@ where
         <T as pallet_avn::Config>::AuthorityId::generate_pair(Some(mnemonic.as_bytes().to_vec()));
     let account_bytes = into_bytes::<T>(&key_pair);
     let account_id = T::AccountId::decode(&mut &account_bytes.encode()[..]).unwrap();
-    return (key_pair, account_id)
+    return (key_pair, account_id);
 }
 
 fn get_relayer<T: Config>() -> T::AccountId {
     let relayer_account: H256 = H256::repeat_byte(1);
-    return T::AccountId::decode(&mut relayer_account.as_bytes()).expect("valid relayer account id")
+    return T::AccountId::decode(&mut relayer_account.as_bytes()).expect("valid relayer account id");
 }
 
 fn get_proof<T: Config>(
@@ -319,7 +319,7 @@ fn get_proof<T: Config>(
         signer: signer.clone(),
         relayer: relayer.clone(),
         signature: sp_core::sr25519::Signature::from_slice(signature).unwrap().into(),
-    }
+    };
 }
 
 #[benchmarks(where T: pallet_avn::Config + frame_system::Config)]
@@ -565,7 +565,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -583,7 +583,7 @@ mod benchmarks {
             market_ids,
             amount,
             create_spot_prices::<T>(asset_count),
-            CENT.saturated_into(),
+            CENT_BASE.saturated_into(),
             FuelOf::<T>::from_total(16),
         ));
 
@@ -620,7 +620,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -638,7 +638,7 @@ mod benchmarks {
             market_ids,
             amount,
             create_spot_prices::<T>(asset_count),
-            CENT.saturated_into(),
+            CENT_BASE.saturated_into(),
             FuelOf::<T>::from_total(16),
         ));
 
@@ -689,7 +689,7 @@ mod benchmarks {
         let total = m;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -703,7 +703,7 @@ mod benchmarks {
         assert_ok!(T::MultiCurrency::deposit(base_asset, &alice, total_cost));
 
         let spot_prices = create_spot_prices::<T>(asset_count);
-        let swap_fee = CENT.saturated_into();
+        let swap_fee = CENT_BASE.saturated_into();
 
         #[extrinsic_call]
         _(
@@ -720,7 +720,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_evaluate() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -749,7 +749,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_update() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,

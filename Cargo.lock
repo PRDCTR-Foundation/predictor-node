@@ -862,6 +862,9 @@ name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
+dependencies = [
+ "derive_arbitrary",
+]
 
 [[package]]
 name = "ark-bls12-377"
@@ -2764,6 +2767,17 @@ name = "derive-syn-parse"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d65d7ce8132b7c0e54497a4d9a55a1c2a0912a0d786cf894472ba818fba45762"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5355,6 +5369,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
 
 [[package]]
+name = "libfuzzer-sys"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f12a681b7dd8ce12bff52488013ba614b869148d54dd79836ab85aafdd53f08d"
+dependencies = [
+ "arbitrary",
+ "cc",
+]
+
+[[package]]
 name = "libloading"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7638,6 +7662,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-combinatorial-tokens-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "frame-system",
+ "libfuzzer-sys",
+ "orml-traits",
+ "pallet-pm-combinatorial-tokens",
+ "prediction-market-primitives",
+ "rand 0.8.5",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-pm-court"
 version = "0.1.0"
 dependencies = [
@@ -7820,6 +7859,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-neo-swaps-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "frame-system",
+ "libfuzzer-sys",
+ "orml-traits",
+ "pallet-pm-neo-swaps",
+ "prediction-market-primitives",
+ "rand 0.8.5",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-pm-order-book"
 version = "0.1.0"
 dependencies = [
@@ -7842,6 +7896,17 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "test-case",
+]
+
+[[package]]
+name = "pallet-pm-order-book-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-system",
+ "libfuzzer-sys",
+ "pallet-pm-order-book",
+ "prediction-market-primitives",
 ]
 
 [[package]]
@@ -7885,6 +7950,18 @@ dependencies = [
  "sp-runtime",
  "staging-xcm",
  "test-case",
+]
+
+[[package]]
+name = "pallet-prediction-markets-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "libfuzzer-sys",
+ "pallet-prediction-markets",
+ "prediction-market-primitives",
+ "sp-arithmetic 26.1.0",
 ]
 
 [[package]]

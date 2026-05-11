@@ -107,7 +107,18 @@ std = [
     "sp-avn-common/std",
     "prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
-    "pallet-avn/std"
+    "pallet-avn/std",
+    # Optional deps activated by `runtime-benchmarks`. Forwarding `std`
+    # via `?/std` ensures they get `std` when activated; otherwise they
+    # are built no-std and break (e.g. `xcm-executor` `environmental!`,
+    # `pallet-asset-conversion` `decl_runtime_apis!`).
+    "xcm?/std",
+    "xcm-builder?/std",
+    "pallet-xcm?/std",
+    "pallet-pm-eth-asset-registry?/std",
+    "pallet-treasury?/std",
+    "pallet-prediction-markets?/std",
+    "pallet-pm-combinatorial-tokens?/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",

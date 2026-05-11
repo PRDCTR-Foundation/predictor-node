@@ -27,6 +27,36 @@ frame_benchmarking::define_benchmarks!(
     [frame_benchmarking, BaselineBench::<Runtime>]
     [frame_system, SystemBench::<Runtime>]
     [pallet_balances, Balances]
-    [pallet_timestamp, Timestamp]
+    [pallet_grandpa, Grandpa]
+    [pallet_im_online, ImOnline]
+    [pallet_multisig, Multisig]
+    [pallet_preimage, Preimage]
+    [pallet_proxy, Proxy]
+    [pallet_scheduler, Scheduler]
     [pallet_sudo, Sudo]
+    [pallet_timestamp, Timestamp]
+    [pallet_utility, Utility]
+    [pallet_collective, AdvisoryCommittee]
+    // AvN pallets
+    [pallet_authors_manager, AuthorsManager]
+    [pallet_avn, Avn]
+    [pallet_avn_proxy, AvnProxy]
+    [pallet_summary, Summary]
+    [pallet_token_manager, TokenManager]
+    // Prediction-market customisations
+    [pallet_config, PalletConfig]
+    [pallet_pm_authorized, Authorized]
+    [pallet_pm_combinatorial_tokens, CombinatorialTokens]
+    [pallet_pm_court, Court]
+    [pallet_pm_global_disputes, GlobalDisputes]
+    [pallet_pm_hybrid_router, HybridRouter]
+    [pallet_pm_neo_swaps, NeoSwaps]
+    [pallet_pm_order_book, Orderbook]
+    [pallet_prediction_markets, PredictionMarkets]
+    // NOTE: `orml_tokens` and `pallet_pm_eth_asset_registry` are excluded
+    // from `define_benchmarks!` because they don't expose the standard
+    // `frame_benchmarking::Benchmarking` impl. ORML uses its own
+    // `orml_benchmarking::define_benchmarks!` macro; eth-asset-registry
+    // currently ships only hand-written reference weights. Add them once
+    // their benchmark code is wired up.
 );
