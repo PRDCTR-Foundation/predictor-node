@@ -22,11 +22,6 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use prediction_market_primitives::{
-    constants::base_multiples::*,
-    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
-    types::{Asset, MarketType},
-};
 use pallet_pm_combinatorial_tokens::{
     mock::{
         ext_builder::ExtBuilder,
@@ -35,6 +30,11 @@ use pallet_pm_combinatorial_tokens::{
     },
     traits::CombinatorialIdManager,
     AccountIdOf, BalanceOf, CombinatorialIdOf, Config, FuelOf, MarketIdOf,
+};
+use prediction_market_primitives::{
+    constants::base_multiples::*,
+    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
+    types::{Asset, MarketType},
 };
 
 #[derive(Debug)]
@@ -59,8 +59,9 @@ impl<'a> Arbitrary<'a> for RedeemPositionFuzzParams {
         let min_len = 2;
         let max_len = 1000;
         let len = u.int_in_range(0..=max_len)?;
-        let index_set =
-            (min_len..len).map(|_| bool::arbitrary(u)).collect::<ArbitraryResult<Vec<_>>>()?;
+        let index_set = (min_len..len)
+            .map(|_| bool::arbitrary(u))
+            .collect::<ArbitraryResult<Vec<_>>>()?;
 
         // Clamp every value of the payout vector to [0..1]. That doesn't ensure that the payout
         // vector is valid, but it's valid enough to avoid most overflows.
