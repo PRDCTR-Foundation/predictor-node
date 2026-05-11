@@ -1,0 +1,83 @@
+name: cargo-build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: cargo-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  production:
+    name: cargo build (release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: cargo-build-${{ runner.os }}-release-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-build-${{ runner.os }}-release-
+            cargo-build-${{ runner.os }}-
+
+      - name: Cargo build
+        run: cargo build --locked --release
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker tags
+        id: docker-tags
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAGS="predictor-node:${SHORT_SHA}"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            TAGS="${TAGS}"$'\n'"predictor-node:latest"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${TAGS}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ${{ steps.docker-tags.outputs.tags }}
+          cache-from: type=gha,scope=predictor-node-docker
+          cache-to: type=gha,mode=max,scope=predictor-node-docker

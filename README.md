@@ -1,4 +1,8 @@
 # predictor-node
+
+[![cargo-build](https://github.com/Galactic-Media-Management/predictor-node/actions/workflows/cargo-build.yml/badge.svg?branch=main)](https://github.com/Galactic-Media-Management/predictor-node/actions/workflows/cargo-build.yml?query=branch%3Amain)
+[![cargo-test](https://github.com/Galactic-Media-Management/predictor-node/actions/workflows/cargo-test.yml/badge.svg?branch=main)](https://github.com/Galactic-Media-Management/predictor-node/actions/workflows/cargo-test.yml?query=branch%3Amain)
+
 Predictor: A prediction market AppChain enabled by polkadot-sdk framework
 
 A standalone version of this template is available for each release of Polkadot

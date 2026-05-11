@@ -1,0 +1,57 @@
+name: cargo-test
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: cargo-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  SKIP_WASM_BUILD: 1
+
+jobs:
+  cargo-test:
+    name: cargo test (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            features: ""
+          - name: runtime-benchmarks
+            features: "--features runtime-benchmarks"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: cargo-test-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-test-${{ runner.os }}-${{ matrix.name }}-
+            cargo-test-${{ runner.os }}-
+
+      - name: Cargo test
+        run: cargo test --locked --workspace ${{ matrix.features }}
