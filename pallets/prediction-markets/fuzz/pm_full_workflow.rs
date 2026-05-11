@@ -22,15 +22,20 @@ use arbitrary::Arbitrary;
 use core::ops::{Range, RangeInclusive};
 use frame_support::traits::Hooks;
 use libfuzzer_sys::fuzz_target;
-use sp_arithmetic::Perbill;
+use pallet_prediction_markets::mock::{ExtBuilder, PredictionMarkets, RuntimeOrigin, System};
 use prediction_market_primitives::{
     constants::mock::MaxCreatorFee,
     types::{
         Asset, Deadlines, MarketCreation, MarketDisputeMechanism, MarketPeriod, MarketType,
-        MultiHash, OutcomeReport, ScoringRule,
+        MultiHash, OutcomeReport, ScoringRule, TestAccountIdPK,
     },
 };
-use pallet_prediction_markets::mock::{ExtBuilder, PredictionMarkets, RuntimeOrigin, System};
+use sp_arithmetic::Perbill;
+
+#[inline]
+fn account(seed: u8) -> TestAccountIdPK {
+    TestAccountIdPK::from_raw([seed; 32])
+}
 
 fuzz_target!(|data: Data| {
     let mut ext = ExtBuilder::default().build();
@@ -47,10 +52,10 @@ fuzz_target!(|data: Data| {
         let bounded_parts = data.create_scalar_market_fee % max_parts_per_bill as u128;
         let fee = Perbill::from_parts(bounded_parts.try_into().unwrap());
         let _ = PredictionMarkets::create_market(
-            RuntimeOrigin::signed(data.create_scalar_market_origin.into()),
+            RuntimeOrigin::signed(account(data.create_scalar_market_origin)),
             Asset::Tru,
             fee,
-            data.create_scalar_market_oracle.into(),
+            account(data.create_scalar_market_oracle),
             MarketPeriod::Block(data.create_scalar_market_period),
             deadlines,
             data.create_scalar_market_metadata,
@@ -64,7 +69,7 @@ fuzz_target!(|data: Data| {
         System::set_block_number(2);
 
         let _ = PredictionMarkets::buy_complete_set(
-            RuntimeOrigin::signed(data.buy_complete_set_origin.into()),
+            RuntimeOrigin::signed(account(data.buy_complete_set_origin)),
             data.buy_complete_set_market_id.into(),
             data.buy_complete_set_amount,
         );
@@ -72,7 +77,7 @@ fuzz_target!(|data: Data| {
         System::set_block_number(3);
 
         let _ = PredictionMarkets::report(
-            RuntimeOrigin::signed(data.report_origin.into()),
+            RuntimeOrigin::signed(account(data.report_origin)),
             data.report_market_id.into(),
             outcome(data.report_outcome),
         );
@@ -82,7 +87,7 @@ fuzz_target!(|data: Data| {
 
         let dispute_market_id = data.dispute_market_id.into();
         let _ = PredictionMarkets::dispute(
-            RuntimeOrigin::signed(data.report_origin.into()),
+            RuntimeOrigin::signed(account(data.report_origin)),
             dispute_market_id,
         );
 
@@ -90,7 +95,7 @@ fuzz_target!(|data: Data| {
         System::set_block_number(5);
 
         let _ = PredictionMarkets::redeem_shares(
-            RuntimeOrigin::signed(data.redeem_origin.into()),
+            RuntimeOrigin::signed(account(data.redeem_origin)),
             data.redeem_market_id.into(),
         );
 
@@ -104,7 +109,7 @@ struct Data {
     create_scalar_market_origin: u8,
     create_scalar_market_oracle: u8,
     create_scalar_market_fee: u128,
-    create_scalar_market_period: Range<u64>,
+    create_scalar_market_period: Range<u32>,
     create_scalar_market_metadata: MultiHash,
     create_scalar_market_creation: u8,
     create_scalar_market_outcome_range: RangeInclusive<u128>,

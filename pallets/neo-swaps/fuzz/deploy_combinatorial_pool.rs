@@ -22,15 +22,15 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use prediction_market_primitives::{
-    constants::base_multiples::*,
-    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
-    types::{Asset, MarketType},
-};
-use zrml_neo_swaps::{
+use pallet_pm_neo_swaps::{
     mock::{ExtBuilder, NeoSwaps, Runtime, RuntimeOrigin},
     AccountIdOf, BalanceOf, Config, FuelOf, MarketIdOf, COMBO_MAX_SPOT_PRICE, COMBO_MIN_SPOT_PRICE,
     MIN_SWAP_FEE,
+};
+use prediction_market_primitives::{
+    constants::base_multiples::*,
+    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
+    types::{Asset, MarketType, TestAccountIdPK},
 };
 
 #[derive(Debug)]
@@ -47,13 +47,14 @@ struct DeployCombinatorialPoolFuzzParams {
 
 impl<'a> Arbitrary<'a> for DeployCombinatorialPoolFuzzParams {
     fn arbitrary(u: &mut Unstructured<'a>) -> ArbitraryResult<Self> {
-        let account_id = u128::arbitrary(u)?;
+        let account_id = TestAccountIdPK::from_raw(<[u8; 32]>::arbitrary(u)?);
 
         let min_market_ids = 1;
         let max_market_ids = 16;
         let market_ids_len: usize = u.int_in_range(min_market_ids..=max_market_ids)?;
-        let market_ids =
-            (0..market_ids_len).map(|x| (x as u32).into()).collect::<Vec<MarketIdOf<Runtime>>>();
+        let market_ids = (0..market_ids_len)
+            .map(|x| (x as u32).into())
+            .collect::<Vec<MarketIdOf<Runtime>>>();
 
         let min_category_count = 2;
         let max_category_count = 16;
@@ -104,7 +105,7 @@ fuzz_target!(|params: DeployCombinatorialPoolFuzzParams| {
 
     ext.execute_with(|| {
         // We create the required markets and deposit enough funds for the user.
-        let collateral = Asset::Ztg;
+        let collateral = Asset::Tru;
         for (&market_id, &category_count) in
             params.market_ids.iter().zip(params.category_counts.iter())
         {

@@ -58,6 +58,8 @@ use crate::{asset_registry::CustomAssetProcessor, impl_fee_types, BlakeTwo256};
 use pallet_collective::{EnsureProportionMoreThan, PrimeDefaultVote};
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
+#[cfg(feature = "runtime-benchmarks")]
+use pallet_prediction_markets::types::PredictionMarketsCombinatorialTokensBenchmarkHelper;
 use pallet_prediction_markets::CustomMetadata;
 use sp_avn_common::event_discovery::filters::AllPrimaryEventsFilter;
 // Local module imports
@@ -143,7 +145,7 @@ parameter_types! {
 
 impl pallet_grandpa::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
+    type WeightInfo = crate::weights::pallet_grandpa::SubstrateWeight<Runtime>;
     type MaxAuthorities = MaxAuthorities;
     type MaxNominators = MaxAuthorities;
     type MaxSetIdSessionEntries = ConstU64<0>;
@@ -157,7 +159,7 @@ impl pallet_timestamp::Config for Runtime {
     type Moment = Moment;
     type OnTimestampSet = Aura;
     type MinimumPeriod = MinimumPeriod; //ConstU64<{ SLOT_DURATION / 2 }>
-    type WeightInfo = ();
+    type WeightInfo = pallet_timestamp::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_balances::Config for Runtime {
@@ -175,7 +177,7 @@ impl pallet_balances::Config for Runtime {
     type FreezeIdentifier = RuntimeFreezeReason;
     type MaxFreezes = VariantCountOf<RuntimeFreezeReason>;
     type RuntimeHoldReason = RuntimeHoldReason;
-    type RuntimeFreezeReason = RuntimeHoldReason;
+    type RuntimeFreezeReason = RuntimeFreezeReason;
 }
 
 parameter_types! {
@@ -213,7 +215,7 @@ impl pallet_session::Config for Runtime {
     type SessionManager = AuthorsManager;
     type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
     type Keys = SessionKeys;
-    type WeightInfo = ();
+    type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_session::historical::Config for Runtime {
@@ -504,9 +506,7 @@ impl orml_tokens::Config for Runtime {
     type MaxLocks = MaxLocks;
     type MaxReserves = MaxReserves;
     type ReserveIdentifier = [u8; 8];
-    // TODO update me
-    // type WeightInfo = third_party_weights::orml_tokens::WeightInfo<Runtime>;
-    type WeightInfo = ();
+    type WeightInfo = crate::third_party_weights::orml_tokens::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -519,9 +519,7 @@ impl orml_currencies::Config for Runtime {
     type GetNativeCurrencyId = GetNativeCurrencyId;
     type MultiCurrency = Tokens;
     type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances>;
-    // TODO update me
-    // type WeightInfo = third_party_weights::orml_currencies::WeightInfo<Runtime>;
-    type WeightInfo = ();
+    type WeightInfo = crate::third_party_weights::orml_currencies::WeightInfo<Runtime>;
 }
 
 type AdvisoryCommitteeInstance = pallet_collective::Instance1;
@@ -592,7 +590,7 @@ impl pallet_pm_eth_asset_registry::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type StringLimit = AssetRegistryStringLimit;
     type AssetProcessor = CustomAssetProcessor;
-    type WeightInfo = ();
+    type WeightInfo = pallet_pm_eth_asset_registry::weights::SubstrateWeight<Runtime>;
 }
 
 // Prediction Market parameters
