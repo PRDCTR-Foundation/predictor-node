@@ -22,7 +22,7 @@ use sp_std::prelude::*;
 pub use pallet::*;
 pub use weights::WeightInfo;
 
-mod weights;
+pub mod weights;
 
 #[cfg(test)]
 mod mock;
