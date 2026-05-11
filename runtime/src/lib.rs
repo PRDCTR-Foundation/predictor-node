@@ -11,6 +11,8 @@ pub mod asset_registry;
 mod benchmarks;
 pub mod configs;
 pub mod fees;
+pub mod third_party_weights;
+pub mod weights;
 
 extern crate alloc;
 use alloc::vec::Vec;
