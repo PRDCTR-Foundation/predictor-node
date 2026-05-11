@@ -24,13 +24,13 @@ libfuzzer-sys = { workspace = true }
 orml-traits = { workspace = true, features = ["default"] }
 rand = { workspace = true, features = ["default"] }
 sp-runtime = { workspace = true, features = ["default"] }
-zeitgeist-primitives = { workspace = true, features = ["default", "mock"] }
-zrml-neo-swaps = { workspace = true, features = ["default", "mock"] }
+prediction-market-primitives = { workspace = true, features = ["default", "mock"] }
+pallet-pm-neo-swaps = { workspace = true, features = ["default", "mock"] }
 
 [package]
 authors = ["Forecasting Technologies Ltd"]
 edition.workspace = true
-name = "zrml-neo-swaps-fuzz"
+name = "pallet-pm-neo-swaps-fuzz"
 publish = false
 version = "0.6.1"
 
