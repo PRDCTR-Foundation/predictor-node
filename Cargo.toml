@@ -98,6 +98,7 @@ pallet-proxy = { version = "38.0.0", default-features = false }
 pallet-collective = { version = "38.0.0", default-features = false }
 
 sp-application-crypto = { version = "38.0.0", default-features = false }
+sp-authority-discovery = { version = "34.0.0", default-features = false }
 sp-staking = { version = "36.0.0", default-features = false }
 sp-genesis-builder = { version = "0.15.1", default-features = false }
 sp-offchain = { version = "34.0.0", default-features = false }
