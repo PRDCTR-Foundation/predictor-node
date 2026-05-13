@@ -101,7 +101,7 @@ try-runtime = [
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets"
 version = { workspace = true }

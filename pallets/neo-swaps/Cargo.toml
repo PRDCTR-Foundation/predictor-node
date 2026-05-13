@@ -113,7 +113,7 @@ try-runtime = [
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-neo-swaps"
 version = { workspace = true }
