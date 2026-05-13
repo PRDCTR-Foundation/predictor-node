@@ -65,6 +65,7 @@ use prediction_market_primitives::{
             TreasuryPalletId, VotePeriod, VotingOutcomeFee, BASE, CENT_BASE,
         },
     },
+    math::fixed::FixedMul,
     traits::{DeployPoolApi, DistributeFees},
     types::{
         Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, MarketId, OrmlAmount,
@@ -179,9 +180,11 @@ where
         _market_id: Self::MarketId,
         asset: Self::Asset,
         account: &Self::AccountId,
-        _amount: Self::Balance,
+        amount: Self::Balance,
     ) -> Self::Balance {
-        let fees = NeoSwaps::additional_swap_fee().unwrap().saturated_into();
+        let percentage: BalanceOf<T> =
+            NeoSwaps::additional_swap_fee().unwrap_or_default().saturated_into();
+        let fees = percentage.bmul(amount).unwrap_or_else(|_| Zero::zero());
         match T::MultiCurrency::transfer(asset, account, &F::get(), fees) {
             Ok(_) => fees,
             Err(_) => Zero::zero(),
@@ -575,7 +578,7 @@ impl ExtBuilder {
         let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
         let _ = env_logger::builder().is_test(true).try_init();
-        pallet_pm_neo_swaps::GenesisConfig::<Runtime> { additional_swap_fee: CENT_BASE / 100 }
+        pallet_pm_neo_swaps::GenesisConfig::<Runtime> { additional_swap_fee: CENT_BASE }
             .assimilate_storage(&mut t)
             .unwrap();
 

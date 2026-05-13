@@ -25,7 +25,7 @@ use crate::{
 use alloc::{collections::BTreeMap, vec};
 use core::marker::PhantomData;
 use prediction_market_primitives::{
-    math::fixed::{BaseProvider, ZeitgeistBase},
+    math::fixed::{BaseProvider, PredictionMarketBase},
     traits::FutarchyBenchmarkHelper,
     types::Asset,
 };
@@ -41,14 +41,14 @@ where
     /// to `value`. The pool is technically in invalid state.
     fn create_oracle(value: bool) -> DecisionMarketOracle<T> {
         let pool_id: MarketIdOf<T> = 0u8.into();
-        let collateral = Asset::Ztg;
+        let collateral = Asset::Tru;
 
         // Create a `reserves` map so that `positive_outcome` has a higher price if and only if
         // `value` is `true`.
         let positive_outcome = Asset::CombinatorialToken([0u8; 32]);
         let negative_outcome = Asset::CombinatorialToken([1u8; 32]);
         let mut reserves = BTreeMap::new();
-        let one: BalanceOf<T> = ZeitgeistBase::get().unwrap();
+        let one: BalanceOf<T> = PredictionMarketBase::get().unwrap();
         let two: BalanceOf<T> = one.saturating_mul(2u8.into());
         if value {
             reserves.insert(positive_outcome, one);

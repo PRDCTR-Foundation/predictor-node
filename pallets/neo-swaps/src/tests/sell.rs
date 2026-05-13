@@ -47,10 +47,10 @@ fn sell_works() {
         ));
 
         let expected_amount_out = 59632253897;
-        let expected_fees =
-            swap_fee.bmul(expected_amount_out).unwrap() + NeoSwaps::additional_swap_fee().unwrap();
-        let expected_swap_fee_amount = expected_fees - NeoSwaps::additional_swap_fee().unwrap();
-        let expected_external_fee_amount = NeoSwaps::additional_swap_fee().unwrap();
+        let additional_fee = NeoSwaps::additional_swap_fee().unwrap();
+        let expected_swap_fee_amount = swap_fee.bmul(expected_amount_out).unwrap();
+        let expected_external_fee_amount = additional_fee.bmul(expected_amount_out).unwrap();
+        let expected_fees = expected_swap_fee_amount + expected_external_fee_amount;
         let expected_amount_out_minus_fees = expected_amount_out - expected_fees;
 
         assert_balance!(bob(), BASE_ASSET, expected_amount_out_minus_fees);

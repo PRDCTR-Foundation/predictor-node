@@ -37,13 +37,13 @@ use orml_traits::MultiCurrency;
 use pallet_pm_market_commons::MarketCommonsPalletApi;
 use parity_scale_codec::{Decode, Encode};
 use prediction_market_primitives::{
-    constants::{base_multiples::*, BASE_CENT},
+    constants::base_multiples::*,
     math::fixed::{BaseProvider, FixedDiv, FixedMul, PredictionMarketBase},
     traits::{CombinatorialTokensFuel, CompleteSetOperationsApi, FutarchyOracle},
     types::{Asset, Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
 use sp_avn_common::Proof;
-use sp_core::{crypto::DEV_PHRASE, H256};
+use sp_core::{crypto::DEV_PHRASE, ByteArray, H256};
 use sp_runtime::{
     traits::{Get, Zero},
     Perbill, RuntimeAppPublic, SaturatedConversion,
@@ -565,7 +565,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -583,7 +583,7 @@ mod benchmarks {
             market_ids,
             amount,
             create_spot_prices::<T>(asset_count),
-            CENT.saturated_into(),
+            CENT_BASE.saturated_into(),
             FuelOf::<T>::from_total(16),
         ));
 
@@ -620,7 +620,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -638,7 +638,7 @@ mod benchmarks {
             market_ids,
             amount,
             create_spot_prices::<T>(asset_count),
-            CENT.saturated_into(),
+            CENT_BASE.saturated_into(),
             FuelOf::<T>::from_total(16),
         ));
 
@@ -689,7 +689,7 @@ mod benchmarks {
         let total = m;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -703,7 +703,7 @@ mod benchmarks {
         assert_ok!(T::MultiCurrency::deposit(base_asset, &alice, total_cost));
 
         let spot_prices = create_spot_prices::<T>(asset_count);
-        let swap_fee = CENT.saturated_into();
+        let swap_fee = CENT_BASE.saturated_into();
 
         #[extrinsic_call]
         _(
@@ -720,7 +720,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_evaluate() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -749,7 +749,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_update() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Ztg;
+        let base_asset = Asset::Tru;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,

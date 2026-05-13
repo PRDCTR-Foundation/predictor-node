@@ -107,7 +107,6 @@ std = [
     "sp-avn-common/std",
     "prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
-    "pallet-avn/std"
 ]
 try-runtime = [
     "frame-support/try-runtime",

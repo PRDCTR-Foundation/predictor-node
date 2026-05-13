@@ -63,8 +63,6 @@ use prediction_market_primitives::{
         MarketId, OrmlAmount, SignatureTest, TestAccountIdPK,
     },
 };
-#[cfg(feature = "runtime-benchmarks")]
-use sp_core::{H160, H256};
 use sp_runtime::{
     traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
     BuildStorage, DispatchError, Perbill, Percent, SaturatedConversion,
@@ -76,7 +74,7 @@ use prediction_market_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
 use sp_core::H160;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 
-pub use prediction_market_primitives::test_helper::get_account;
+pub use prediction_market_primitives::test_helper::{get_account, get_account_from_seed};
 pub const INITIAL_BALANCE: Balance = 100 * BASE;
 
 // pub const ALICE: AccountIdTest = 0;
@@ -528,15 +526,13 @@ impl pallet_pm_global_disputes::Config for Runtime {
 #[cfg(feature = "runtime-benchmarks")]
 pub struct BenchmarkHelper;
 #[cfg(feature = "runtime-benchmarks")]
-impl ArgumentsFactory<(), AccountIdTest> for BenchmarkHelper {
+impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
     fn create_asset_kind(_seed: u32) {
         // No-op
     }
 
-    fn create_beneficiary(seed: [u8; 32]) -> AccountIdTest {
-        let h160 = H160::from(H256::from(seed));
-        let lower_128: u128 = u128::from_le_bytes(h160.as_bytes()[..16].try_into().unwrap());
-        AccountIdTest::from(lower_128)
+    fn create_beneficiary(seed: [u8; 32]) -> TestAccountIdPK {
+        get_account_from_seed(seed)
     }
 }
 

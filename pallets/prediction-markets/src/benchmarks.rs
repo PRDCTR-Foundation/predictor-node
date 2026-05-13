@@ -55,7 +55,7 @@ use prediction_market_primitives::{
         MarketType, MultiHash, OutcomeReport, ScoringRule,
     },
 };
-use sp_core::{crypto::DEV_PHRASE, H160, H256};
+use sp_core::{crypto::DEV_PHRASE, ByteArray, H160, H256};
 use sp_runtime::{
     traits::{SaturatedConversion, Saturating, Zero},
     DispatchError, Perbill, RuntimeAppPublic,

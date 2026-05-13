@@ -39,9 +39,8 @@ impl SubstrateCli for Cli {
         Ok(match id {
             "dev" => Box::new(chain_spec::development_config()?),
             "" | "local" => Box::new(chain_spec::local_testnet_config()?),
-            path => {
-                Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?)
-            },
+            path =>
+                Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
         })
     }
 }
@@ -115,7 +114,7 @@ pub fn run() -> sc_cli::Result<()> {
                                 "Runtime benchmarking wasn't enabled when building the node. \
 							You can enable it with `--features runtime-benchmarks`."
                                     .into(),
-                            );
+                            )
                         }
 
                         cmd.run_with_spec::<sp_runtime::traits::HashingFor<Block>, ()>(Some(
@@ -166,9 +165,8 @@ pub fn run() -> sc_cli::Result<()> {
 
                         cmd.run(client, inherent_benchmark_data()?, Vec::new(), &ext_factory)
                     },
-                    BenchmarkCmd::Machine(cmd) => {
-                        cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())
-                    },
+                    BenchmarkCmd::Machine(cmd) =>
+                        cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone()),
                 }
             })
         },
@@ -194,13 +192,12 @@ pub fn run() -> sc_cli::Result<()> {
                         external_service_config,
                     )
                     .map_err(sc_cli::Error::Service),
-                    sc_network::config::NetworkBackendType::Litep2p => {
+                    sc_network::config::NetworkBackendType::Litep2p =>
                         service::new_full::<sc_network::Litep2pNetworkBackend>(
                             config,
                             external_service_config,
                         )
-                        .map_err(sc_cli::Error::Service)
-                    },
+                        .map_err(sc_cli::Error::Service),
                 }
             })
         },
