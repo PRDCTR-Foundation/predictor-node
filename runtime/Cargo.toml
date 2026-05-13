@@ -213,8 +213,7 @@ runtime-benchmarks = [
 	"pallet-scheduler/runtime-benchmarks",
 	"pallet-utility/runtime-benchmarks",
 
-	# AvN-fork pallets. `pallet-eth-bridge/runtime-benchmarks` is omitted
-	# to match Truth (its benchmarks are known-broken upstream).
+	"pallet-eth-bridge/runtime-benchmarks",
 	"pallet-authors-manager/runtime-benchmarks",
 	"pallet-avn/runtime-benchmarks",
 	"pallet-avn-proxy/runtime-benchmarks",

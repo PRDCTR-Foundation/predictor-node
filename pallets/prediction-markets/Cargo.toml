@@ -96,9 +96,6 @@ std = [
     "pallet-pm-global-disputes/std",
     "pallet-avn/std",
     "xcm?/std",
-    # Optional deps activated by `runtime-benchmarks` / mock. Forwarding
-    # `std` via `?/std` keeps them coherent under the benchmarks build.
-    "orml-asset-registry?/std",
     "orml-currencies?/std",
     "orml-tokens?/std",
     "pallet-balances?/std",
