@@ -7921,7 +7921,6 @@ dependencies = [
  "frame-system",
  "log",
  "more-asserts",
- "orml-asset-registry",
  "orml-currencies",
  "orml-tokens",
  "orml-traits",
