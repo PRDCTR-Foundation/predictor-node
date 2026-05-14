@@ -20,6 +20,8 @@ scale-info = { features = [
 	"derive",
 	"serde",
 ], workspace = true }
+smallvec = "1.15.0"
+
 serde = { workspace = true }
 frame-support = { features = ["experimental"], workspace = true }
 frame-system.workspace = true
@@ -53,6 +55,7 @@ sp-inherents.workspace = true
 sp-offchain.workspace = true
 sp-runtime = { features = ["serde"], workspace = true }
 sp-session.workspace = true
+sp-std.workspace = true
 sp-storage.workspace = true
 sp-transaction-pool.workspace = true
 sp-version = { features = ["serde"], workspace = true }
@@ -71,13 +74,30 @@ pallet-avn.workspace = true
 pallet-authors-manager.workspace = true
 pallet-eth-bridge.workspace = true
 pallet-eth-bridge-runtime-api.workspace = true
+pallet-token-manager.workspace = true
+pallet-avn-proxy.workspace = true
 sp-avn-common.workspace = true
 sp-watchtower.workspace = true
-pallet-token-manager.workspace = true
 sp-application-crypto.workspace = true
 sp-staking.workspace = true
 
 common-primitives.workspace = true
+
+# Prediction market
+prediction-market-primitives = { workspace = true }
+pallet-config = { workspace = true }
+pallet-pm-authorized = { workspace = true }
+pallet-pm-court = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
+pallet-prediction-markets = { workspace = true }
+pallet-pm-global-disputes = { workspace = true, optional = true }
+pallet-pm-neo-swaps = { workspace = true }
+pallet-pm-hybrid-router = { workspace = true }
+pallet-collective = { workspace = true }
+pallet-insecure-randomness-collective-flip = { workspace = true }
+pallet-pm-eth-asset-registry = { workspace = true }
+pallet-pm-order-book = { workspace = true }
+pallet-pm-combinatorial-tokens = { workspace = true }
 
 [build-dependencies]
 substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
@@ -116,6 +136,8 @@ std = [
 	"pallet-preimage/std",
 	"pallet-multisig/std",
 	"pallet-proxy/std",
+	"pallet-collective/std",
+	"pallet-insecure-randomness-collective-flip/std",
 
 	"orml-currencies/std",
 	"orml-tokens/std",
@@ -124,6 +146,7 @@ std = [
 
 	"pallet-summary/std",
 	"pallet-avn/std",
+	"pallet-avn-proxy/std",
 	"pallet-authors-manager/std",
 	"pallet-eth-bridge/std",
 	"pallet-eth-bridge-runtime-api/std",
@@ -143,11 +166,27 @@ std = [
 	"sp-offchain/std",
 	"sp-runtime/std",
 	"sp-session/std",
+	"sp-std/std",
 	"sp-storage/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
 
 	"common-primitives/std",
+
+	# Prediction market pallets
+	"pallet-config/std",
+	"prediction-market-primitives/std",
+    "pallet-pm-market-commons/std",
+    "pallet-pm-authorized/std",
+    "pallet-pm-court/std",
+    "pallet-prediction-markets/std",
+    "pallet-pm-global-disputes/std",
+	"pallet-insecure-randomness-collective-flip/std",
+	"pallet-pm-neo-swaps/std",
+	"pallet-pm-eth-asset-registry/std",
+	"pallet-pm-hybrid-router/std",
+	"pallet-pm-order-book/std",
+	"pallet-pm-combinatorial-tokens/std",
 
 	"substrate-wasm-builder",
 ]
@@ -162,7 +201,40 @@ runtime-benchmarks = [
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+
+	# SDK pallets used by the runtime that gate `try_successful_origin`
+	# behind their own `runtime-benchmarks` feature.
+	"pallet-collective/runtime-benchmarks",
+	"pallet-im-online/runtime-benchmarks",
+	"pallet-multisig/runtime-benchmarks",
+	"pallet-offences/runtime-benchmarks",
+	"pallet-preimage/runtime-benchmarks",
+	"pallet-proxy/runtime-benchmarks",
+	"pallet-scheduler/runtime-benchmarks",
+	"pallet-utility/runtime-benchmarks",
+
+	"pallet-eth-bridge/runtime-benchmarks",
+	"pallet-authors-manager/runtime-benchmarks",
+	"pallet-avn/runtime-benchmarks",
+	"pallet-avn-proxy/runtime-benchmarks",
+	"pallet-summary/runtime-benchmarks",
+	"pallet-token-manager/runtime-benchmarks",
+
+	# ORML
 	"orml-benchmarking",
+	"orml-tokens/runtime-benchmarks",
+
+	# Prediction-market customisations
+	"pallet-config/runtime-benchmarks",
+	"pallet-prediction-markets/runtime-benchmarks",
+	"pallet-pm-authorized/runtime-benchmarks",
+	"pallet-pm-combinatorial-tokens/runtime-benchmarks",
+	"pallet-pm-court/runtime-benchmarks",
+	"pallet-pm-eth-asset-registry/runtime-benchmarks",
+	"pallet-pm-global-disputes/runtime-benchmarks",
+	"pallet-pm-hybrid-router/runtime-benchmarks",
+	"pallet-pm-neo-swaps/runtime-benchmarks",
+	"pallet-pm-order-book/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -179,6 +251,8 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 	"orml-currencies/try-runtime",
 	"orml-tokens/try-runtime",
+	"pallet-config/try-runtime",
+	"pallet-pm-combinatorial-tokens/try-runtime",
 ]
 
 # Enable the metadata hash generation.

@@ -547,7 +547,7 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde",
  "alloy-sol-types",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "serde",
  "serde_json",
  "serde_with",
@@ -700,7 +700,7 @@ checksum = "5ce599598ef8ebe067f3627509358d9faaa1ef94f77f834a7783cd44209ef55c"
 dependencies = [
  "alloy-json-rpc",
  "alloy-transport",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "opentelemetry",
  "opentelemetry-http",
  "reqwest",
@@ -862,6 +862,9 @@ name = "arbitrary"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
+dependencies = [
+ "derive_arbitrary",
+]
 
 [[package]]
 name = "ark-bls12-377"
@@ -2113,9 +2116,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 
 [[package]]
+name = "cli-commands"
+version = "8.5.0"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+dependencies = [
+ "clap",
+ "external-service",
+ "sc-cli",
+ "sc-keystore",
+ "sc-service",
+ "sp-core",
+ "sp-keystore",
+]
+
+[[package]]
 name = "client-extrinsic-utils"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "anyhow",
  "log",
@@ -2177,24 +2194,10 @@ checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 name = "common-primitives"
 version = "0.1.0"
 dependencies = [
- "arbitrary",
- "fixed",
  "frame-support",
- "frame-system",
- "more-asserts",
- "num-traits",
- "orml-currencies",
- "orml-tokens",
- "orml-traits",
  "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-arithmetic 26.1.0",
- "sp-avn-common",
  "sp-core",
  "sp-runtime",
- "test-case",
- "typenum",
 ]
 
 [[package]]
@@ -2785,6 +2788,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_arbitrary"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3325,7 +3339,7 @@ dependencies = [
 [[package]]
 name = "external-service"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "alloy",
  "alloy-consensus",
@@ -5102,15 +5116,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5367,6 +5372,16 @@ name = "libc"
 version = "0.2.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+
+[[package]]
+name = "libfuzzer-sys"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f12a681b7dd8ce12bff52488013ba614b869148d54dd79836ab85aafdd53f08d"
+dependencies = [
+ "arbitrary",
+ "cc",
+]
 
 [[package]]
 name = "libloading"
@@ -6664,7 +6679,7 @@ version = "0.1.0"
 [[package]]
 name = "node-primitives"
 version = "2.0.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "sp-core",
  "sp-runtime",
@@ -7185,7 +7200,7 @@ dependencies = [
 [[package]]
 name = "pallet-authors-manager"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7225,7 +7240,7 @@ dependencies = [
 [[package]]
 name = "pallet-avn"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7248,8 +7263,9 @@ dependencies = [
 [[package]]
 name = "pallet-avn-proxy"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "hex-literal",
@@ -7321,6 +7337,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-collective"
+version = "38.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e149f1aefd444c9a1da6ec5a94bc8a7671d7a33078f85dd19ae5b06e3438e60"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-config"
+version = "0.1.0"
+dependencies = [
+ "common-primitives",
+ "env_logger 0.11.10",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "log",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "pallet-election-provider-multi-phase"
 version = "37.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7360,7 +7413,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "ethabi",
  "frame-benchmarking",
@@ -7389,7 +7442,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge-runtime-api"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "frame-support",
  "pallet-avn",
@@ -7614,6 +7667,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-combinatorial-tokens-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "frame-system",
+ "libfuzzer-sys",
+ "orml-traits",
+ "pallet-pm-combinatorial-tokens",
+ "prediction-market-primitives",
+ "rand 0.8.5",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-pm-court"
 version = "0.1.0"
 dependencies = [
@@ -7796,6 +7864,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-neo-swaps-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "frame-system",
+ "libfuzzer-sys",
+ "orml-traits",
+ "pallet-pm-neo-swaps",
+ "prediction-market-primitives",
+ "rand 0.8.5",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-pm-order-book"
 version = "0.1.0"
 dependencies = [
@@ -7821,6 +7904,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-order-book-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-system",
+ "libfuzzer-sys",
+ "pallet-pm-order-book",
+ "prediction-market-primitives",
+]
+
+[[package]]
 name = "pallet-prediction-markets"
 version = "0.1.0"
 dependencies = [
@@ -7832,7 +7926,6 @@ dependencies = [
  "frame-system",
  "log",
  "more-asserts",
- "orml-asset-registry",
  "orml-currencies",
  "orml-tokens",
  "orml-traits",
@@ -7861,6 +7954,18 @@ dependencies = [
  "sp-runtime",
  "staging-xcm",
  "test-case",
+]
+
+[[package]]
+name = "pallet-prediction-markets-fuzz"
+version = "0.6.1"
+dependencies = [
+ "arbitrary",
+ "frame-support",
+ "libfuzzer-sys",
+ "pallet-prediction-markets",
+ "prediction-market-primitives",
+ "sp-arithmetic 26.1.0",
 ]
 
 [[package]]
@@ -7996,7 +8101,7 @@ dependencies = [
 [[package]]
 name = "pallet-summary"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -8042,7 +8147,7 @@ dependencies = [
 [[package]]
 name = "pallet-token-manager"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -8877,12 +8982,14 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "clap",
+ "cli-commands",
  "external-service",
  "frame-benchmarking-cli",
  "frame-metadata-hash-extension",
  "frame-system",
  "futures",
  "jsonrpsee",
+ "pallet-im-online",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
  "parity-scale-codec",
@@ -8905,6 +9012,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sp-api",
+ "sp-authority-discovery",
  "sp-avn-common",
  "sp-block-builder",
  "sp-blockchain",
@@ -8942,13 +9050,27 @@ dependencies = [
  "pallet-authors-manager",
  "pallet-authorship",
  "pallet-avn",
+ "pallet-avn-proxy",
  "pallet-balances",
+ "pallet-collective",
+ "pallet-config",
  "pallet-eth-bridge",
  "pallet-eth-bridge-runtime-api",
  "pallet-grandpa",
  "pallet-im-online",
+ "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
  "pallet-offences",
+ "pallet-pm-authorized",
+ "pallet-pm-combinatorial-tokens",
+ "pallet-pm-court",
+ "pallet-pm-eth-asset-registry",
+ "pallet-pm-global-disputes",
+ "pallet-pm-hybrid-router",
+ "pallet-pm-market-commons",
+ "pallet-pm-neo-swaps",
+ "pallet-pm-order-book",
+ "pallet-prediction-markets",
  "pallet-preimage",
  "pallet-proxy",
  "pallet-scheduler",
@@ -8961,8 +9083,10 @@ dependencies = [
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-utility",
  "parity-scale-codec",
+ "prediction-market-primitives",
  "scale-info",
  "serde",
+ "smallvec",
  "sp-api",
  "sp-application-crypto",
  "sp-avn-common",
@@ -8976,6 +9100,7 @@ dependencies = [
  "sp-runtime",
  "sp-session",
  "sp-staking",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sp-storage",
  "sp-transaction-pool",
  "sp-version",
@@ -11901,9 +12026,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.13.2"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 dependencies = [
  "serde",
 ]
@@ -12072,7 +12197,7 @@ dependencies = [
 [[package]]
 name = "sp-avn-common"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -12764,7 +12889,7 @@ dependencies = [
 [[package]]
 name = "sp-watchtower"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#f6011bdcc51888fb37d4113cf7267fc12c52b5a2"
+source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
 dependencies = [
  "derive_more 0.99.18",
  "hex",

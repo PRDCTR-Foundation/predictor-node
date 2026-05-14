@@ -48,8 +48,9 @@ use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Aura, Avn, Balance, Block, EthBridge, Executive, Grandpa, InherentDataExt, Nonce,
-    Runtime, RuntimeCall, RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, VERSION,
+    opaque::SessionKeys, AccountId, Aura, Avn, Balance, Block, EthBridge, Executive, Grandpa,
+    InherentDataExt, Nonce, Runtime, RuntimeCall, RuntimeGenesisConfig, System, TransactionPayment,
+    VERSION,
 };
 
 const MAIN_ETH_BRIDGE_ID: InstanceId = 0u8;

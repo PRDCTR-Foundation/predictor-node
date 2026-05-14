@@ -13,6 +13,22 @@ members = [
     "macros",
     "primitives/*",
     "pallets/*",
+    "pallets/combinatorial-tokens/fuzz",
+    "pallets/neo-swaps/fuzz",
+    "pallets/orderbook/fuzz",
+    "pallets/prediction-markets/fuzz",
+]
+# Fuzz crates are members so they can inherit workspace deps via
+# `workspace = true`, but they are excluded from the default member set so a
+# bare `cargo build` does not pull in libfuzzer-sys (which only links cleanly
+# under cargo-fuzz). Run them with
+# `cd pallets/<x>/fuzz && cargo +nightly fuzz run <target>`.
+default-members = [
+    "node",
+    "runtime",
+    "macros",
+    "primitives/*",
+    "pallets/*",
 ]
 resolver = "2"
 
@@ -97,8 +113,10 @@ pallet-authority-discovery = { version = "38.0.0", default-features = false }
 pallet-authorship = { version = "38.0.0", default-features = false }
 pallet-multisig = { version = "38.0.0", default-features = false }
 pallet-proxy = { version = "38.0.0", default-features = false }
+pallet-collective = { version = "38.0.0", default-features = false }
 
 sp-application-crypto = { version = "38.0.0", default-features = false }
+sp-authority-discovery = { version = "34.0.0", default-features = false }
 sp-staking = { version = "36.0.0", default-features = false }
 sp-genesis-builder = { version = "0.15.1", default-features = false }
 sp-offchain = { version = "34.0.0", default-features = false }
@@ -120,6 +138,7 @@ node-macros = { path = "./macros", default-features = false }
 common-primitives = { path = "./primitives/common", default-features = false }
 prediction-market-primitives = { path = "./primitives/prediction-market", default-features = false }
 
+pallet-config = { path = "pallets/config", default-features = false }
 pallet-pm-market-commons = { path = "pallets/market-commons", default-features = false }
 pallet-pm-authorized = { path = "./pallets/authorized", default-features = false }
 pallet-pm-court = { path = "pallets/court", default-features = false }
@@ -150,10 +169,12 @@ pallet-eth-bridge-runtime-api = { git = "https://github.com/Galactic-Media-Manag
 pallet-token-manager = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 sp-avn-common = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 sp-watchtower = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
-external-service = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
+external-service = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch"}
+cli-commands = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch"}
 
 # Other (wasm)
 arbitrary = { version = "1.3.2", default-features = false }
+libfuzzer-sys = { version = "0.4.7" }
 ark-bn254 = { version = "0.5.0", default-features = false, features = ["curve"] }
 ark-ff = { version = "0.5.0", default-features = false }
 fixed = { version = "=1.15.0", default-features = false, features = ["num-traits"] }

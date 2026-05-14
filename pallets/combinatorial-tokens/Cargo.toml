@@ -65,7 +65,7 @@ try-runtime = [
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-combinatorial-tokens"
 version = "0.6.1"

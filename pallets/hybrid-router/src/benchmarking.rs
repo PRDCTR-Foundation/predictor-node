@@ -42,7 +42,7 @@ use prediction_market_primitives::{
     traits::{CompleteSetOperationsApi, DeployPoolApi, HybridRouterOrderbookApi},
     types::{Asset, Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
-use sp_core::{crypto::DEV_PHRASE, H256};
+use sp_core::{crypto::DEV_PHRASE, ByteArray, H256};
 use sp_runtime::{Perbill, RuntimeAppPublic, SaturatedConversion};
 use types::Strategy;
 

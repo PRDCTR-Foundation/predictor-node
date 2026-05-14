@@ -41,7 +41,7 @@ use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
 use parity_scale_codec::{alloc::sync::Arc, Encode};
-pub use prediction_market_primitives::test_helper::get_account;
+pub use prediction_market_primitives::test_helper::{get_account, get_account_from_seed};
 use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
@@ -65,8 +65,6 @@ use prediction_market_primitives::{
     },
 };
 use sp_arithmetic::{per_things::Percent, Perbill};
-#[cfg(feature = "runtime-benchmarks")]
-use sp_core::H256;
 use sp_core::{Get, H160};
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 use sp_runtime::{
@@ -520,9 +518,7 @@ impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
     }
 
     fn create_beneficiary(seed: [u8; 32]) -> TestAccountIdPK {
-        let h160 = H160::from(H256::from(seed));
-        let lower_128: u128 = u128::from_le_bytes(h160.as_bytes()[..16].try_into().unwrap());
-        TestAccountIdPK::from(lower_128)
+        get_account_from_seed(seed)
     }
 }
 

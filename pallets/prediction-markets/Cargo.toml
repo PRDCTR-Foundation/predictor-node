@@ -22,7 +22,6 @@ pallet-pm-market-commons = { workspace = true }
 cfg-if = { workspace = true, optional = true }
 env_logger = { workspace = true, optional = true }
 pallet-pm-eth-asset-registry = { workspace = true }
-orml-asset-registry = { workspace = true, optional = true }
 orml-currencies = { workspace = true, optional = true }
 orml-tokens = { workspace = true, optional = true }
 pallet-balances = { workspace = true, optional = true }
@@ -65,7 +64,6 @@ mock = [
     "prediction-market-primitives/mock",
     "pallet-prediction-markets-runtime-api/default",
     "xcm/default",
-    "orml-asset-registry/default",
     "env_logger/default",
 ]
 parachain = []
@@ -75,6 +73,7 @@ runtime-benchmarks = [
     "frame-system/runtime-benchmarks",
     "pallet-pm-eth-asset-registry/runtime-benchmarks",
     "pallet-timestamp/runtime-benchmarks",
+    "pallet-treasury/runtime-benchmarks",
     "prediction-market-primitives/mock",
 ]
 std = [
@@ -102,7 +101,7 @@ try-runtime = [
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets"
 version = { workspace = true }

@@ -22,10 +22,6 @@ mod common;
 use arbitrary::{Arbitrary, Result as ArbitraryResult, Unstructured};
 use libfuzzer_sys::fuzz_target;
 use orml_traits::currency::MultiCurrency;
-use prediction_market_primitives::{
-    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
-    types::{Asset, MarketType},
-};
 use pallet_pm_combinatorial_tokens::{
     mock::{
         ext_builder::ExtBuilder,
@@ -33,6 +29,10 @@ use pallet_pm_combinatorial_tokens::{
     },
     traits::CombinatorialIdManager,
     AccountIdOf, BalanceOf, CombinatorialIdOf, Config, FuelOf, MarketIdOf,
+};
+use prediction_market_primitives::{
+    traits::{CombinatorialTokensFuel, MarketCommonsPalletApi},
+    types::{Asset, MarketType},
 };
 
 #[derive(Debug)]
@@ -57,8 +57,9 @@ impl<'a> Arbitrary<'a> for SplitPositionFuzzParams {
         let min_len = 0;
         let max_len = 10;
         let len = u.int_in_range(0..=max_len)?;
-        let partition =
-            (min_len..len).map(|_| Arbitrary::arbitrary(u)).collect::<ArbitraryResult<Vec<_>>>()?;
+        let partition = (min_len..len)
+            .map(|_| Arbitrary::arbitrary(u))
+            .collect::<ArbitraryResult<Vec<_>>>()?;
 
         let params = SplitPositionFuzzParams {
             account_id,

@@ -96,13 +96,27 @@ std = [
     "common-primitives/std",
     "pallet-avn/std",
     "sp-avn-common/std",
+    # Optional deps activated by `runtime-benchmarks`. See neo-swaps for
+    # rationale.
+    "xcm?/std",
+    "xcm-builder?/std",
+    "pallet-xcm?/std",
+    "pallet-pm-eth-asset-registry?/std",
+    "pallet-treasury?/std",
+    "pallet-prediction-markets?/std",
+    "pallet-pm-combinatorial-tokens?/std",
+    "pallet-pm-neo-swaps?/std",
+    "pallet-pm-order-book?/std",
+    "pallet-pm-authorized?/std",
+    "pallet-pm-court?/std",
+    "pallet-pm-global-disputes?/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-hybrid-router"
 version = { workspace = true }
