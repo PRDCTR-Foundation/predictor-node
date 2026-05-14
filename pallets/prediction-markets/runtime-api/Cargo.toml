@@ -12,7 +12,7 @@ std = [
 ]
 
 [package]
-authors = ["Zeitgeist PM <contact@zeitgeist.pm>"]
+authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets-runtime-api"
 version = { workspace = true }

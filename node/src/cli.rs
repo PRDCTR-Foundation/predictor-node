@@ -1,3 +1,4 @@
+use cli_commands::key;
 use sc_cli::RunCmd;
 
 #[derive(Debug, clap::Parser)]
@@ -21,8 +22,8 @@ pub struct Cli {
 #[allow(clippy::large_enum_variant)]
 pub enum Subcommand {
     /// Key management cli utilities
-    #[command(subcommand)]
-    Key(sc_cli::KeySubcommand),
+    #[clap(subcommand)]
+    Key(key::AvnKeySubcommand),
 
     /// Build a chain specification.
     BuildSpec(sc_cli::BuildSpecCmd),

@@ -167,7 +167,8 @@ pallet-eth-bridge-runtime-api = { git = "https://github.com/Galactic-Media-Manag
 pallet-token-manager = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 sp-avn-common = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 sp-watchtower = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
-external-service = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
+external-service = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch"}
+cli-commands = { git = "https://github.com/Galactic-Media-Management/avn-parachain", branch = "feat/create-stable-2409-branch"}
 
 # Other (wasm)
 arbitrary = { version = "1.3.2", default-features = false }
