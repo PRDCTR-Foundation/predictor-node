@@ -86,7 +86,9 @@ frame-benchmarking-cli.workspace = true
 frame-benchmarking-cli.default-features = true
 predictor-runtime.workspace = true
 
-external-service = { workspace = true, default-features = true }
+external-service = { workspace = true }
+cli-commands = { workspace = true }
+
 sc-keystore.workspace = true
 sc-keystore.default-features = true
 parity-scale-codec = { workspace = true, default-features = true }
