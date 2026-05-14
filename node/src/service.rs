@@ -362,11 +362,10 @@ pub fn new_full<
     if role.is_authority() || offchain_worker_enabled {
         let keystore_path = match keystore_config_snapshot {
             KeystoreConfig::Path { path, .. } => path,
-            KeystoreConfig::InMemory => {
+            KeystoreConfig::InMemory =>
                 return Err(ServiceError::Other(
                     "external-service requires a file-based keystore (KeystoreConfig::Path)".into(),
-                ))
-            },
+                )),
         };
 
         let node_deps = NodeDeps::<Block, _> {
