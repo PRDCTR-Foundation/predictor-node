@@ -73,7 +73,7 @@ use super::{
     Timestamp, TokenManager, Tokens, UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES,
     NATIVE_EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
 };
-use crate::configs::misc::Treasury;
+use crate::configs::misc::{MajorityQuorum, Treasury};
 use orml_traits::{parameter_type_with_key, LockIdentifier};
 use sp_runtime::traits::{ConvertInto, OpaqueKeys};
 use sp_watchtower::NoopWatchtower;
@@ -401,7 +401,7 @@ impl pallet_eth_bridge::Config for Runtime {
     type ProcessedEventsChecker = EthBridge;
     type EthereumEventsMigration = ();
     type ProcessedEventsHandler = AllPrimaryEventsFilter;
-    type Quorum = Avn;
+    type Quorum = MajorityQuorum;
     type WeightInfo = pallet_eth_bridge::default_weights::SubstrateWeight<Runtime>;
 }
 
