@@ -2118,7 +2118,7 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 [[package]]
 name = "cli-commands"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "clap",
  "external-service",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "client-extrinsic-utils"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "anyhow",
  "log",
@@ -3339,7 +3339,7 @@ dependencies = [
 [[package]]
 name = "external-service"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "alloy",
  "alloy-consensus",
@@ -6679,7 +6679,7 @@ version = "0.1.0"
 [[package]]
 name = "node-primitives"
 version = "2.0.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "sp-core",
  "sp-runtime",
@@ -7200,7 +7200,7 @@ dependencies = [
 [[package]]
 name = "pallet-authors-manager"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7240,7 +7240,7 @@ dependencies = [
 [[package]]
 name = "pallet-avn"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7263,7 +7263,7 @@ dependencies = [
 [[package]]
 name = "pallet-avn-proxy"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7413,7 +7413,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "ethabi",
  "frame-benchmarking",
@@ -7442,7 +7442,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge-runtime-api"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "frame-support",
  "pallet-avn",
@@ -8101,7 +8101,7 @@ dependencies = [
 [[package]]
 name = "pallet-summary"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -8147,7 +8147,7 @@ dependencies = [
 [[package]]
 name = "pallet-token-manager"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -8159,6 +8159,7 @@ dependencies = [
  "pallet-timestamp",
  "parity-scale-codec",
  "scale-info",
+ "serde",
  "sp-application-crypto",
  "sp-avn-common",
  "sp-core",
@@ -8982,11 +8983,13 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "cli-commands",
+ "common-primitives",
  "external-service",
  "frame-benchmarking-cli",
  "frame-metadata-hash-extension",
  "frame-system",
  "futures",
+ "hex-literal",
  "jsonrpsee",
  "pallet-im-online",
  "pallet-transaction-payment",
@@ -8994,6 +8997,7 @@ dependencies = [
  "parity-scale-codec",
  "predictor-runtime",
  "sc-basic-authorship",
+ "sc-chain-spec",
  "sc-cli",
  "sc-client-api",
  "sc-consensus",
@@ -9016,6 +9020,7 @@ dependencies = [
  "sp-consensus-aura",
  "sp-consensus-grandpa",
  "sp-core",
+ "sp-genesis-builder",
  "sp-inherents",
  "sp-io",
  "sp-keyring",
@@ -9038,6 +9043,7 @@ dependencies = [
  "frame-system-benchmarking",
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
+ "hex-literal",
  "orml-benchmarking",
  "orml-currencies",
  "orml-tokens",
@@ -9083,9 +9089,11 @@ dependencies = [
  "prediction-market-primitives",
  "scale-info",
  "serde",
+ "serde_json",
  "smallvec",
  "sp-api",
  "sp-application-crypto",
+ "sp-authority-discovery",
  "sp-avn-common",
  "sp-block-builder",
  "sp-consensus-aura",
@@ -12194,7 +12202,7 @@ dependencies = [
 [[package]]
 name = "sp-avn-common"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -12886,7 +12894,7 @@ dependencies = [
 [[package]]
 name = "sp-watchtower"
 version = "8.5.0"
-source = "git+https://github.com/Galactic-Media-Management/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#a1a201635e364a05b223948714d515b317a208a2"
+source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
 dependencies = [
  "derive_more 0.99.18",
  "hex",

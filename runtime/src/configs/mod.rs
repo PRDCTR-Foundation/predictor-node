@@ -84,6 +84,7 @@ mod avn_proxy_config;
 use avn_proxy_config::AvnProxyConfig;
 mod misc;
 use misc::MinimumPeriod;
+pub(crate) mod genesis_config_helpers;
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
