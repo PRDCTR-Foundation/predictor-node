@@ -59,6 +59,7 @@ pallet-transaction-payment = { version = "38.0.2", default-features = false }
 pallet-transaction-payment-rpc = { version = "41.0.0", default-features = false }
 sc-basic-authorship = { version = "0.45.0", default-features = false }
 sc-cli = { version = "0.47.0", default-features = false }
+sc-chain-spec = { version = "38.0.0" }
 sc-client-api = { version = "37.0.0", default-features = false }
 sc-client-db = { version = "0.44.1", default-features = false }
 sc-keystore = { version = "33.0.0", default-features = false }

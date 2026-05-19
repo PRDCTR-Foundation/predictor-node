@@ -12,7 +12,9 @@ chain_spec_command = "./target/release/predictor-node build-spec --chain local -
   [[relaychain.nodes]]
   name = "alice"
   validator = true
+  args = ["--avn-port", "2020"]
 
   [[relaychain.nodes]]
   name = "bob"
   validator = true
+  args = ["--avn-port", "2021"]

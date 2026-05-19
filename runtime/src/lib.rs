@@ -11,6 +11,7 @@ pub mod asset_registry;
 mod benchmarks;
 pub mod configs;
 pub mod fees;
+mod genesis_config_presets;
 pub mod third_party_weights;
 pub mod weights;
 
@@ -29,6 +30,10 @@ pub use pallet_timestamp::Call as TimestampCall;
 
 /// AvN authority key type, re-exported for convenience (chain spec etc.).
 pub use pallet_avn::sr25519::AuthorityId as AvnId;
+pub use pallet_grandpa::AuthorityId as GrandpaId;
+pub use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
+pub use sp_authority_discovery::AuthorityId as AuthorityDiscoveryId;
+pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 
