@@ -48,7 +48,6 @@ use sp_runtime::{
 
 pub mod offchain;
 pub mod reward;
-pub mod stake;
 pub mod types;
 use crate::types::*;
 pub mod default_weights;
@@ -64,9 +63,6 @@ mod mock;
 #[path = "tests/test_admin.rs"]
 mod test_admin;
 #[cfg(test)]
-#[path = "tests/test_auto_stake_preference.rs"]
-mod test_auto_stake_preference;
-#[cfg(test)]
 #[path = "tests/test_heartbeat.rs"]
 mod test_heartbeat;
 #[cfg(test)]
@@ -78,9 +74,6 @@ mod test_node_registration;
 #[cfg(test)]
 #[path = "tests/test_reward_payment.rs"]
 mod test_reward_payment;
-#[cfg(test)]
-#[path = "tests/test_stake_weight.rs"]
-mod test_stake_weight;
 
 // Definition of the crypto to use for signing
 pub mod sr25519 {
@@ -104,7 +97,6 @@ pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
 pub const SIGNED_DEREGISTER_NODE_CONTEXT: &[u8] = b"deregister_node";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
-pub const MAX_STAKE_CHANGES_PER_PERIOD: u32 = 256;
 
 const PALLET_ID: &'static [u8; 12] = b"node-manager";
 /// Offchain-worker storage key under which the local node's registered AccountId is persisted.
@@ -138,8 +130,6 @@ pub(crate) type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 pub(crate) type NodeId<T> = <T as frame_system::Config>::AccountId;
 /// Max nodes per deregistration call
 pub type MaxNodesToDeregister = ConstU32<MAX_NODES_TO_DEREGISTER>;
-/// Max stake changes per period
-pub type MaxStakeChangesPerPeriod = ConstU32<MAX_STAKE_CHANGES_PER_PERIOD>;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -157,7 +147,7 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         NodeId<T>,
-        NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
+        NodeInfo<T::SignerId, T::AccountId>,
         OptionQuery,
     >;
 
@@ -275,18 +265,6 @@ pub mod pallet {
     #[pallet::storage]
     pub type MinUptimeThreshold<T: Config> = StorageValue<_, Perbill, OptionQuery>;
 
-    /// Auto-stake duration in seconds
-    #[pallet::storage]
-    pub type AutoStakeDurationSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
-
-    /// Unstake period in seconds
-    #[pallet::storage]
-    pub type UnstakePeriodSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
-
-    /// Max unstake percentage
-    #[pallet::storage]
-    pub type MaxUnstakePercentage<T: Config> = StorageValue<_, Perbill, ValueQuery>;
-
     /// Next node serial number
     #[pallet::storage]
     pub type NextNodeSerialNumber<T: Config> = StorageValue<_, u32, ValueQuery>;
@@ -296,18 +274,9 @@ pub mod pallet {
     pub type NextBonusNodeSerialNumber<T: Config> =
         StorageValue<_, u32, ValueQuery, T::BonusNodeSerialStart>;
 
-    /// Restricted unstake duration in seconds
-    #[pallet::storage]
-    pub type RestrictedUnstakeDurationSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
-
     /// Reward fee percentage
     #[pallet::storage]
     pub type RewardFeePercentage<T: Config> = StorageValue<_, Perbill, ValueQuery>;
-
-    /// Total stake by owner
-    #[pallet::storage]
-    pub type TotalStake<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, OptionQuery>;
 
     /// 50% genesis bonus serial nodes
     #[pallet::storage]
@@ -331,10 +300,6 @@ pub mod pallet {
         pub heartbeat_period: u32,
         pub reward_amount_per_period: BalanceOf<T>,
         pub num_periods_to_mint: u32,
-        pub auto_stake_duration_sec: Duration,
-        pub max_unstake_percentage: Perbill,
-        pub unstake_period_sec: Duration,
-        pub restricted_unstake_duration_sec: Duration,
         pub reward_fee_percentage: Perbill,
     }
 
@@ -347,10 +312,6 @@ pub mod pallet {
                 heartbeat_period: 1,
                 reward_amount_per_period: Default::default(),
                 num_periods_to_mint: 1,
-                auto_stake_duration_sec: 180 * 24 * 60 * 60, // 180 days
-                max_unstake_percentage: Perbill::from_percent(10),
-                unstake_period_sec: 7 * 24 * 60 * 60, // 1 week
-                restricted_unstake_duration_sec: 10 * 7 * 24 * 60 * 60, // 10 weeks
                 reward_fee_percentage: Perbill::from_percent(0),
             }
         }
@@ -360,7 +321,6 @@ pub mod pallet {
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
             assert!(self.reward_period > self.heartbeat_period);
-            assert!(self.unstake_period_sec > 0);
             let default_threshold = Pallet::<T>::get_default_threshold();
 
             NextRewardPeriodLength::<T>::set(self.reward_period);
@@ -369,10 +329,6 @@ pub mod pallet {
             MaxBatchSize::<T>::set(self.max_batch_size);
             NextHeartbeatPeriod::<T>::set(self.heartbeat_period);
             MinUptimeThreshold::<T>::set(Some(default_threshold));
-            AutoStakeDurationSec::<T>::set(self.auto_stake_duration_sec);
-            MaxUnstakePercentage::<T>::set(self.max_unstake_percentage);
-            UnstakePeriodSec::<T>::set(self.unstake_period_sec);
-            RestrictedUnstakeDurationSec::<T>::set(self.restricted_unstake_duration_sec);
             RewardFeePercentage::<T>::set(self.reward_fee_percentage);
 
             let uptime_threshold =
@@ -426,13 +382,6 @@ pub mod pallet {
             node: NodeId<T>,
             error: DispatchError,
         },
-        /// Reward auto-staked
-        RewardAutoStaked {
-            reward_period: RewardPeriodIndex,
-            owner: T::AccountId,
-            node: NodeId<T>,
-            amount: BalanceOf<T>,
-        },
         /// Node registrar set
         NodeRegistrarSet { new_registrar: T::AccountId },
         /// Batch size set
@@ -449,46 +398,16 @@ pub mod pallet {
         RewardEnabledSet { enabled: bool },
         /// Min uptime threshold set
         MinUptimeThresholdSet { threshold: Perbill },
-        /// Max unstake percentage set
-        MaxUnstakePercentageSet { percentage: Perbill },
-        /// Unstake period set
-        UnstakePeriodSet { duration_sec: Duration },
         /// Node deregistered
         NodeDeregistered { owner: T::AccountId, node: NodeId<T> },
         /// Signing key updated
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
-        /// Auto-stake duration set
-        AutoStakeDurationSet { duration_sec: Duration },
-        /// Stake added
-        StakeAdded {
-            owner: T::AccountId,
-            node_id: NodeId<T>,
-            reward_period: RewardPeriodIndex,
-            amount: BalanceOf<T>,
-            new_total: BalanceOf<T>,
-        },
-        /// Stake removed
-        StakeRemoved {
-            owner: T::AccountId,
-            node_id: NodeId<T>,
-            reward_period: RewardPeriodIndex,
-            amount: BalanceOf<T>,
-            new_total: BalanceOf<T>,
-        },
-        /// Restricted unstake duration set
-        RestrictedUnstakeDurationSet { duration_sec: Duration },
         /// Reward fee percentage set
         RewardFeePercentageSet { percentage: Perbill },
         /// Genesis bonus 50% range set
         GenesisBonus50Set { range: BonusRange },
         /// Genesis bonus 25% range set
         GenesisBonus25Set { range: BonusRange },
-        /// Auto-stake preference updated
-        AutoStakePreferenceUpdated {
-            owner: T::AccountId,
-            node_id: NodeId<T>,
-            auto_stake_rewards: bool,
-        },
         /// Mint request submitted
         MintRequestSubmitted { amount: BalanceOf<T>, tx_id: EthereumId },
         /// Mint request resolved
@@ -547,28 +466,12 @@ pub mod pallet {
         HeartbeatThresholdReached,
         /// Uptime threshold is zero
         UptimeThresholdZero,
-        /// Node not owned by owner
-        NodeNotOwnedByOwner,
         /// Unauthorized signing key update
         UnauthorizedSigningKeyUpdate,
         /// Signing key must be different
         SigningKeyMustBeDifferent,
         /// Amount must be greater than zero
         ZeroAmount,
-        /// Insufficient free balance
-        InsufficientFreeBalance,
-        /// Insufficient staked balance
-        InsufficientStakedBalance,
-        /// Reserve failed
-        ReserveFailed,
-        /// Duration must be greater than zero
-        DurationZero,
-        /// No stake found
-        NoStakeFound,
-        /// Auto-stake still active
-        AutoStakeStillActive,
-        /// No stake available to unstake
-        NoAvailableStakeToUnstake,
         /// Node not found
         NodeNotFound,
         /// Balance overflow
@@ -636,9 +539,6 @@ pub mod pallet {
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
-        /// Stake needed for one virtual node bonus
-        #[pallet::constant]
-        type VirtualNodeStake: Get<BalanceOf<Self>>;
         /// Extrinsic weight provider
         type WeightInfo: WeightInfo;
         /// Interface to the Ethereum bridge pallet
@@ -664,8 +564,7 @@ pub mod pallet {
             let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
             ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
 
-            // Default to auto_stake true
-            Self::do_register_node(node, owner, signing_key, true, false)?;
+            Self::do_register_node(node, owner, signing_key, false)?;
             Ok(())
         }
 
@@ -681,10 +580,6 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_num_periods_to_mint())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_enabled())
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
-            .max(<T as Config>::WeightInfo::set_admin_config_auto_stake_duration())
-            .max(<T as Config>::WeightInfo::set_admin_config_max_unstake_percentage())
-            .max(<T as Config>::WeightInfo::set_admin_config_unstake_period())
-            .max(<T as Config>::WeightInfo::set_admin_config_restricted_unstake_duration())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_fee_percentage())
             .max(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_50())
             .max(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_25())
@@ -767,32 +662,6 @@ pub mod pallet {
 
                     Self::deposit_event(Event::MinUptimeThresholdSet { threshold });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_min_threshold()).into())
-                },
-                AdminConfig::AutoStakeDuration(duration_sec) => {
-                    <AutoStakeDurationSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::AutoStakeDurationSet { duration_sec });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_auto_stake_duration())
-                        .into())
-                },
-                AdminConfig::MaxUnstakePercentage(percentage) => {
-                    <MaxUnstakePercentage<T>>::put(percentage);
-                    Self::deposit_event(Event::MaxUnstakePercentageSet { percentage });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_max_unstake_percentage())
-                        .into())
-                },
-                AdminConfig::UnstakePeriod(duration_sec) => {
-                    ensure!(duration_sec > 0, Error::<T>::DurationZero);
-                    <UnstakePeriodSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::UnstakePeriodSet { duration_sec });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_unstake_period()).into())
-                },
-                AdminConfig::RestrictedUnstakeDuration(duration_sec) => {
-                    <RestrictedUnstakeDurationSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::RestrictedUnstakeDurationSet { duration_sec });
-                    Ok(Some(
-                        <T as Config>::WeightInfo::set_admin_config_restricted_unstake_duration(),
-                    )
-                    .into())
                 },
                 AdminConfig::RewardFee(percentage) => {
                     <RewardFeePercentage<T>>::put(percentage);
@@ -951,8 +820,9 @@ pub mod pallet {
                     weight: 0,
                 });
 
-                let node_weight =
-                    Self::effective_heartbeat_weight(&node_info, Self::time_now_sec());
+                // Stake removed: every heartbeat counts as one base unit.
+                let _ = node_info;
+                let node_weight = HEARTBEAT_BASE_WEIGHT;
 
                 info.count = info.count.saturating_add(1);
                 info.last_reported = now;
@@ -1010,8 +880,7 @@ pub mod pallet {
                 Error::<T>::UnauthorizedSignedTransaction
             );
 
-            // Perform the actual registration. Default to auto_stake_rewards = true
-            Self::do_register_node(node, owner, signing_key, true, false)?;
+            Self::do_register_node(node, owner, signing_key, false)?;
 
             Ok(())
         }
@@ -1111,86 +980,6 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(8)]
-        #[pallet::weight(<T as Config>::WeightInfo::add_stake())]
-        pub fn add_stake(
-            origin: OriginFor<T>,
-            node_id: NodeId<T>,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
-            ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
-            );
-            let reward_period = RewardPeriod::<T>::get().current;
-            let new_total = Self::do_add_stake(&owner, &node_id, amount)?;
-
-            Self::deposit_event(Event::StakeAdded {
-                owner,
-                node_id,
-                reward_period,
-                amount,
-                new_total,
-            });
-            Ok(())
-        }
-
-        #[pallet::call_index(9)]
-        #[pallet::weight(<T as Config>::WeightInfo::remove_stake())]
-        pub fn remove_stake(
-            origin: OriginFor<T>,
-            node_id: NodeId<T>,
-            maybe_amount: Option<BalanceOf<T>>,
-        ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
-            ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
-            );
-
-            let reward_period = RewardPeriod::<T>::get().current;
-            let (amount, new_total) = Self::do_remove_stake(&owner, &node_id, maybe_amount)?;
-
-            Self::deposit_event(Event::StakeRemoved {
-                owner,
-                node_id,
-                reward_period,
-                amount,
-                new_total,
-            });
-
-            Ok(())
-        }
-
-        #[pallet::call_index(10)]
-        #[pallet::weight(<T as Config>::WeightInfo::update_auto_stake_preference())]
-        pub fn update_auto_stake_preference(
-            origin: OriginFor<T>,
-            node_id: NodeId<T>,
-            auto_stake_rewards: bool,
-        ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
-            ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
-            );
-
-            <NodeRegistry<T>>::try_mutate(&node_id, |maybe_info| -> Result<(), DispatchError> {
-                let info = maybe_info.as_mut().ok_or(Error::<T>::NodeNotFound)?;
-                info.auto_stake_rewards = auto_stake_rewards;
-                Ok(())
-            })?;
-
-            Self::deposit_event(Event::AutoStakePreferenceUpdated {
-                owner,
-                node_id,
-                auto_stake_rewards,
-            });
-
-            Ok(())
-        }
-
         #[pallet::call_index(11)]
         #[pallet::weight(<T as Config>::WeightInfo::offchain_mint_rewards())]
         pub fn offchain_mint_rewards(
@@ -1237,8 +1026,8 @@ pub mod pallet {
             let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
             ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
 
-            // Default to auto_stake true; bonus nodes use the bonus serial counter
-            Self::do_register_node(node, owner, signing_key, true, true)?;
+            // bonus nodes use the bonus serial counter
+            Self::do_register_node(node, owner, signing_key, true)?;
             Ok(())
         }
     }
@@ -1481,7 +1270,7 @@ pub mod pallet {
             for node in nodes {
                 ensure!(
                     <OwnedNodes<T>>::contains_key(owner, node),
-                    Error::<T>::NodeNotOwnedByOwner
+                    Error::<T>::NodeNotRegistered
                 );
 
                 let info = NodeRegistry::<T>::take(node).ok_or(Error::<T>::NodeNotRegistered)?;
@@ -1493,11 +1282,6 @@ pub mod pallet {
 
                 if Self::is_bonus_node(&info) {
                     <TotalRegisteredBonusNodes<T>>::mutate(|n| *n = n.saturating_sub(1));
-                }
-
-                // Unreserve stake for this node if there is any
-                if !info.stake.amount.is_zero() {
-                    Self::update_reserves(owner, info.stake.amount, StakeOperation::Remove)?;
                 }
 
                 Self::deposit_event(Event::NodeDeregistered {
@@ -1522,7 +1306,6 @@ pub mod pallet {
             node: NodeId<T>,
             owner: T::AccountId,
             signing_key: T::SignerId,
-            auto_stake_rewards: bool,
             is_bonus: bool,
         ) -> DispatchResult {
             ensure!(!<NodeRegistry<T>>::contains_key(&node), Error::<T>::DuplicateNode);
@@ -1537,8 +1320,6 @@ pub mod pallet {
                     Error::<T>::NodeSerialLimitReached
                 );
             }
-
-            let auto_stake_expiry = Self::calculate_auto_stake_expiry();
 
             <OwnedNodes<T>>::insert(&owner, &node, ());
             <OwnedNodesCount<T>>::mutate(&owner, |count| *count = count.saturating_add(1));
@@ -1559,18 +1340,10 @@ pub mod pallet {
 
             <NodeRegistry<T>>::insert(
                 &node,
-                NodeInfo::<T::SignerId, T::AccountId, BalanceOf<T>>::new(
+                NodeInfo::<T::SignerId, T::AccountId>::new(
                     owner.clone(),
                     signing_key,
                     node_serial_number,
-                    auto_stake_expiry,
-                    auto_stake_rewards,
-                    StakeInfo::<BalanceOf<T>>::new(
-                        Zero::zero(),
-                        Zero::zero(),
-                        None,
-                        UnstakeRestriction::Locked,
-                    ),
                 ),
             );
 
@@ -1596,7 +1369,7 @@ pub mod pallet {
         }
 
         pub fn is_bonus_node(
-            node_info: &NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
+            node_info: &NodeInfo<T::SignerId, T::AccountId>,
         ) -> bool {
             node_info.serial_number >= T::BonusNodeSerialStart::get()
         }
@@ -1667,11 +1440,6 @@ pub mod pallet {
 
         pub fn get_default_threshold() -> Perbill {
             Perbill::from_percent(33)
-        }
-
-        pub fn calculate_auto_stake_expiry() -> Duration {
-            let current_time = Self::time_now_sec();
-            current_time.saturating_add(AutoStakeDurationSec::<T>::get())
         }
 
         pub fn next_mint_amount_to_request() -> Option<BalanceOf<T>> {

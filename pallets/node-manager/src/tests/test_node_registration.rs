@@ -58,10 +58,6 @@ mod node_registration {
             let node_info = node_info.unwrap();
             assert_eq!(node_info.owner, context.owner);
             assert_eq!(node_info.signing_key, context.signing_key);
-            assert_eq!(node_info.stake.amount, 0);
-            assert_eq!(node_info.stake.unlocked_stake, 0);
-            assert_eq!(node_info.stake.next_unstake_time_sec, None);
-            assert_eq!(node_info.stake.restriction, UnstakeRestriction::Locked);
 
             // The correct event is emitted
             System::assert_last_event(
@@ -166,7 +162,6 @@ mod bonus_node_registration {
             let node_info = <NodeRegistry<TestRuntime>>::get(&context.node_id).unwrap();
             assert_eq!(node_info.owner, context.owner);
             assert_eq!(node_info.signing_key, context.signing_key);
-            assert_eq!(node_info.stake.amount, 0);
 
             System::assert_last_event(
                 Event::NodeRegistered { owner: context.owner, node: context.node_id }.into(),

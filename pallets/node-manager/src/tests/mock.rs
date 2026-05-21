@@ -70,7 +70,6 @@ frame_support::construct_runtime!(
 
 parameter_types! {
     pub const RewardPotId: PalletId = PalletId(*b"avtnodes");
-    pub const VirtualNodeStake: u128 = 2000 * AVT;
     pub const BonusNodeSerialStart: u32 = 20_000;
 }
 
@@ -127,7 +126,6 @@ impl Config for TestRuntime {
     type RewardPotId = RewardPotId;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
-    type VirtualNodeStake = VirtualNodeStake;
     type Token = H160;
     type RewardFeeHandler = Self;
     type WeightInfo = ();
@@ -261,10 +259,6 @@ impl ExtBuilder {
             heartbeat_period: 5u32,
             reward_amount_per_period: 20 * AVT,
             num_periods_to_mint: 3,
-            auto_stake_duration_sec: 180 * 24 * 60 * 60,
-            max_unstake_percentage: Perbill::from_percent(10),
-            unstake_period_sec: 7 * 24 * 60 * 60,
-            restricted_unstake_duration_sec: 10 * 7 * 24 * 60 * 60,
             reward_fee_percentage: Perbill::from_percent(0),
         }
         .assimilate_storage(&mut self.storage);
