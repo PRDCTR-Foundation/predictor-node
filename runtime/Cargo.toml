@@ -78,6 +78,7 @@ pallet-authors-manager.workspace = true
 pallet-eth-bridge.workspace = true
 pallet-eth-bridge-runtime-api.workspace = true
 pallet-token-manager.workspace = true
+pallet-node-manager.workspace = true
 pallet-avn-proxy.workspace = true
 sp-avn-common.workspace = true
 sp-watchtower.workspace = true
@@ -158,6 +159,7 @@ std = [
 	"pallet-eth-bridge/std",
 	"pallet-eth-bridge-runtime-api/std",
 	"pallet-token-manager/std",
+	"pallet-node-manager/std",
 	"sp-avn-common/std",
 	"sp-watchtower/std",
 
@@ -230,6 +232,7 @@ runtime-benchmarks = [
 	"pallet-avn-proxy/runtime-benchmarks",
 	"pallet-summary/runtime-benchmarks",
 	"pallet-token-manager/runtime-benchmarks",
+	"pallet-node-manager/runtime-benchmarks",
 
 	# ORML
 	"orml-benchmarking",

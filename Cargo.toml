@@ -169,6 +169,7 @@ pallet-authors-manager = { git = "https://github.com/Predictor-Foundation/avn-pa
 pallet-eth-bridge = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-eth-bridge-runtime-api = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 pallet-token-manager = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
+pallet-node-manager = { path = "pallets/node-manager", default-features = false }
 sp-avn-common = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 sp-watchtower = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch", default-features = false }
 external-service = { git = "https://github.com/Predictor-Foundation/avn-parachain", branch = "feat/create-stable-2409-branch"}

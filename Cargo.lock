@@ -9169,6 +9169,7 @@ dependencies = [
  "pallet-im-online",
  "pallet-insecure-randomness-collective-flip",
  "pallet-multisig",
+ "pallet-node-manager",
  "pallet-offences",
  "pallet-pm-authorized",
  "pallet-pm-combinatorial-tokens",

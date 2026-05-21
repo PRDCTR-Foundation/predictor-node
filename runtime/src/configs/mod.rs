@@ -86,6 +86,7 @@ mod proxy_config;
 use proxy_config::ProxyType;
 mod avn_proxy_config;
 use avn_proxy_config::AvnProxyConfig;
+mod node_manager_config;
 mod misc;
 use misc::MinimumPeriod;
 pub(crate) mod genesis_config_helpers;
