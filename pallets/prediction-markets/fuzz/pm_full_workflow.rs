@@ -53,7 +53,7 @@ fuzz_target!(|data: Data| {
         let fee = Perbill::from_parts(bounded_parts.try_into().unwrap());
         let _ = PredictionMarkets::create_market(
             RuntimeOrigin::signed(account(data.create_scalar_market_origin)),
-            Asset::Tru,
+            Asset::Prd,
             fee,
             account(data.create_scalar_market_oracle),
             MarketPeriod::Block(data.create_scalar_market_period),

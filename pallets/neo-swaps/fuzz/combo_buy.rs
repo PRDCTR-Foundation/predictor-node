@@ -129,7 +129,7 @@ fuzz_target!(|params: ComboBuyFuzzParams| {
 
     ext.execute_with(|| {
         // We create the required markets and deposit collateral in the user's account.
-        let collateral = Asset::Tru;
+        let collateral = Asset::Prd;
         for (market_id, &category_count) in params.category_counts.iter().enumerate() {
             let market = common::market::<Runtime>(
                 market_id as u128,

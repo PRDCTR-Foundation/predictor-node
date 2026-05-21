@@ -28,7 +28,7 @@ fn on_market_close_auto_rejects_expired_advised_market() {
         // Give alice() `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the AdvisoryBond and the OracleBond gets unreserved, when the advised
         // market expires.
-        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
+        assert_ok!(AssetManager::deposit(Asset::Prd, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
             &alice(),
@@ -61,7 +61,7 @@ fn on_market_close_auto_rejects_expired_advised_market() {
         System::assert_has_event(Event::MarketExpired(market_id).into());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -75,7 +75,7 @@ fn on_market_close_auto_rejects_expired_advised_market_with_edit_request() {
         // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the AdvisoryBond and the OracleBond gets unreserved, when the advised
         // market expires.
-        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
+        assert_ok!(AssetManager::deposit(Asset::Prd, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
             &alice(),
@@ -121,7 +121,7 @@ fn on_market_close_auto_rejects_expired_advised_market_with_edit_request() {
         System::assert_has_event(Event::MarketExpired(market_id).into());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -137,7 +137,7 @@ fn on_market_close_successfully_auto_closes_market_with_blocks() {
         WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Block(0..end),
@@ -170,7 +170,7 @@ fn on_market_close_successfully_auto_closes_market_with_timestamps() {
         WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Timestamp(0..end),
@@ -211,7 +211,7 @@ fn on_market_close_successfully_auto_closes_multiple_markets_after_stall() {
         WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Timestamp(0..end),
@@ -224,7 +224,7 @@ fn on_market_close_successfully_auto_closes_multiple_markets_after_stall() {
         ));
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Timestamp(0..end),
@@ -263,7 +263,7 @@ fn on_market_close_market_status_manager_exceeds_max_recovery_time_frames_after_
         WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Timestamp(0..end),
@@ -276,7 +276,7 @@ fn on_market_close_market_status_manager_exceeds_max_recovery_time_frames_after_
         ));
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             alice(),
             MarketPeriod::Timestamp(0..end),

@@ -33,7 +33,7 @@ use sp_runtime::{traits::Zero, Perbill};
 fn create_market<T: Config>(caller: T::AccountId, asset_count: u16) -> MarketIdOf<T> {
     let market = Market {
         market_id: Default::default(),
-        base_asset: Asset::Tru,
+        base_asset: Asset::Prd,
         creation: MarketCreation::Permissionless,
         creator_fee: Perbill::zero(),
         creator: caller.clone(),
@@ -84,7 +84,7 @@ mod benchmarks {
             .collect();
         let amount = PredictionMarketBase::get().unwrap();
 
-        T::MultiCurrency::deposit(Asset::Tru, &alice, amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Prd, &alice, amount).unwrap();
 
         #[extrinsic_call]
         split_position(
@@ -121,7 +121,7 @@ mod benchmarks {
             parent_collection_id,
             market_id,
             partition,
-            asset_in: Asset::Tru,
+            asset_in: Asset::Prd,
             assets_out,
             collection_ids,
             amount,
@@ -317,7 +317,7 @@ mod benchmarks {
         for &asset in assets_in.iter() {
             T::MultiCurrency::deposit(asset, &alice, amount).unwrap();
         }
-        T::MultiCurrency::deposit(Asset::Tru, &Pallet::<T>::account_id(), amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Prd, &Pallet::<T>::account_id(), amount).unwrap();
 
         #[extrinsic_call]
         merge_position(
@@ -334,7 +334,7 @@ mod benchmarks {
             parent_collection_id,
             market_id,
             partition,
-            asset_out: Asset::Tru,
+            asset_out: Asset::Prd,
             assets_in,
             amount,
         });
@@ -511,7 +511,7 @@ mod benchmarks {
         .unwrap();
         let amount = PredictionMarketBase::get().unwrap();
         T::MultiCurrency::deposit(position, &alice, amount).unwrap();
-        T::MultiCurrency::deposit(Asset::Tru, &Pallet::<T>::account_id(), amount).unwrap();
+        T::MultiCurrency::deposit(Asset::Prd, &Pallet::<T>::account_id(), amount).unwrap();
 
         #[extrinsic_call]
         redeem_position(
@@ -529,7 +529,7 @@ mod benchmarks {
             index_set,
             asset_in: position,
             amount_in: amount,
-            asset_out: Asset::Tru,
+            asset_out: Asset::Prd,
             amount_out: amount,
         });
         System::<T>::assert_last_event(expected_event.into());
