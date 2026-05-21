@@ -69,30 +69,21 @@ impl<T: Config> Pallet<T> {
         }
 
         let reward_pot_account_id = Self::compute_reward_account_id();
-        let reward_fee = Self::calculate_reward_fee(amount);
-        let net_reward = amount.saturating_sub(reward_fee);
 
-        // Pay the owner.
+        // Pay the owner the full reward (no fee taken at the pallet level).
         T::Currency::transfer(
             &reward_pot_account_id,
             &node_owner,
-            net_reward,
+            amount,
             ExistenceRequirement::KeepAlive,
         )?;
 
         Self::deposit_event(Event::RewardPaid {
             reward_period: *period,
-            owner: node_owner.clone(),
-            node: node_id.clone(),
-            amount: net_reward,
+            owner: node_owner,
+            node: node_id,
+            amount,
         });
-
-        if reward_fee > Zero::zero() {
-            // Pay the fee to the treasury
-            if let Err(e) = T::RewardFeeHandler::pay_treasury(&reward_fee, &reward_pot_account_id) {
-                log::error!("💔 Failed to pay reward fee of {:?} from reward pot. Node {:?}. Period: {:?}. Error: {:?}", reward_fee, node_id, period, e);
-            }
-        }
 
         Ok(())
     }
@@ -165,10 +156,5 @@ impl<T: Config> Pallet<T> {
     /// Get the current time in seconds
     pub fn time_now_sec() -> Duration {
         T::TimeProvider::now().as_secs()
-    }
-
-    pub fn calculate_reward_fee(amount: BalanceOf<T>) -> BalanceOf<T> {
-        let fee_percentage = RewardFeePercentage::<T>::get();
-        fee_percentage.mul_floor(amount)
     }
 }

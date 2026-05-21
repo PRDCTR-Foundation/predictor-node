@@ -37,7 +37,6 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_node_manager.
 pub trait WeightInfo {
 	fn register_node() -> Weight;
-	fn register_bonus_node() -> Weight;
 	fn set_admin_config_registrar() -> Weight;
 	fn set_admin_config_reward_period() -> Weight;
 	fn set_admin_config_reward_batch_size() -> Weight;
@@ -45,20 +44,13 @@ pub trait WeightInfo {
 	fn set_admin_config_reward_amount() -> Weight;
 	fn set_admin_config_reward_enabled() -> Weight;
 	fn set_admin_config_min_threshold() -> Weight;
-	fn set_admin_config_reward_fee_percentage() -> Weight;
-	fn set_admin_config_num_periods_to_mint() -> Weight;
-	fn set_admin_config_genesis_bonus_50() -> Weight;
-	fn set_admin_config_genesis_bonus_25() -> Weight;
 	fn on_initialise_with_new_reward_period() -> Weight;
 	fn on_initialise_no_reward_period() -> Weight;
 	fn offchain_submit_heartbeat() -> Weight;
-	fn offchain_pay_nodes(b: u32, ) -> Weight;
-	fn pay_nodes_constant_batch_size(n: u32, ) -> Weight;
 	fn signed_register_node() -> Weight;
 	fn deregister_nodes(b: u32, ) -> Weight;
 	fn signed_deregister_nodes(b: u32, ) -> Weight;
 	fn update_signing_key() -> Weight;
-	fn offchain_mint_rewards() -> Weight;
 }
 
 /// Weights for pallet_node_manager using the Substrate node and recommended hardware.
@@ -105,21 +97,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Proof: `NodeManager::OwnedNodesCount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::TotalRegisteredNodes` (r:1 w:1)
 	/// Proof: `NodeManager::TotalRegisteredNodes` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalRegisteredBonusNodes` (r:1 w:1)
-	/// Proof: `NodeManager::TotalRegisteredBonusNodes` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NextBonusNodeSerialNumber` (r:1 w:1)
-	/// Proof: `NodeManager::NextBonusNodeSerialNumber` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::OwnedNodes` (r:0 w:1)
-	/// Proof: `NodeManager::OwnedNodes` (`max_values`: None, `max_size`: Some(96), added: 2571, mode: `MaxEncodedLen`)
-	fn register_bonus_node() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `433`
-		//  Estimated: `3656`
-		// Minimum execution time: 68_472_000 picoseconds.
-		Weight::from_parts(69_671_000, 3656)
-			.saturating_add(T::DbWeight::get().reads(9_u64))
-			.saturating_add(T::DbWeight::get().writes(7_u64))
-	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:1)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	fn set_admin_config_registrar() -> Weight {
@@ -200,46 +177,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(10_830_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
-	/// Storage: `NodeManager::RewardFeePercentage` (r:0 w:1)
-	/// Proof: `NodeManager::RewardFeePercentage` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	fn set_admin_config_reward_fee_percentage() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_120_000 picoseconds.
-		Weight::from_parts(10_420_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::NumPeriodsToMint` (r:0 w:1)
-	/// Proof: `NodeManager::NumPeriodsToMint` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	fn set_admin_config_num_periods_to_mint() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_251_000 picoseconds.
-		Weight::from_parts(10_470_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::GenesisBonus50` (r:0 w:1)
-	/// Proof: `NodeManager::GenesisBonus50` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	fn set_admin_config_genesis_bonus_50() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_370_000 picoseconds.
-		Weight::from_parts(10_650_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::GenesisBonus25` (r:0 w:1)
-	/// Proof: `NodeManager::GenesisBonus25` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	fn set_admin_config_genesis_bonus_25() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_360_000 picoseconds.
-		Weight::from_parts(10_670_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1_u64))
-	}
 	/// Storage: `NodeManager::RewardEnabled` (r:1 w:0)
 	/// Proof: `NodeManager::RewardEnabled` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::RewardPeriod` (r:1 w:1)
@@ -298,43 +235,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(5_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
-	/// Storage: `NodeManager::OldestUnpaidRewardPeriodIndex` (r:1 w:0)
-	/// Proof: `NodeManager::OldestUnpaidRewardPeriodIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPeriod` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPeriod` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalUptime` (r:1 w:0)
-	/// Proof: `NodeManager::TotalUptime` (`max_values`: None, `max_size`: Some(48), added: 2523, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeUptime` (r:1001 w:999)
-	/// Proof: `NodeManager::NodeUptime` (`max_values`: None, `max_size`: Some(100), added: 2575, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPot` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPot` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::LastPaidPointer` (r:1 w:1)
-	/// Proof: `NodeManager::LastPaidPointer` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:2 w:2)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::MaxBatchSize` (r:1 w:0)
-	/// Proof: `NodeManager::MaxBatchSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeRegistry` (r:999 w:0)
-	/// Proof: `NodeManager::NodeRegistry` (`max_values`: None, `max_size`: Some(191), added: 2666, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardFeePercentage` (r:1 w:0)
-	/// Proof: `NodeManager::RewardFeePercentage` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `Timestamp::Now` (r:1 w:0)
-	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// The range of component `b` is `[1, 1000]`.
-	fn offchain_pay_nodes(b: u32, ) -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `2680 + b * (248 ±0)`
-		//  Estimated: `6196 + b * (2666 ±0)`
-		// Minimum execution time: 195_354_000 picoseconds.
-		Weight::from_parts(69_322_158, 6196)
-			// Standard Error: 11_525
-			.saturating_add(Weight::from_parts(69_640_027, 0).saturating_mul(b.into()))
-			.saturating_add(T::DbWeight::get().reads(12_u64))
-			.saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(b.into())))
-			.saturating_add(T::DbWeight::get().writes(3_u64))
-			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(b.into())))
-			.saturating_add(Weight::from_parts(0, 2666).saturating_mul(b.into()))
-	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:0)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::NodeRegistry` (r:1 w:1)
@@ -345,8 +245,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Proof: `NodeManager::NextNodeSerialNumber` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `Timestamp::Now` (r:1 w:0)
 	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::AutoStakeDurationSec` (r:1 w:0)
-	/// Proof: `NodeManager::AutoStakeDurationSec` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::OwnedNodesCount` (r:1 w:1)
 	/// Proof: `NodeManager::OwnedNodesCount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::TotalRegisteredNodes` (r:1 w:1)
@@ -431,63 +329,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(4_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
-	/// Storage: `Avn::Validators` (r:1 w:0)
-	/// Proof: `Avn::Validators` (`max_values`: Some(1), `max_size`: Some(16386), added: 16881, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::PendingMintRequestState` (r:1 w:1)
-	/// Proof: `NodeManager::PendingMintRequestState` (`max_values`: Some(1), `max_size`: Some(22), added: 517, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::NextTxId` (r:1 w:1)
-	/// Proof: `EthBridge::NextTxId` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::ActiveRequest` (r:1 w:1)
-	/// Proof: `EthBridge::ActiveRequest` (`max_values`: Some(1), `max_size`: Some(20946), added: 21441, mode: `MaxEncodedLen`)
-	/// Storage: `Timestamp::Now` (r:1 w:0)
-	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::EthTxLifetimeSecs` (r:1 w:0)
-	/// Proof: `EthBridge::EthTxLifetimeSecs` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::Instance` (r:1 w:0)
-	/// Proof: `EthBridge::Instance` (`max_values`: Some(1), `max_size`: Some(578), added: 1073, mode: `MaxEncodedLen`)
-	/// Storage: `Avn::PrimaryCollatorIndexForSending` (r:1 w:1)
-	/// Proof: `Avn::PrimaryCollatorIndexForSending` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	fn offchain_mint_rewards() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `691`
-		//  Estimated: `22431`
-		// Minimum execution time: 165_964_000 picoseconds.
-		Weight::from_parts(168_583_000, 22431)
-			.saturating_add(T::DbWeight::get().reads(8_u64))
-			.saturating_add(T::DbWeight::get().writes(4_u64))
-	}
-
-	/// Storage: `NodeManager::OldestUnpaidRewardPeriodIndex` (r:1 w:0)
-	/// Proof: `NodeManager::OldestUnpaidRewardPeriodIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPeriod` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPeriod` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalUptime` (r:1 w:0)
-	/// Proof: `NodeManager::TotalUptime` (`max_values`: None, `max_size`: Some(32), added: 2507, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeUptime` (r:12 w:10)
-	/// Proof: `NodeManager::NodeUptime` (`max_values`: None, `max_size`: Some(84), added: 2559, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPot` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPot` (`max_values`: None, `max_size`: Some(48), added: 2523, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:2 w:2)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::LastPaidPointer` (r:1 w:1)
-	/// Proof: `NodeManager::LastPaidPointer` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::MaxBatchSize` (r:1 w:0)
-	/// Proof: `NodeManager::MaxBatchSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeRegistry` (r:10 w:0)
-	/// Proof: `NodeManager::NodeRegistry` (`max_values`: None, `max_size`: Some(112), added: 2587, mode: `MaxEncodedLen`)
-	/// The range of component `n` is `[1, 100]`.
-	fn pay_nodes_constant_batch_size(n: u32, ) -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `2601 + n * (12 ±0)`
-		//  Estimated: `25899 + n * (85 ±6)`
-		// Minimum execution time: 103_187_000 picoseconds.
-		Weight::from_parts(450_638_048, 25899)
-			// Standard Error: 117_984
-			.saturating_add(Weight::from_parts(1_491_787, 0).saturating_mul(n.into()))
-			.saturating_add(T::DbWeight::get().reads(26_u64))
-			.saturating_add(T::DbWeight::get().writes(12_u64))
-			.saturating_add(Weight::from_parts(0, 85).saturating_mul(n.into()))
-	}
 }
 
 // For backwards compatibility and tests.
@@ -533,21 +374,6 @@ impl WeightInfo for () {
 	/// Proof: `NodeManager::OwnedNodesCount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::TotalRegisteredNodes` (r:1 w:1)
 	/// Proof: `NodeManager::TotalRegisteredNodes` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalRegisteredBonusNodes` (r:1 w:1)
-	/// Proof: `NodeManager::TotalRegisteredBonusNodes` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NextBonusNodeSerialNumber` (r:1 w:1)
-	/// Proof: `NodeManager::NextBonusNodeSerialNumber` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::OwnedNodes` (r:0 w:1)
-	/// Proof: `NodeManager::OwnedNodes` (`max_values`: None, `max_size`: Some(96), added: 2571, mode: `MaxEncodedLen`)
-	fn register_bonus_node() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `433`
-		//  Estimated: `3656`
-		// Minimum execution time: 68_472_000 picoseconds.
-		Weight::from_parts(69_671_000, 3656)
-			.saturating_add(RocksDbWeight::get().reads(9_u64))
-			.saturating_add(RocksDbWeight::get().writes(7_u64))
-	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:1)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	fn set_admin_config_registrar() -> Weight {
@@ -628,46 +454,6 @@ impl WeightInfo for () {
 		Weight::from_parts(10_830_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
-	/// Storage: `NodeManager::RewardFeePercentage` (r:0 w:1)
-	/// Proof: `NodeManager::RewardFeePercentage` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	fn set_admin_config_reward_fee_percentage() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_120_000 picoseconds.
-		Weight::from_parts(10_420_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::NumPeriodsToMint` (r:0 w:1)
-	/// Proof: `NodeManager::NumPeriodsToMint` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	fn set_admin_config_num_periods_to_mint() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_251_000 picoseconds.
-		Weight::from_parts(10_470_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::GenesisBonus50` (r:0 w:1)
-	/// Proof: `NodeManager::GenesisBonus50` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	fn set_admin_config_genesis_bonus_50() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_370_000 picoseconds.
-		Weight::from_parts(10_650_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1_u64))
-	}
-	/// Storage: `NodeManager::GenesisBonus25` (r:0 w:1)
-	/// Proof: `NodeManager::GenesisBonus25` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	fn set_admin_config_genesis_bonus_25() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 10_360_000 picoseconds.
-		Weight::from_parts(10_670_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1_u64))
-	}
 	/// Storage: `NodeManager::RewardEnabled` (r:1 w:0)
 	/// Proof: `NodeManager::RewardEnabled` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::RewardPeriod` (r:1 w:1)
@@ -726,43 +512,6 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().reads(5_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}
-	/// Storage: `NodeManager::OldestUnpaidRewardPeriodIndex` (r:1 w:0)
-	/// Proof: `NodeManager::OldestUnpaidRewardPeriodIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPeriod` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPeriod` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalUptime` (r:1 w:0)
-	/// Proof: `NodeManager::TotalUptime` (`max_values`: None, `max_size`: Some(48), added: 2523, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeUptime` (r:1001 w:999)
-	/// Proof: `NodeManager::NodeUptime` (`max_values`: None, `max_size`: Some(100), added: 2575, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPot` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPot` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::LastPaidPointer` (r:1 w:1)
-	/// Proof: `NodeManager::LastPaidPointer` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:2 w:2)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::MaxBatchSize` (r:1 w:0)
-	/// Proof: `NodeManager::MaxBatchSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeRegistry` (r:999 w:0)
-	/// Proof: `NodeManager::NodeRegistry` (`max_values`: None, `max_size`: Some(191), added: 2666, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardFeePercentage` (r:1 w:0)
-	/// Proof: `NodeManager::RewardFeePercentage` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `Timestamp::Now` (r:1 w:0)
-	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// The range of component `b` is `[1, 1000]`.
-	fn offchain_pay_nodes(b: u32, ) -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `2680 + b * (248 ±0)`
-		//  Estimated: `6196 + b * (2666 ±0)`
-		// Minimum execution time: 195_354_000 picoseconds.
-		Weight::from_parts(69_322_158, 6196)
-			// Standard Error: 11_525
-			.saturating_add(Weight::from_parts(69_640_027, 0).saturating_mul(b.into()))
-			.saturating_add(RocksDbWeight::get().reads(12_u64))
-			.saturating_add(RocksDbWeight::get().reads((2_u64).saturating_mul(b.into())))
-			.saturating_add(RocksDbWeight::get().writes(3_u64))
-			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(b.into())))
-			.saturating_add(Weight::from_parts(0, 2666).saturating_mul(b.into()))
-	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:0)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::NodeRegistry` (r:1 w:1)
@@ -773,8 +522,6 @@ impl WeightInfo for () {
 	/// Proof: `NodeManager::NextNodeSerialNumber` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `Timestamp::Now` (r:1 w:0)
 	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::AutoStakeDurationSec` (r:1 w:0)
-	/// Proof: `NodeManager::AutoStakeDurationSec` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::OwnedNodesCount` (r:1 w:1)
 	/// Proof: `NodeManager::OwnedNodesCount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
 	/// Storage: `NodeManager::TotalRegisteredNodes` (r:1 w:1)
@@ -858,62 +605,5 @@ impl WeightInfo for () {
 		Weight::from_parts(41_311_000, 6100)
 			.saturating_add(RocksDbWeight::get().reads(4_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
-	}
-	/// Storage: `Avn::Validators` (r:1 w:0)
-	/// Proof: `Avn::Validators` (`max_values`: Some(1), `max_size`: Some(16386), added: 16881, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::PendingMintRequestState` (r:1 w:1)
-	/// Proof: `NodeManager::PendingMintRequestState` (`max_values`: Some(1), `max_size`: Some(22), added: 517, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::NextTxId` (r:1 w:1)
-	/// Proof: `EthBridge::NextTxId` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::ActiveRequest` (r:1 w:1)
-	/// Proof: `EthBridge::ActiveRequest` (`max_values`: Some(1), `max_size`: Some(20946), added: 21441, mode: `MaxEncodedLen`)
-	/// Storage: `Timestamp::Now` (r:1 w:0)
-	/// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::EthTxLifetimeSecs` (r:1 w:0)
-	/// Proof: `EthBridge::EthTxLifetimeSecs` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `EthBridge::Instance` (r:1 w:0)
-	/// Proof: `EthBridge::Instance` (`max_values`: Some(1), `max_size`: Some(578), added: 1073, mode: `MaxEncodedLen`)
-	/// Storage: `Avn::PrimaryCollatorIndexForSending` (r:1 w:1)
-	/// Proof: `Avn::PrimaryCollatorIndexForSending` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	fn offchain_mint_rewards() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `691`
-		//  Estimated: `22431`
-		// Minimum execution time: 165_964_000 picoseconds.
-		Weight::from_parts(168_583_000, 22431)
-			.saturating_add(RocksDbWeight::get().reads(8_u64))
-			.saturating_add(RocksDbWeight::get().writes(4_u64))
-	}
-
-	/// Storage: `NodeManager::OldestUnpaidRewardPeriodIndex` (r:1 w:0)
-	/// Proof: `NodeManager::OldestUnpaidRewardPeriodIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPeriod` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPeriod` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::TotalUptime` (r:1 w:0)
-	/// Proof: `NodeManager::TotalUptime` (`max_values`: None, `max_size`: Some(32), added: 2507, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeUptime` (r:12 w:10)
-	/// Proof: `NodeManager::NodeUptime` (`max_values`: None, `max_size`: Some(84), added: 2559, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::RewardPot` (r:1 w:0)
-	/// Proof: `NodeManager::RewardPot` (`max_values`: None, `max_size`: Some(48), added: 2523, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:2 w:2)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::LastPaidPointer` (r:1 w:1)
-	/// Proof: `NodeManager::LastPaidPointer` (`max_values`: Some(1), `max_size`: Some(40), added: 535, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::MaxBatchSize` (r:1 w:0)
-	/// Proof: `NodeManager::MaxBatchSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `NodeManager::NodeRegistry` (r:10 w:0)
-	/// Proof: `NodeManager::NodeRegistry` (`max_values`: None, `max_size`: Some(112), added: 2587, mode: `MaxEncodedLen`)
-	/// The range of component `n` is `[1, 100]`.
-	fn pay_nodes_constant_batch_size(n: u32, ) -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `2601 + n * (12 ±0)`
-		//  Estimated: `25899 + n * (85 ±6)`
-		// Minimum execution time: 103_187_000 picoseconds.
-		Weight::from_parts(450_638_048, 25899)
-			// Standard Error: 117_984
-			.saturating_add(Weight::from_parts(1_491_787, 0).saturating_mul(n.into()))
-			.saturating_add(RocksDbWeight::get().reads(26_u64))
-			.saturating_add(RocksDbWeight::get().writes(12_u64))
-			.saturating_add(Weight::from_parts(0, 85).saturating_mul(n.into()))
 	}
 }
