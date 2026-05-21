@@ -64,15 +64,9 @@ fn set_registrar<T: Config>(registrar: T::AccountId) {
 
 fn register_new_node<T: Config>(node: NodeId<T>, owner: T::AccountId) -> T::SignerId {
     let key = T::SignerId::generate_pair(None);
-    let stake_info = StakeInfo::<BalanceOf<T>>::new(
-        Zero::zero(),
-        Zero::zero(),
-        None,
-        UnstakeRestriction::Locked,
-    );
     <NodeRegistry<T>>::insert(
         node.clone(),
-        NodeInfo::new(owner.clone(), key.clone(), 0u32, 0u64, false, stake_info),
+        NodeInfo::new(owner.clone(), key.clone(), 0u32),
     );
     <OwnedNodes<T>>::insert(owner.clone(), node, ());
     <OwnedNodesCount<T>>::mutate(owner, |count| *count += 1);
@@ -82,10 +76,7 @@ fn register_new_node<T: Config>(node: NodeId<T>, owner: T::AccountId) -> T::Sign
 
 fn create_heartbeat<T: Config>(node: NodeId<T>, reward_period_index: RewardPeriodIndex) {
     let uptime = 1u64;
-    let node_info = <NodeRegistry<T>>::get(&node).unwrap();
-    let single_hb_weight =
-        Pallet::<T>::effective_heartbeat_weight(&node_info, Pallet::<T>::time_now_sec());
-    let weight = single_hb_weight.saturating_mul(uptime.into());
+    let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(uptime.into());
 
     <NodeUptime<T>>::mutate(&reward_period_index, &node, |maybe_info| {
         if let Some(info) = maybe_info.as_mut() {
@@ -261,42 +252,6 @@ benchmarks! {
     }: set_admin_config(RawOrigin::Root, config.clone())
     verify {
         assert!(<MinUptimeThreshold<T>>::get() == Some(new_threshold));
-    }
-
-    set_admin_config_auto_stake_duration {
-        let current_duration = <AutoStakeDurationSec<T>>::get();
-        let new_duration = current_duration + 60;
-        let config = AdminConfig::AutoStakeDuration(new_duration);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<AutoStakeDurationSec<T>>::get() == new_duration);
-    }
-
-    set_admin_config_max_unstake_percentage {
-        let current_percentage = <MaxUnstakePercentage<T>>::get();
-        let new_percentage = Perbill::from_percent(17);
-        let config = AdminConfig::MaxUnstakePercentage(new_percentage);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<MaxUnstakePercentage<T>>::get() == new_percentage);
-    }
-
-    set_admin_config_unstake_period {
-        let current_duration = <UnstakePeriodSec<T>>::get();
-        let new_duration = current_duration + 60;
-        let config = AdminConfig::UnstakePeriod(new_duration);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<UnstakePeriodSec<T>>::get() == new_duration);
-    }
-
-    set_admin_config_restricted_unstake_duration {
-        let current_duration = <RestrictedUnstakeDurationSec<T>>::get();
-        let new_duration = current_duration + 16;
-        let config = AdminConfig::RestrictedUnstakeDuration(new_duration);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<RestrictedUnstakeDurationSec<T>>::get() == new_duration);
     }
 
     set_admin_config_reward_fee_percentage {
@@ -602,74 +557,6 @@ benchmarks! {
         let node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
         assert!(node_info.signing_key == new_signing_key);
         assert_last_event::<T>(Event::SigningKeyUpdated {owner, node}.into());
-    }
-
-    add_stake {
-        let registrar_key = crate::sr25519::app_sr25519::Public::generate_pair(None);
-        let registrar: T::AccountId =
-            T::AccountId::decode(&mut Encode::encode(&registrar_key).as_slice()).expect("valid account id");
-
-        set_registrar::<T>(registrar.clone());
-        enable_rewards::<T>();
-        fund_reward_pot::<T>();
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let reward_period_index = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-        T::Currency::make_free_balance_be(&owner.clone(), 1_000_000u32.into());
-        let nodes = create_nodes_and_heartbeat::<T>(owner.clone(), reward_period_index, 2);
-        let node_id = nodes.first().cloned().unwrap();
-    }: add_stake(RawOrigin::Signed(owner.clone()), node_id.clone(), 100u32.into())
-    verify {
-        let node_info = <NodeRegistry<T>>::get(&node_id).expect("Node must be registered");
-        let stake = node_info.stake;
-        assert!(stake.amount == 100u32.into());
-        assert_last_event::<T>(Event::StakeAdded { owner, node_id, reward_period: reward_period_index, amount: 100u32.into(), new_total: stake.amount }.into());
-    }
-
-    remove_stake {
-        let registrar_key = crate::sr25519::app_sr25519::Public::generate_pair(None);
-        let registrar: T::AccountId =
-            T::AccountId::decode(&mut Encode::encode(&registrar_key).as_slice()).expect("valid account id");
-
-        set_registrar::<T>(registrar.clone());
-        enable_rewards::<T>();
-        fund_reward_pot::<T>();
-        // Make sure we can unstake
-        AutoStakeDurationSec::<T>::put(0u64);
-        UnstakePeriodSec::<T>::put(1_000u64);
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let reward_period_index = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-        T::Currency::make_free_balance_be(&owner.clone(), 1_000_000u32.into());
-        let nodes = create_nodes_and_heartbeat::<T>(owner.clone(), reward_period_index, 2);
-        let node_id = nodes.first().cloned().unwrap();
-        Pallet::<T>::do_add_stake(&owner, &node_id, 100u32.into()).unwrap();
-        // Go forward in time to make the stake available for unstaking
-        pallet_timestamp::Pallet::<T>::set_timestamp(10_000 * 12_000);
-    }: remove_stake(RawOrigin::Signed(owner.clone()), node_id.clone(), Some(10u32.into()))
-    verify {
-        let node_info = <NodeRegistry<T>>::get(&node_id).expect("Node must be registered");
-        let stake = node_info.stake;
-        assert!(stake.amount == (100u32 - 10u32).into());
-        assert_last_event::<T>(Event::StakeRemoved { owner, node_id, reward_period: reward_period_index, amount: 10u32.into(), new_total: stake.amount }.into());
-    }
-
-    update_auto_stake_preference {
-        let registrar: T::AccountId = account("registrar", 0, 0);
-        set_registrar::<T>(registrar.clone());
-        enable_rewards::<T>();
-
-        let owner: T::AccountId = account("owner", 1, 1);
-        let node_id: NodeId<T> = account("node", 2, 2);
-        register_new_node::<T>(node_id.clone(), owner.clone());
-        let preference = NodeRegistry::<T>::get(&node_id).unwrap().auto_stake_rewards;
-    }: update_auto_stake_preference(RawOrigin::Signed(owner.clone()), node_id.clone(), !preference)
-    verify {
-        let node_info = <NodeRegistry<T>>::get(&node_id).expect("Node must be registered");
-        assert_eq!(node_info.auto_stake_rewards, !preference);
-        assert_last_event::<T>(Event::AutoStakePreferenceUpdated {owner, node_id, auto_stake_rewards: !preference}.into());
     }
 
     offchain_mint_rewards {

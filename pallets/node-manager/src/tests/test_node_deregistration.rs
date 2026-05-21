@@ -84,10 +84,8 @@ fn register_node_and_send_heartbeat(
 
 fn incr_heartbeats(reward_period: RewardPeriodIndex, nodes: Vec<NodeId<TestRuntime>>, uptime: u64) {
     for node in nodes {
-        let node_info = <NodeRegistry<TestRuntime>>::get(&node).unwrap();
-        let single_hb_weight =
-            NodeManager::effective_heartbeat_weight(&node_info, NodeManager::time_now_sec());
-        let weight = single_hb_weight.saturating_mul(uptime.into());
+        let _ = <NodeRegistry<TestRuntime>>::get(&node).unwrap();
+        let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(uptime.into());
 
         <NodeUptime<TestRuntime>>::mutate(&reward_period, &node, |maybe_info| {
             if let Some(info) = maybe_info.as_mut() {
@@ -414,7 +412,7 @@ fn payment_works_some_nodes_deregistered() {
             reward_amount / node_count as u128 * (node_count - num_nodes_to_deregister) as u128;
         let fee_amount = <RewardFeePercentage<TestRuntime>>::get() * gross_owner_reward_amount;
         let expected_owner_reward_amount = gross_owner_reward_amount - fee_amount;
-        assert_eq!(Balances::reserved_balance(&context.owner), expected_owner_reward_amount);
+        assert_eq!(Balances::free_balance(&context.owner), expected_owner_reward_amount);
 
         // The pot balance should stay the same because all the nodes were deregistered
         assert_eq!(
@@ -429,40 +427,6 @@ fn payment_works_some_nodes_deregistered() {
         System::assert_last_event(
             Event::RewardPayoutCompleted { reward_period_index: reward_period_to_pay }.into(),
         );
-    });
-}
-
-#[test]
-fn deregistration_returns_reserved_stake() {
-    let (mut ext, _pool_state, _offchain_state) = ExtBuilder::build_default()
-        .with_genesis_config()
-        .with_authors()
-        .for_offchain_worker()
-        .as_externality_with_state();
-    ext.execute_with(|| {
-        let context = Context::new(1u8);
-        let node = context.registered_nodes[0];
-        let stake_amount = 10_000u128;
-
-        // Give the owner funds and stake them
-        Balances::make_free_balance_be(&context.owner, stake_amount * 2);
-        assert_ok!(NodeManager::add_stake(
-            RuntimeOrigin::signed(context.owner.clone()),
-            node,
-            stake_amount
-        ));
-        assert_eq!(Balances::reserved_balance(&context.owner), stake_amount);
-
-        // Deregister
-        assert_ok!(NodeManager::deregister_nodes(
-            RuntimeOrigin::signed(context.registrar),
-            context.owner,
-            BoundedVec::truncate_from(vec![node]),
-        ));
-
-        // Reserved balance must be returned to free balance
-        assert_eq!(Balances::reserved_balance(&context.owner), 0);
-        assert_eq!(Balances::free_balance(&context.owner), stake_amount * 2);
     });
 }
 
@@ -562,7 +526,7 @@ mod fails_when {
                     context.owner,
                     BoundedVec::truncate_from(vec![bad_node, context.registered_nodes[0].clone()]),
                 ),
-                Error::<TestRuntime>::NodeNotOwnedByOwner
+                Error::<TestRuntime>::NodeNotRegistered
             );
         });
     }
@@ -584,7 +548,7 @@ mod fails_when {
                     bad_owner,
                     BoundedVec::truncate_from(context.registered_nodes.clone()),
                 ),
-                Error::<TestRuntime>::NodeNotOwnedByOwner
+                Error::<TestRuntime>::NodeNotRegistered
             );
         });
     }

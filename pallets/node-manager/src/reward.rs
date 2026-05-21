@@ -9,9 +9,9 @@ impl<T: Config> Pallet<T> {
     pub fn calculate_node_weight(
         node_id: &NodeId<T>,
         uptime_info: UptimeInfo<BlockNumberFor<T>>,
-        node_info: &NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
+        _node_info: &NodeInfo<T::SignerId, T::AccountId>,
         uptime_threshold: u32,
-        reward_period_end_time: Duration,
+        _reward_period_end_time: Duration,
     ) -> u128 {
         let actual_uptime = uptime_info.count;
         let weight = uptime_info.weight;
@@ -20,13 +20,10 @@ impl<T: Config> Pallet<T> {
             log::warn!("⚠️ Node ({:?}) has been up for more than the expected uptime. Actual: {:?}, Expected: {:?}",
                 node_id, actual_uptime, uptime_threshold);
 
-            // re-calculate weight using reward_period_end_time. If autostaking expired mid period,
-            // the node's reward will reduce because this recalculation will remove the
-            // genesis bonus for all heartbeats. This is ok because we are in this
-            // situation because the node managed to send more heartbeats than it should.
-            let single_node_weight =
-                Self::effective_heartbeat_weight(node_info, reward_period_end_time);
-            single_node_weight.saturating_mul(u128::from(uptime_threshold))
+            // Cap at threshold. With staking removed, each heartbeat carries
+            // HEARTBEAT_BASE_WEIGHT, so the capped contribution is exactly
+            // threshold * HEARTBEAT_BASE_WEIGHT.
+            HEARTBEAT_BASE_WEIGHT.saturating_mul(u128::from(uptime_threshold))
         } else {
             weight
         }
@@ -53,7 +50,7 @@ impl<T: Config> Pallet<T> {
     pub fn pay_reward(
         period: &RewardPeriodIndex,
         node_id: NodeId<T>,
-        node_info: &NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
+        node_info: &NodeInfo<T::SignerId, T::AccountId>,
         amount: BalanceOf<T>,
         _reward_percentage: Perquintill,
     ) -> DispatchResult {
@@ -75,7 +72,7 @@ impl<T: Config> Pallet<T> {
         let reward_fee = Self::calculate_reward_fee(amount);
         let net_reward = amount.saturating_sub(reward_fee);
 
-        // First pay the owner, this is the most important step here.
+        // Pay the owner.
         T::Currency::transfer(
             &reward_pot_account_id,
             &node_owner,
@@ -94,28 +91,6 @@ impl<T: Config> Pallet<T> {
             // Pay the fee to the treasury
             if let Err(e) = T::RewardFeeHandler::pay_treasury(&reward_fee, &reward_pot_account_id) {
                 log::error!("💔 Failed to pay reward fee of {:?} from reward pot. Node {:?}. Period: {:?}. Error: {:?}", reward_fee, node_id, period, e);
-            }
-        }
-
-        if net_reward <= Zero::zero() {
-            return Ok(())
-        }
-
-        if Self::time_now_sec() < node_info.auto_stake_expiry || node_info.auto_stake_rewards {
-            // Best-effort auto-stake. Failure is tolerated because funds are already in free
-            // balance.
-            let r = Self::do_add_stake(&node_owner, &node_id, net_reward);
-            match r {
-                Ok(_) => {
-                    Self::deposit_event(Event::RewardAutoStaked {
-                        reward_period: *period,
-                        owner: node_owner,
-                        node: node_id,
-                        amount: net_reward,
-                    });
-                },
-                Err(e) =>
-                    log::error!("💔 Failed to auto-stake reward for node {:?}. Period: {:?}, amount: {:?}. Error: {:?}", node_id, period, net_reward, e),
             }
         }
 
