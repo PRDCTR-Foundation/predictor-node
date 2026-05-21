@@ -1,8 +1,5 @@
 FROM docker.io/library/ubuntu:24.04
 
-# show backtraces
-ENV RUST_BACKTRACE=1
-
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -11,7 +8,7 @@ RUN apt-get update && \
 	apt-get autoremove -y && \
 	apt-get clean && \
 	find /var/lib/apt/lists/ -type f -not -name lock -delete; \
-	# add system user and link ~/.local/share/polkadot to /data
+	# add system user and link ~/.local/share/predictor-node to /data
 	useradd --system --no-create-home --shell /usr/sbin/nologin -U polkadot && \
 	mkdir -p /data /polkadot/.local/share && \
 	chown -R polkadot:polkadot /data && \
@@ -28,4 +25,4 @@ RUN /usr/bin/predictor-node --version
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
 
-CMD ["/usr/bin/predictor-node"]
+ENTRYPOINT ["/usr/bin/predictor-node"]
