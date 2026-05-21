@@ -43,7 +43,6 @@ pallet-avn = { workspace = true }
 sp-keystore = { workspace = true, optional = true }
 
 [dev-dependencies]
-pallet-avn-proxy = { workspace = true }
 more-asserts = { workspace = true }
 test-case = { workspace = true }
 pallet-pm-neo-swaps = { workspace = true, features = ["mock"] }
@@ -64,6 +63,7 @@ mock = [
     "sp-keystore/default",
     "prediction-market-primitives/mock",
     "pallet-prediction-markets-runtime-api/default",
+    "xcm/default",
     "pallet-pm-eth-asset-registry/default",
     "orml-currencies/default",
     "orml-tokens/default",
@@ -81,6 +81,7 @@ mock = [
     "pallet-prediction-markets/std",
     "pallet-prediction-markets/mock",
     "pallet-prediction-markets/default",
+    "pallet-avn/default",
     "serde/default",
     "env_logger/default",
 ]
@@ -104,9 +105,13 @@ std = [
     "parity-scale-codec/std",
     "sp-core/std",
     "sp-runtime/std",
+    "xcm-builder/std",
+    "pallet-xcm/std",
     "sp-avn-common/std",
     "prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
+    "common-primitives/std",
+    "pallet-avn/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
