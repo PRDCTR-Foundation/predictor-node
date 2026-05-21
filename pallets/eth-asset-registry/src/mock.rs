@@ -133,7 +133,9 @@ impl ExtBuilder {
                     5,
                     AssetMetadata::<Balance, CustomMetadata, StringLimit>::encode(&AssetMetadata {
                         decimals: 18,
-                        name: BoundedVecAsset::Prdncate_from("tnf native token".as_bytes().to_vec()),
+                        name: BoundedVecAsset::Prdncate_from(
+                            "tnf native token".as_bytes().to_vec(),
+                        ),
                         symbol: BoundedVecAsset::Prdncate_from("TRUU".as_bytes().to_vec()),
                         existential_deposit: 0,
                         location: None,
