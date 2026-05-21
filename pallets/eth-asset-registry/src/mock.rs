@@ -119,10 +119,10 @@ impl ExtBuilder {
                     4,
                     AssetMetadata::<Balance, CustomMetadata, StringLimit>::encode(&AssetMetadata {
                         decimals: 6,
-                        name: BoundedVec::truncate_from(
+                        name: BoundedVecAsset::Prdncate_from(
                             "Eth USDC - foreign token".as_bytes().to_vec(),
                         ),
-                        symbol: BoundedVec::truncate_from("USDC".as_bytes().to_vec()),
+                        symbol: BoundedVecAsset::Prdncate_from("USDC".as_bytes().to_vec()),
                         existential_deposit: 0,
                         location: None,
                         additional: CustomMetadata { eth_address: H160::from([1; 20]) },
@@ -133,8 +133,8 @@ impl ExtBuilder {
                     5,
                     AssetMetadata::<Balance, CustomMetadata, StringLimit>::encode(&AssetMetadata {
                         decimals: 18,
-                        name: BoundedVec::truncate_from("tnf native token".as_bytes().to_vec()),
-                        symbol: BoundedVec::truncate_from("TRUU".as_bytes().to_vec()),
+                        name: BoundedVecAsset::Prdncate_from("tnf native token".as_bytes().to_vec()),
+                        symbol: BoundedVecAsset::Prdncate_from("TRUU".as_bytes().to_vec()),
                         existential_deposit: 0,
                         location: None,
                         additional: CustomMetadata { eth_address: H160::from([2; 20]) },

@@ -330,7 +330,7 @@ mod benchmarks {
     #[benchmark]
     fn buy(n: Linear<2, 4>) {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -353,7 +353,7 @@ mod benchmarks {
     #[benchmark]
     fn sell(n: Linear<2, 128>) {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -378,7 +378,7 @@ mod benchmarks {
     #[benchmark]
     fn join_in_place(n: Linear<2, 128>) {
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice.clone(),
@@ -410,7 +410,7 @@ mod benchmarks {
     #[benchmark]
     fn join_reassigned(n: Linear<2, 128>) {
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice.clone(),
@@ -442,7 +442,7 @@ mod benchmarks {
     #[benchmark]
     fn join_leaf(n: Linear<2, 128>) {
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice.clone(),
@@ -480,7 +480,7 @@ mod benchmarks {
     #[benchmark]
     fn exit(n: Linear<2, 128>) {
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             alice.clone(),
@@ -509,7 +509,7 @@ mod benchmarks {
         let alice: T::AccountId = whitelisted_caller();
         let market_id = create_market_and_deploy_pool::<T>(
             alice.clone(),
-            Asset::Tru,
+            Asset::Prd,
             2u16,
             (100 * _100).saturated_into(),
         );
@@ -531,7 +531,7 @@ mod benchmarks {
     #[benchmark]
     fn deploy_pool(n: Linear<2, 128>) {
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market::<T>(alice.clone(), base_asset, asset_count);
         let amount = (100 * _100).saturated_into();
@@ -565,7 +565,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -620,7 +620,7 @@ mod benchmarks {
         let market_count = n;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -689,7 +689,7 @@ mod benchmarks {
         let total = m;
 
         let alice: T::AccountId = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = 2u16.pow(market_count);
 
         let mut market_ids = vec![];
@@ -720,7 +720,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_evaluate() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -749,7 +749,7 @@ mod benchmarks {
     #[benchmark]
     fn decision_market_oracle_update() {
         let alice = whitelisted_caller();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = 2;
         let market_id = create_market_and_deploy_pool::<T>(
             alice,
@@ -778,7 +778,7 @@ mod benchmarks {
     #[benchmark]
     fn signed_join(n: Linear<2, 128>) {
         let (signer_account_keypair, signer_account_id) = get_user_account::<T>();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             signer_account_id.clone(),
@@ -829,7 +829,7 @@ mod benchmarks {
         let (signer_account_keypair, signer_account_id) = get_user_account::<T>();
         let market_id = create_market_and_deploy_pool::<T>(
             signer_account_id.clone(),
-            Asset::Tru,
+            Asset::Prd,
             2u16,
             _10.saturated_into(),
         );
@@ -900,7 +900,7 @@ mod benchmarks {
     #[benchmark]
     fn signed_exit(n: Linear<2, 128>) {
         let (signer_account_keypair, signer_account_id) = get_user_account::<T>();
-        let base_asset = Asset::Tru;
+        let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
             signer_account_id.clone(),

@@ -447,7 +447,7 @@ impl pallet_avn_proxy::Config for Runtime {
 parameter_type_with_key! {
     pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
         match currency_id {
-            Asset::Tru => NATIVE_EXISTENTIAL_DEPOSIT,
+            Asset::Prd => NATIVE_EXISTENTIAL_DEPOSIT,
             Asset::ForeignAsset(id) => {
                 let maybe_metadata = <
                 pallet_pm_eth_asset_registry::Pallet<Runtime> as prediction_market_primitives::traits::InspectEthAsset
@@ -511,7 +511,7 @@ impl orml_tokens::Config for Runtime {
 }
 
 parameter_types! {
-    pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
+    pub const GetNativeCurrencyId: CurrencyId = Asset::Prd;
         pub const TreasuryPalletId: PalletId = TREASURY_PALLET_ID;
     pub TnfTreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
 }

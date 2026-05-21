@@ -36,7 +36,7 @@ fn admin_move_market_to_resolved_resolves_reported_market() {
 
         // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the correct bonds are unreserved!
-        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
+        assert_ok!(AssetManager::deposit(Asset::Prd, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
             &alice(),
@@ -83,7 +83,7 @@ fn admin_move_market_to_resolved_resolves_reported_market() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
 
     ExtBuilder::default().build().execute_with(|| {
@@ -106,7 +106,7 @@ fn admin_move_market_to_resolved_resolves_disputed_market() {
 
         // Give alice `SENTINEL_AMOUNT` free and reserved TRUU; we record the free balance to
         // check that the correct bonds are unreserved!
-        assert_ok!(AssetManager::deposit(Asset::Tru, &alice(), 2 * SENTINEL_AMOUNT));
+        assert_ok!(AssetManager::deposit(Asset::Prd, &alice(), 2 * SENTINEL_AMOUNT));
         assert_ok!(Balances::reserve_named(
             &PredictionMarkets::reserve_id(),
             &alice(),
@@ -156,7 +156,7 @@ fn admin_move_market_to_resolved_resolves_disputed_market() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
 
     ExtBuilder::default().build().execute_with(|| {
@@ -172,7 +172,7 @@ fn admin_move_market_to_resolved_fails_if_market_is_not_reported_or_disputed(
 ) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..33,
             ScoringRule::AmmCdaHybrid,

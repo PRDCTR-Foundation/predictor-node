@@ -24,7 +24,7 @@ fn payout_vector_works_categorical() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_categorical_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -57,7 +57,7 @@ fn payout_vector_works_scalar(value: u128, expected: Vec<BalanceOf<Runtime>>) {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_scalar_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -92,7 +92,7 @@ fn payout_vector_fails_on_market_not_found() {
 fn payout_vector_fails_if_market_is_not_redeemable() {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::Parimutuel,
@@ -115,7 +115,7 @@ fn payout_vector_fails_if_market_is_not_redeemable() {
 fn payout_vector_fails_on_invalid_market_status(status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         simple_create_categorical_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..2,
             ScoringRule::AmmCdaHybrid,

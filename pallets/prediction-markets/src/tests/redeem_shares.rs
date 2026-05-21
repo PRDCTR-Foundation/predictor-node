@@ -65,7 +65,7 @@ fn it_allows_to_redeem_shares() {
 
         assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(charlie()), 0));
         let bal = Balances::free_balance(charlie());
-        if base_asset == Asset::Tru {
+        if base_asset == Asset::Prd {
             assert_eq!(bal, 1_000 * BASE - winning_fee);
         } else {
             assert_eq!(bal, 1_000 * BASE);
@@ -83,13 +83,13 @@ fn it_allows_to_redeem_shares() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru, false);
+        test(Asset::Prd, false);
     });
     ExtBuilder::default().build().execute_with(|| {
         test(Asset::ForeignAsset(100), false);
     });
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru, true);
+        test(Asset::Prd, true);
     });
     ExtBuilder::default().build().execute_with(|| {
         test(Asset::ForeignAsset(100), true);
@@ -118,7 +118,7 @@ fn redeem_shares_fails_if_invalid_resolution_mechanism(scoring_rule: ScoringRule
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -135,7 +135,7 @@ fn scalar_market_correctly_resolves_on_out_of_range_outcomes_below_threshold() {
         assert_eq!(AssetManager::free_balance(base_asset, &eve()), 1100 * BASE - winning_fee);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -152,7 +152,7 @@ fn scalar_market_correctly_resolves_on_out_of_range_outcomes_above_threshold() {
         assert_eq!(AssetManager::free_balance(base_asset, &eve()), 1000 * BASE);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {

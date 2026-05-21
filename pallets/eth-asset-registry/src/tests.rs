@@ -25,8 +25,8 @@ fn dummy_metadata() -> AssetMetadata<
 > {
     AssetMetadata {
         decimals: 12,
-        name: BoundedVec::truncate_from("dummy token".as_bytes().to_vec()),
-        symbol: BoundedVec::truncate_from("DMY".as_bytes().to_vec()),
+        name: BoundedVecAsset::Prdncate_from("dummy token".as_bytes().to_vec()),
+        symbol: BoundedVecAsset::Prdncate_from("DMY".as_bytes().to_vec()),
         existential_deposit: 0,
         location: None,
         additional: CustomMetadata { eth_address: H160::from([1; 20]) },
@@ -38,16 +38,16 @@ fn genesis_issuance_should_work() {
     ExtBuilder::default().build_with_genesis_assets().execute_with(|| {
         let metadata1 = AssetMetadata {
             decimals: 6,
-            name: BoundedVec::truncate_from("Eth USDC - foreign token".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("USDC".as_bytes().to_vec()),
+            name: BoundedVecAsset::Prdncate_from("Eth USDC - foreign token".as_bytes().to_vec()),
+            symbol: BoundedVecAsset::Prdncate_from("USDC".as_bytes().to_vec()),
             existential_deposit: 0,
             location: None,
             additional: CustomMetadata { eth_address: H160::from([1; 20]) },
         };
         let metadata2 = AssetMetadata {
             decimals: 18,
-            name: BoundedVec::truncate_from("tnf native token".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("TRUU".as_bytes().to_vec()),
+            name: BoundedVecAsset::Prdncate_from("tnf native token".as_bytes().to_vec()),
+            symbol: BoundedVecAsset::Prdncate_from("TRUU".as_bytes().to_vec()),
             existential_deposit: 0,
             location: None,
             additional: CustomMetadata { eth_address: H160::from([2; 20]) },
@@ -65,8 +65,8 @@ fn test_sequential_id_normal_behavior() {
         let metadata1 = dummy_metadata();
 
         let metadata2 = AssetMetadata {
-            name: BoundedVec::truncate_from("Test token 2".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("TKN2".as_bytes().to_vec()),
+            name: BoundedVecAsset::Prdncate_from("Test token 2".as_bytes().to_vec()),
+            symbol: BoundedVecAsset::Prdncate_from("TKN2".as_bytes().to_vec()),
             additional: CustomMetadata { eth_address: H160::from([20; 20]) },
             ..dummy_metadata()
         };
@@ -173,8 +173,8 @@ fn test_update_metadata_works() {
 
         let new_metadata = AssetMetadata {
             decimals: 11,
-            name: BoundedVec::truncate_from("new native token2".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("NTV2".as_bytes().to_vec()),
+            name: BoundedVecAsset::Prdncate_from("new native token2".as_bytes().to_vec()),
+            symbol: BoundedVecAsset::Prdncate_from("NTV2".as_bytes().to_vec()),
             existential_deposit: 1,
             location: None,
             additional: CustomMetadata { eth_address: H160::from([21; 20]) },

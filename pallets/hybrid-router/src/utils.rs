@@ -44,7 +44,7 @@ where
 
     prediction_market_primitives::types::Market {
         market_id: 0u8.into(),
-        base_asset: Asset::Tru,
+        base_asset: Asset::Prd,
         creation: MarketCreation::Permissionless,
         creator_fee: Perbill::zero(),
         creator,
