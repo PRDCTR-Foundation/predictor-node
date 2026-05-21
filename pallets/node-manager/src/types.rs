@@ -1,28 +1,12 @@
 // Copyright 2026 Aventus DAO Ltd
 
 use crate::*;
-use frame_support::traits::Get;
-use sp_runtime::{FixedPointNumber, FixedU128, Saturating};
+use sp_runtime::Saturating;
 // This is used to scale a single heartbeat so we can preserve precision when applying the reward
 // weight.
 pub const HEARTBEAT_BASE_WEIGHT: u128 = 100_000_000;
 pub type Duration = u64;
 pub type RewardPeriodIndex = u64;
-
-/// Local mirror of sp_avn_common's TotalSupplyUpdatedData. Lives here while
-/// the published sp_avn_common on the consumed branch lacks it; the pallet
-/// only needs the struct shape, not the EventData wiring.
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
-pub struct TotalSupplyUpdatedData {
-    pub amount: u128,
-    pub t2_tx_id: u32,
-}
-
-impl TotalSupplyUpdatedData {
-    pub fn is_valid(&self) -> bool {
-        self.amount > 0u128
-    }
-}
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 /// The current era index and transition information
@@ -215,12 +199,8 @@ pub enum AdminConfig<AccountId, Balance> {
     BatchSize(u32),
     NextHeartbeatPeriod(u32),
     NextRewardAmountPerPeriod(Balance),
-    NumPeriodsToMint(u32),
     RewardEnabled(bool),
     MinUptimeThreshold(Perbill),
-    RewardFee(Perbill),
-    GenesisBonus50(BonusRange),
-    GenesisBonus25(BonusRange),
 }
 
 #[derive(
@@ -248,64 +228,3 @@ impl TotalUptimeInfo {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct RewardWeight {
-    pub genesis_bonus: FixedU128,
-    pub stake_multiplier: FixedU128,
-}
-
-impl RewardWeight {
-    pub fn to_heartbeat_weight(&self) -> u128 {
-        let scaled_stake_weight = self.stake_multiplier.saturating_mul_int(HEARTBEAT_BASE_WEIGHT);
-        // apply the bonus last to preserve precision.
-        self.genesis_bonus.saturating_mul_int(scaled_stake_weight)
-    }
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct PendingMintRequest<Balance> {
-    pub tx_id: EthereumId,
-    pub amount: Balance,
-    pub bridge_confirmed: bool,
-    pub credit_received: bool,
-}
-
-#[derive(
-    Encode,
-    Decode,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
-)]
-pub struct BonusRange {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl BonusRange {
-    pub fn new(start: u32, end: u32) -> Self {
-        BonusRange { start, end }
-    }
-
-    pub fn contains(&self, n: &u32) -> bool {
-        *n >= self.start && *n <= self.end
-    }
-}
-
-pub struct DefaultGenesisBonus50;
-impl Get<BonusRange> for DefaultGenesisBonus50 {
-    fn get() -> BonusRange {
-        BonusRange::new(3001, 6000)
-    }
-}
-
-pub struct DefaultGenesisBonus25;
-impl Get<BonusRange> for DefaultGenesisBonus25 {
-    fn get() -> BonusRange {
-        BonusRange::new(6001, 11000)
-    }
-}

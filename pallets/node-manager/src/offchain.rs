@@ -14,71 +14,6 @@ pub const OCW_ID: &'static [u8; 22] = b"node_manager::last_run";
 const OC_HB_DB_PREFIX: &[u8] = b"tnf/node-manager-heartbeat/";
 
 impl<T: Config> Pallet<T> {
-    pub fn trigger_payment_if_required(reward_period_index: RewardPeriodIndex, author: Author<T>) {
-        if Self::can_trigger_payment().unwrap_or(false) {
-            log::info!("🛠️  Triggering payment for period: {:?}", reward_period_index);
-
-            let signature = author.key.sign(&(PAYOUT_REWARD_CONTEXT, reward_period_index).encode());
-
-            match signature {
-                Some(signature) => {
-                    let call = Call::<T>::offchain_pay_nodes {
-                        reward_period_index,
-                        author: author.clone(),
-                        signature,
-                    };
-
-                    if let Err(e) =
-                        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-                    {
-                        log::error!(
-                            "💔 Error submitting transaction to trigger payment. Period: {:?}, Error: {:?}",
-                            reward_period_index,
-                            e
-                        );
-                    }
-                },
-                None => {
-                    log::error!(
-                        "💔 Error signing payment transaction. Period: {:?}",
-                        reward_period_index
-                    );
-                },
-            }
-        }
-    }
-
-    pub fn trigger_mint_if_required(author: Author<T>) {
-        if let Some(amount) = Self::next_mint_amount_to_request() {
-            log::info!("🛠️  Triggering mint request for amount: {:?}", amount);
-
-            let signature = author.key.sign(&(MINT_REWARDS_CONTEXT, amount).encode());
-
-            match signature {
-                Some(signature) => {
-                    let call = Call::<T>::offchain_mint_rewards {
-                        amount,
-                        author: author.clone(),
-                        signature,
-                    };
-
-                    if let Err(e) =
-                        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-                    {
-                        log::error!(
-                            "💔 Error submitting mint request transaction. Amount: {:?}, Error: {:?}",
-                            amount,
-                            e
-                        );
-                    }
-                },
-                None => {
-                    log::error!("💔 Error signing mint request transaction. Amount: {:?}", amount);
-                },
-            }
-        }
-    }
-
     pub fn send_heartbeat_if_required(block_number: BlockNumberFor<T>) {
         let maybe_node_key = Self::get_node_from_signing_key();
         if let Some((node, signing_key)) = maybe_node_key {
@@ -139,44 +74,6 @@ impl<T: Config> Pallet<T> {
                 }
             }
         }
-    }
-
-    pub fn try_get_node_author(block_number: BlockNumberFor<T>) -> Option<Author<T>> {
-        let setup_result = AVN::<T>::pre_run_setup(block_number, OCW_ID.to_vec());
-        if let Ok((this_author, _)) = setup_result {
-            let is_primary = AVN::<T>::is_primary_for_block(block_number, &this_author.account_id);
-
-            if is_primary.is_err() {
-                log::error!("💔 Error checking if author is Primary");
-                return None
-            }
-
-            return Some(this_author)
-        }
-
-        return None
-    }
-
-    pub fn can_trigger_payment() -> Result<bool, ()> {
-        let oldest_period = OldestUnpaidRewardPeriodIndex::<T>::get();
-        let current_period = RewardPeriod::<T>::get().current;
-
-        if oldest_period >= current_period {
-            return Ok(false)
-        }
-
-        let last_paid_pointer = LastPaidPointer::<T>::get();
-        if last_paid_pointer.is_some() {
-            log::info!("🛠️  Resuming payment for period: {:?}", oldest_period);
-        } else {
-            log::info!(
-                "🛠️  Triggering payment for period: {:?}. Current period: {:?}",
-                oldest_period,
-                current_period
-            );
-        }
-
-        return Ok(true)
     }
 
     pub fn get_node_from_signing_key() -> Option<(T::AccountId, T::SignerId)> {

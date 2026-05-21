@@ -7,7 +7,6 @@ use super::*;
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite};
 use frame_system::{EventRecord, RawOrigin};
 use sp_avn_common::Proof;
-use sp_runtime::SaturatedConversion;
 
 // Inlined from sp_avn_common::benchmarking on the avn-parachain main branch.
 // The helper isn't on the published feat/create-stable-2409-branch this
@@ -18,7 +17,7 @@ where
     Signature: parity_scale_codec::Decode + parity_scale_codec::Encode + 'static,
 {
     use core::any::TypeId;
-    use parity_scale_codec::{Decode, Encode};
+    use parity_scale_codec::Encode;
     use sp_runtime::MultiSignature;
 
     if TypeId::of::<Signature>() == TypeId::of::<MultiSignature>() {
@@ -29,25 +28,6 @@ where
     } else {
         Signature::decode(&mut &signature.encode()[..]).expect("signature bytes decode")
     }
-}
-
-// Macro for comparing fixed point u128.
-#[allow(unused_macros)]
-macro_rules! assert_approx {
-    ($left:expr, $right:expr, $precision:expr $(,)?) => {
-        match (&$left, &$right, &$precision) {
-            (left_val, right_val, precision_val) => {
-                let diff = if *left_val > *right_val {
-                    *left_val - *right_val
-                } else {
-                    *right_val - *left_val
-                };
-                if diff > $precision {
-                    panic!("{:?} is not {:?}-close to {:?}", *left_val, *precision_val, *right_val);
-                }
-            },
-        }
-    };
 }
 
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
@@ -104,12 +84,6 @@ fn fund_reward_pot<T: Config>() {
     T::Currency::make_free_balance_be(&reward_pot_address, reward_amount);
 }
 
-fn create_author<T: Config>() -> Author<T> {
-    let account = account("dummy_validator", 0, 0);
-    let key = <T as avn::Config>::AuthorityId::generate_pair(Some("//bob".as_bytes().to_vec()));
-    Author::<T>::new(account, key)
-}
-
 fn create_nodes_and_heartbeat<T: Config>(
     owner: T::AccountId,
     reward_period_index: RewardPeriodIndex,
@@ -123,10 +97,6 @@ fn create_nodes_and_heartbeat<T: Config>(
         registered_nodes.push(node);
     }
     registered_nodes
-}
-
-fn set_max_batch_size<T: Config>(batch_size: u32) {
-    <MaxBatchSize<T>>::set(batch_size);
 }
 
 fn get_proof<T: Config>(
@@ -163,24 +133,8 @@ benchmarks! {
         let signing_key: T::SignerId = account("signing_key", 3, 3);
     }: register_node(RawOrigin::Signed(registrar.clone()), node.clone(), owner.clone(), signing_key.clone())
     verify {
-        let node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
+        let _node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
         assert!(<OwnedNodes<T>>::contains_key(owner.clone(), node.clone()));
-        assert!(node_info.serial_number < T::BonusNodeSerialStart::get());
-        assert_last_event::<T>(Event::NodeRegistered {owner, node}.into());
-    }
-
-    register_bonus_node {
-        let registrar: T::AccountId = account("registrar", 0, 0);
-        set_registrar::<T>(registrar.clone());
-
-        let owner: T::AccountId = account("owner", 1, 1);
-        let node: NodeId<T> = account("node", 2, 2);
-        let signing_key: T::SignerId = account("signing_key", 3, 3);
-    }: register_bonus_node(RawOrigin::Signed(registrar.clone()), node.clone(), owner.clone(), signing_key.clone())
-    verify {
-        let node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
-        assert!(<OwnedNodes<T>>::contains_key(owner.clone(), node.clone()));
-        assert!(node_info.serial_number >= T::BonusNodeSerialStart::get());
         assert_last_event::<T>(Event::NodeRegistered {owner, node}.into());
     }
 
@@ -254,40 +208,6 @@ benchmarks! {
         assert!(<MinUptimeThreshold<T>>::get() == Some(new_threshold));
     }
 
-    set_admin_config_reward_fee_percentage {
-        let current_percentage = <RewardFeePercentage<T>>::get();
-        let new_percentage = Perbill::from_percent(5);
-        let config = AdminConfig::RewardFee(new_percentage);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<RewardFeePercentage<T>>::get() == new_percentage);
-    }
-
-    set_admin_config_num_periods_to_mint {
-        let current_periods = <NumPeriodsToMint<T>>::get();
-        let new_periods = current_periods + 1;
-        let config = AdminConfig::NumPeriodsToMint(new_periods);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<NumPeriodsToMint<T>>::get() == new_periods);
-    }
-
-    set_admin_config_genesis_bonus_50 {
-        let new_range = BonusRange::new(100, 500);
-        let config = AdminConfig::GenesisBonus50(new_range);
-    }: set_admin_config(RawOrigin::Root, config)
-    verify {
-        assert!(<GenesisBonus50<T>>::get() == new_range);
-    }
-
-    set_admin_config_genesis_bonus_25 {
-        let new_range = BonusRange::new(501, 1000);
-        let config = AdminConfig::GenesisBonus25(new_range);
-    }: set_admin_config(RawOrigin::Root, config)
-    verify {
-        assert!(<GenesisBonus25<T>>::get() == new_range);
-    }
-
     on_initialise_with_new_reward_period {
         let reward_period = <RewardPeriod<T>>::get();
         let block_number: BlockNumberFor<T> = reward_period.first + BlockNumberFor::<T>::from(reward_period.length) + 1u32.into();
@@ -343,97 +263,6 @@ benchmarks! {
         let uptime_info = <NodeUptime<T>>::get(reward_period_index, &node).expect("No uptime info");
         assert!(uptime_info.count == heartbeat_count + 1);
         assert_last_event::<T>(Event::HeartbeatReceived {reward_period_index, node}.into());
-    }
-
-    offchain_pay_nodes {
-        let registered_nodes = 1001;
-
-        // This should affect the performance of the extrinsic.
-        let b in 1 .. 1000;
-
-        enable_rewards::<T>();
-        fund_reward_pot::<T>();
-        set_max_batch_size::<T>(b);
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let reward_period_index = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-        let author = create_author::<T>();
-
-        let _ = create_nodes_and_heartbeat::<T>(owner.clone(), reward_period_index, registered_nodes);
-
-        // Move forward to the next reward period
-        <frame_system::Pallet<T>>::set_block_number((reward_period.length + 1).into());
-        let current_block_number = frame_system::Pallet::<T>::block_number();
-        <frame_system::Pallet<T>>::set_block_number(current_block_number + reward_period.length.into());
-        Pallet::<T>::on_initialize(current_block_number);
-        let signature = author.key.sign(
-            &(PAYOUT_REWARD_CONTEXT, reward_period_index).encode()
-        ).expect("Error signing");
-    }: offchain_pay_nodes(RawOrigin::None, reward_period_index, author, signature)
-    verify {
-        let max_batch_size = MaxBatchSize::<T>::get();
-        let nodes_to_pay = max_batch_size.min(registered_nodes);
-        let ratio = Perquintill::from_rational(nodes_to_pay as u128, registered_nodes as u128);
-        let total_rewards_u128: u128 = (NextRewardAmountPerPeriod::<T>::get()).saturated_into();
-        let gross_expected_balance = ratio.mul_floor(total_rewards_u128).saturated_into::<BalanceOf<T>>();
-        let reward_fee = RewardFeePercentage::<T>::get().mul_floor(gross_expected_balance);
-        let expected_balance = gross_expected_balance.saturating_sub(reward_fee);
-
-        assert_approx!(T::Currency::free_balance(&owner.clone()), expected_balance, 1_000u32.saturated_into::<BalanceOf<T>>());
-    }
-
-    #[extra]
-    pay_nodes_constant_batch_size {
-        /* Prove that the read/write is constant time with respect to the batch size.
-           Even if the number of registered nodes (n) increases. You should see something like:
-
-             Median Slopes Analysis
-             ========
-             -- Extrinsic Time --
-
-             Model:
-             Time ~=    514.2
-                + n    0.554 µs
-
-             Reads = 30 + (0 * n)
-             Writes = 13 + (0 * n)
-             Recorded proof Size = 2601 + (12 * n)
-
-        */
-
-        // This should NOT affect the performance of the extrinsic. The execution time should be constant.
-        let n in 1 .. 100;
-
-        enable_rewards::<T>();
-        fund_reward_pot::<T>();
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let reward_period_index = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-        let author = create_author::<T>();
-
-        let _ = create_nodes_and_heartbeat::<T>(owner.clone(), reward_period_index, n);
-
-        // Move forward to the next reward period
-        <frame_system::Pallet<T>>::set_block_number((reward_period.length + 1).into());
-        let current_block_number = frame_system::Pallet::<T>::block_number();
-        <frame_system::Pallet<T>>::set_block_number(current_block_number + reward_period.length.into());
-        Pallet::<T>::on_initialize(current_block_number);
-        let signature = author.key.sign(
-            &(PAYOUT_REWARD_CONTEXT, reward_period_index).encode()
-        ).expect("Error signing");
-    }: offchain_pay_nodes(RawOrigin::None, reward_period_index, author ,signature)
-    verify {
-        let max_batch_size = MaxBatchSize::<T>::get();
-        let nodes_to_pay = max_batch_size.min(n);
-        let ratio = Perquintill::from_rational(nodes_to_pay as u128, n as u128);
-        let total_rewards_u128: u128 = (NextRewardAmountPerPeriod::<T>::get()).saturated_into();
-        let gross_expected_balance = ratio.mul_floor(total_rewards_u128).saturated_into::<BalanceOf<T>>();
-        let reward_fee = RewardFeePercentage::<T>::get().mul_floor(gross_expected_balance);
-        let expected_balance = gross_expected_balance.saturating_sub(reward_fee);
-
-        assert_approx!(T::Currency::free_balance(&owner.clone()), expected_balance, 1_000u32.saturated_into::<BalanceOf<T>>());
     }
 
     signed_register_node {
@@ -550,32 +379,13 @@ benchmarks! {
 
         let owner: T::AccountId = account("owner", 1, 1);
         let node: NodeId<T> = account("node", 2, 2);
-        let current_signing_key: T::SignerId = register_new_node::<T>(node.clone(), owner.clone());
+        let _current_signing_key: T::SignerId = register_new_node::<T>(node.clone(), owner.clone());
         let new_signing_key: T::SignerId = account("new_signing_key", 3, 3);
     }: update_signing_key(RawOrigin::Signed(owner.clone()), node.clone(), new_signing_key.clone())
     verify {
         let node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
         assert!(node_info.signing_key == new_signing_key);
         assert_last_event::<T>(Event::SigningKeyUpdated {owner, node}.into());
-    }
-
-    offchain_mint_rewards {
-        let author = create_author::<T>();
-        // Register the author in the AVN validator set so signature_is_valid passes
-        avn::Validators::<T>::put(sp_runtime::WeakBoundedVec::force_from(
-            vec![author.clone()],
-            Some("Too many validators for session"),
-        ));
-        let amount: BalanceOf<T> = 1_000u32.into();
-        let signature = author.key.sign(
-            &(MINT_REWARDS_CONTEXT, amount).encode()
-        ).expect("Error signing");
-    }: offchain_mint_rewards(RawOrigin::None, amount, author, signature)
-    verify {
-        assert!(<PendingMintRequestState<T>>::exists());
-        let pending = <PendingMintRequestState<T>>::get().expect("Pending mint request must exist");
-        assert_eq!(pending.amount, amount);
-        assert_last_event::<T>(Event::MintRequestSubmitted { amount, tx_id: pending.tx_id }.into());
     }
 }
 

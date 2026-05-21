@@ -9,7 +9,6 @@ use frame_support::{derive_impl, parameter_types, weights::Weight, PalletId};
 use frame_system as system;
 use pallet_session as session;
 pub use parking_lot::RwLock;
-pub use sp_avn_common::event_types::EthEventId;
 pub use sp_core::{
     offchain::{
         testing::{
@@ -17,13 +16,13 @@ pub use sp_core::{
         },
         OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
     },
-    sr25519, Pair, H160,
+    sr25519, Pair,
 };
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 pub use sp_runtime::{
     testing::{TestXt, UintAuthorityId},
     traits::{ConvertInto, IdentityLookup, Verify},
-    BuildStorage, DispatchError, Perbill,
+    BuildStorage, Perbill,
 };
 use sp_state_machine::BasicExternalities;
 use std::cell::RefCell;
@@ -70,50 +69,6 @@ frame_support::construct_runtime!(
 
 parameter_types! {
     pub const RewardPotId: PalletId = PalletId(*b"avtnodes");
-    pub const BonusNodeSerialStart: u32 = 20_000;
-}
-
-pub struct TestBridgeInterface;
-impl pallet_avn::BridgeInterface for TestBridgeInterface {
-    fn publish(
-        _function_name: &[u8],
-        _params: &[(Vec<u8>, Vec<u8>)],
-        _caller_id: Vec<u8>,
-    ) -> Result<u32, sp_runtime::DispatchError> {
-        Ok(1u32.into())
-    }
-
-    fn generate_lower_proof(
-        _lower_id: u32,
-        _params: &[u8; 116],
-        _caller_id: Vec<u8>,
-    ) -> Result<(), DispatchError> {
-        Ok(())
-    }
-
-    fn read_bridge_contract(
-        _contract: Vec<u8>,
-        _function_name: &[u8],
-        _params: &[(Vec<u8>, Vec<u8>)],
-        _at_block: Option<u32>,
-    ) -> Result<Vec<u8>, DispatchError> {
-        Ok(Vec::new())
-    }
-
-    fn latest_finalised_ethereum_block() -> Result<u32, DispatchError> {
-        Ok(1u32)
-    }
-}
-
-pub struct TestProcessedEventsChecker;
-
-impl pallet_avn::ProcessedEventsChecker for TestProcessedEventsChecker {
-    fn processed_event_exists(_event_id: &sp_avn_common::event_types::EthEventId) -> bool {
-        true
-    }
-    fn add_processed_event(_event_id: &EthEventId, _accepted: bool) -> Result<(), ()> {
-        Ok(())
-    }
 }
 
 impl Config for TestRuntime {
@@ -126,12 +81,7 @@ impl Config for TestRuntime {
     type RewardPotId = RewardPotId;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
-    type Token = H160;
-    type RewardFeeHandler = Self;
     type WeightInfo = ();
-    type BridgeInterface = TestBridgeInterface;
-    type ProcessedEventsChecker = TestProcessedEventsChecker;
-    type BonusNodeSerialStart = BonusNodeSerialStart;
 }
 
 parameter_types! {
@@ -253,13 +203,10 @@ impl ExtBuilder {
 
     pub fn with_genesis_config(mut self) -> Self {
         let _ = pallet_node_manager::GenesisConfig::<TestRuntime> {
-            _phantom: Default::default(),
             reward_period: 200u32,
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
             reward_amount_per_period: 20 * AVT,
-            num_periods_to_mint: 3,
-            reward_fee_percentage: Perbill::from_percent(0),
         }
         .assimilate_storage(&mut self.storage);
         self
@@ -362,27 +309,3 @@ pub fn mock_get_finalised_block(state: &mut OffchainState, response: &Option<Vec
     });
 }
 
-impl FeePaymentHandler for TestRuntime {
-    type Token = H160;
-    type TokenBalance = u128;
-    type AccountId = AccountId;
-    type Error = DispatchError;
-
-    fn pay_fee(
-        _token: &Self::Token,
-        _amount: &Self::TokenBalance,
-        _payer: &Self::AccountId,
-        _recipient: &Self::AccountId,
-    ) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn pay_treasury(
-        amount: &Self::TokenBalance,
-        payer: &Self::AccountId,
-    ) -> Result<(), Self::Error> {
-        let balance = Balances::free_balance(payer);
-        Balances::make_free_balance_be(payer, balance.saturating_sub(*amount));
-        Ok(())
-    }
-}
