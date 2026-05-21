@@ -7602,6 +7602,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-node-manager"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "log",
+ "pallet-avn",
+ "pallet-balances",
+ "pallet-session",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "parking_lot 0.12.3",
+ "scale-info",
+ "sp-application-crypto",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-keystore",
+ "sp-runtime",
+ "sp-state-machine",
+ "sp-std 14.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "test-case",
+]
+
+[[package]]
 name = "pallet-offences"
 version = "37.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
