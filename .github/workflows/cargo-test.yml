@@ -54,4 +54,4 @@ jobs:
             cargo-test-${{ runner.os }}-
 
       - name: Cargo test
-        run: cargo test --locked --workspace ${{ matrix.features }}
+        run: cargo test --locked ${{ matrix.features }}

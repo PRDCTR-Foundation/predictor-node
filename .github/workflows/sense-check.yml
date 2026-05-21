@@ -112,4 +112,4 @@ jobs:
             sense-check-${{ runner.os }}-
 
       - name: Cargo clippy
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings

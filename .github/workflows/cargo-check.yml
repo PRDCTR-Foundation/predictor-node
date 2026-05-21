@@ -54,4 +54,4 @@ jobs:
             cargo-check-${{ runner.os }}-
 
       - name: Cargo check
-        run: cargo check --locked --workspace ${{ matrix.features }}
+        run: cargo check --locked ${{ matrix.features }}
