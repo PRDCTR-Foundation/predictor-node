@@ -24,6 +24,7 @@ serde_json = { workspace = true, default-features = true }
 jsonrpsee = { features = ["server", "macros"], workspace = true }
 sc-block-builder = { workspace = true, default-features = true }
 sc-cli.workspace = true
+sc-chain-spec.workspace = true
 sc-cli.default-features = true
 sp-core.workspace = true
 sp-core.default-features = true
@@ -75,6 +76,7 @@ sp-blockchain.workspace = true
 sp-blockchain.default-features = true
 sp-block-builder.workspace = true
 sp-block-builder.default-features = true
+sp-genesis-builder.workspace = true
 frame-system.workspace = true
 frame-system.default-features = true
 frame-metadata-hash-extension.workspace = true
@@ -96,6 +98,7 @@ sc-keystore.workspace = true
 sc-keystore.default-features = true
 parity-scale-codec = { workspace = true, default-features = true }
 sp-avn-common = { workspace = true, default-features = true }
+common-primitives = { workspace = true, default-features = true }
 
 [build-dependencies]
 substrate-build-script-utils.workspace = true

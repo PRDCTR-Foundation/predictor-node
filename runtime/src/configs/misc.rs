@@ -5,9 +5,10 @@ use frame_support::{
 
 use crate::{
     configs::{Currency, ExtrinsicBaseWeight, OnUnbalanced},
-    AccountId, Balance, PalletConfig, SLOT_DURATION,
+    AccountId, Avn, Balance, PalletConfig, SLOT_DURATION,
 };
 use smallvec::smallvec;
+use sp_avn_common::QuorumPolicy;
 use sp_runtime::{FixedPointNumber, FixedU128, Perbill};
 
 parameter_types! {
@@ -99,5 +100,22 @@ where
             .unwrap_or_else(|_| <pallet_token_manager::Pallet<R>>::compute_treasury_account_id());
 
         <pallet_balances::Pallet<R>>::resolve_creating(&recipient, amount);
+    }
+}
+
+pub struct MajorityQuorum {}
+
+impl QuorumPolicy for MajorityQuorum {
+    const QUORUM_PERCENT: u32 = 51;
+    const SUPERMAJORITY_PERCENT: u32 = 67;
+
+    fn get_quorum() -> u32 {
+        let total_num_of_validators = Avn::validators().len() as u32;
+        Self::required_for(total_num_of_validators)
+    }
+
+    fn get_supermajority_quorum() -> u32 {
+        let total_num_of_validators = Avn::validators().len() as u32;
+        Self::required_for_supermajority(total_num_of_validators)
     }
 }
