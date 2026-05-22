@@ -1,0 +1,30 @@
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Release PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Release Please
+        uses: google-github-actions/release-please-action@v3
+        with:
+          release-type: rust
+          package-name: predictor-node
+          changelog-types: conventional
+          token: ${{ secrets.GITHUB_TOKEN }}

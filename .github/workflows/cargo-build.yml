@@ -42,42 +42,18 @@ jobs:
             cargo-build-${{ runner.os }}-
 
       - name: Cargo build
-        run: cargo build --locked --release
-
-  docker:
-    name: docker build
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Prepare Docker tags
-        id: docker-tags
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          TAGS="predictor-node:${SHORT_SHA}"
+          cargo build --locked --release
+          mkdir -p dist
+          cp target/release/predictor-node dist/
+          find ./target -name predictor_runtime.compact.compressed.wasm -exec cp {} dist/predictor_runtime.compact.compressed.wasm \;
+          # Generate sha256 checksums
+          (cd dist && sha256sum predictor-node > predictor-node.sha256)
+          (cd dist && sha256sum predictor_runtime.compact.compressed.wasm > predictor_runtime.compact.compressed.wasm.sha256)
 
-          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            TAGS="${TAGS}"$'\n'"predictor-node:latest"
-          fi
-
-          {
-            echo "tags<<EOF"
-            echo "${TAGS}"
-            echo "EOF"
-          } >> "${GITHUB_OUTPUT}"
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v6
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          tags: ${{ steps.docker-tags.outputs.tags }}
-          cache-from: type=gha,scope=predictor-node-docker
-          cache-to: type=gha,mode=max,scope=predictor-node-docker
+          name: release-artifacts
+          path: dist/
+          retention-days: 48
