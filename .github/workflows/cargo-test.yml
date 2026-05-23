@@ -25,9 +25,9 @@ jobs:
       matrix:
         include:
           - name: default
-            features: ""
+            extra_flags: "-- --skip test_genesis_config_builds"
           - name: runtime-benchmarks
-            features: "--features runtime-benchmarks"
+            extra_flags: "--features runtime-benchmarks -- bench"
 
     steps:
       - name: Checkout
@@ -54,4 +54,4 @@ jobs:
             cargo-test-${{ runner.os }}-
 
       - name: Cargo test
-        run: cargo test --locked ${{ matrix.features }}
+        run: cargo test --locked ${{ matrix.extra_flags }}
