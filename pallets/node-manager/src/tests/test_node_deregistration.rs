@@ -232,11 +232,6 @@ fn signed_deregistration_succeeds() {
     });
 }
 
-// payment_works_all_nodes_deregistered and payment_works_some_nodes_deregistered
-// were OCW-payout-flow tests dressed as deregistration tests. With offchain_pay_nodes
-// retired in PR2 the equivalent coverage will be reintroduced in PR6 against the
-// on_idle drain.
-
 #[test]
 fn deregistration_cleans_up_signing_key_index() {
     let (mut ext, _pool_state, _offchain_state) = ExtBuilder::build_default()

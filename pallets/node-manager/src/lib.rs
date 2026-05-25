@@ -60,6 +60,18 @@ mod test_node_deregistration;
 #[cfg(test)]
 #[path = "tests/test_node_registration.rs"]
 mod test_node_registration;
+#[cfg(test)]
+#[path = "tests/test_delegated_heartbeat.rs"]
+mod test_delegated_heartbeat;
+#[cfg(test)]
+#[path = "tests/test_reward_halving.rs"]
+mod test_reward_halving;
+#[cfg(test)]
+#[path = "tests/test_on_idle_drain.rs"]
+mod test_on_idle_drain;
+#[cfg(test)]
+#[path = "tests/test_top_up_reward_pot.rs"]
+mod test_top_up_reward_pot;
 
 // Definition of the crypto to use for signing
 pub mod sr25519 {
@@ -79,6 +91,7 @@ const MAX_BATCH_SIZE: u32 = 1_000;
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
 pub const SIGNED_DEREGISTER_NODE_CONTEXT: &[u8] = b"deregister_node";
+pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
 
 /// Offchain-worker storage key under which the local node's registered AccountId is persisted.
@@ -232,6 +245,18 @@ pub mod pallet {
     #[pallet::storage]
     pub type NextNodeSerialNumber<T: Config> = StorageValue<_, u32, ValueQuery>;
 
+    /// Cumulative count of reward-amount halvings applied since genesis.
+    /// Updated by `apply_halving_if_due` at most once per `HalvingInterval`
+    /// boundary. Idempotent within the same block.
+    #[pallet::storage]
+    pub type RewardAmountHalvingsApplied<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+    /// Whether automatic reward-amount halving is enabled. Defaults to
+    /// `HalvingEnabledAtGenesis` at genesis; flipped at runtime via the
+    /// root-only `set_halving_enabled` extrinsic.
+    #[pallet::storage]
+    pub type HalvingEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
+
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
         pub max_batch_size: u32,
@@ -277,6 +302,7 @@ pub mod pallet {
 
             <RewardPeriod<T>>::put(reward_period);
             OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
+            HalvingEnabled::<T>::put(T::HalvingEnabledAtGenesis::get());
         }
     }
 
@@ -332,6 +358,25 @@ pub mod pallet {
         NodeDeregistered { owner: T::AccountId, node: NodeId<T> },
         /// Signing key updated
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
+        /// Reward pot funded for a period (treasury transfer succeeded)
+        RewardPotFunded { period: RewardPeriodIndex, amount: BalanceOf<T> },
+        /// Reward pot funding failed at rollover; period is recoverable via top_up_reward_pot
+        RewardPotFundingFailed {
+            period: RewardPeriodIndex,
+            requested_amount: BalanceOf<T>,
+            reason: DispatchError,
+        },
+        /// Halving applied to `NextRewardAmountPerPeriod`. `total_halvings` is
+        /// the cumulative count since genesis; `new_amount` is the post-halving
+        /// value (post all pending halvings if more than one boundary was
+        /// crossed between calls).
+        RewardHalvingApplied {
+            period_index: RewardPeriodIndex,
+            new_amount: BalanceOf<T>,
+            total_halvings: u32,
+        },
+        /// `HalvingEnabled` toggled by root
+        HalvingEnabledSet { enabled: bool },
     }
 
     #[pallet::error]
@@ -402,6 +447,14 @@ pub mod pallet {
         RewardPotNotFound,
         /// Reward amount per period must be greater than zero
         NextRewardAmountPerPeriodZero,
+        /// Reward pot already funded for the given period
+        RewardPotAlreadyFunded,
+        /// Treasury could not supply the requested amount
+        TreasuryUnderfunded,
+        /// `proof.signer` does not resolve to a registered node
+        ProverNotRegistered,
+        /// A node in the batch is not registered or not owned by the prover
+        NodeNotOwnedByProver,
     }
 
     #[pallet::config]
@@ -437,6 +490,23 @@ pub mod pallet {
         /// Reward pot ID
         #[pallet::constant]
         type RewardPotId: Get<PalletId>;
+        /// Source account from which the reward pot is funded at each period rollover
+        type TreasurySource: Get<Self::AccountId>;
+        /// Number of blocks between halving applications. Setting this to
+        /// `BLOCKS_PER_YEAR` (predictor's annual cadence) is the production
+        /// default. Setting it small in tests makes halving observable on a
+        /// budget.
+        #[pallet::constant]
+        type HalvingInterval: Get<BlockNumberFor<Self>>;
+        /// Whether `HalvingEnabled` defaults to `true` at genesis. Runtime
+        /// flips it via `set_halving_enabled`.
+        #[pallet::constant]
+        type HalvingEnabledAtGenesis: Get<bool>;
+        /// Maximum number of nodes covered by a single
+        /// `heartbeat_for_owned_nodes` call. Bounds extrinsic weight and
+        /// validation work.
+        #[pallet::constant]
+        type MaxNodesPerAggregateHeartbeat: Get<u32>;
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
@@ -738,12 +808,162 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Root: top up the reward pot for a period whose rollover funding
+        /// failed. The period's `RewardPotInfo` must exist with
+        /// `total_reward == 0` (i.e. produced by a failed rollover transfer).
+        /// Pulls `amount` from `TreasurySource` into the reward pot account
+        /// and bumps `OutstandingRewardToPay`.
+        #[pallet::call_index(8)]
+        #[pallet::weight(<T as Config>::WeightInfo::top_up_reward_pot())]
+        pub fn top_up_reward_pot(
+            origin: OriginFor<T>,
+            period: RewardPeriodIndex,
+            amount: BalanceOf<T>,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+            ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+
+            let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
+            ensure!(pot_info.total_reward.is_zero(), Error::<T>::RewardPotAlreadyFunded);
+
+            let treasury = T::TreasurySource::get();
+            let pot = Self::compute_reward_account_id();
+            T::Currency::transfer(
+                &treasury,
+                &pot,
+                amount,
+                ExistenceRequirement::KeepAlive,
+            )
+            .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
+
+            pot_info.total_reward = amount;
+            RewardPot::<T>::insert(period, pot_info);
+            OutstandingRewardToPay::<T>::mutate(|outstanding| {
+                *outstanding = outstanding.saturating_add(amount);
+            });
+
+            Self::deposit_event(Event::RewardPotFunded { period, amount });
+            Ok(())
+        }
+
+        /// Root: toggle automatic reward-amount halving. When enabled the
+        /// pallet halves `NextRewardAmountPerPeriod` at every `HalvingInterval`
+        /// block boundary (idempotent per block, catch-up across multiple
+        /// boundaries if disabled and re-enabled later).
+        #[pallet::call_index(9)]
+        #[pallet::weight(<T as Config>::WeightInfo::set_halving_enabled())]
+        pub fn set_halving_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
+            ensure_root(origin)?;
+            HalvingEnabled::<T>::put(enabled);
+            Self::deposit_event(Event::HalvingEnabledSet { enabled });
+            Ok(())
+        }
+
+        /// Aggregate heartbeat: a single prover node signs a batch of node
+        /// ids it owns. Mirrors `signed_register_node`'s avn-proxy shape:
+        /// `proof.signer` is the prover's NodeId (==AccountId), sender must
+        /// equal proof.signer. The pallet validates every node in `nodes`
+        /// is registered to the prover's owner; on any failure the whole
+        /// call rolls back (all-or-nothing). ("Prover" rather than "anchor"
+        /// is used here to avoid conflating with the chain's separate
+        /// anchoring mechanism.)
+        ///
+        /// Successful dispatch records one heartbeat per node into
+        /// `NodeUptime` for the current reward period and emits one
+        /// `HeartbeatReceived` per node. Duplicate entries in `nodes` are
+        /// silently deduped via a BTreeSet so callers don't accidentally
+        /// double-count.
+        #[pallet::call_index(12)]
+        #[pallet::weight(<T as Config>::WeightInfo::heartbeat_for_owned_nodes(nodes.len() as u32))]
+        pub fn heartbeat_for_owned_nodes(
+            origin: OriginFor<T>,
+            proof: Proof<T::Signature, T::AccountId>,
+            nodes: BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat>,
+            block_number: BlockNumberFor<T>,
+        ) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
+            ensure!(
+                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
+                    frame_system::Pallet::<T>::block_number(),
+                Error::<T>::SignedTransactionExpired
+            );
+
+            let signed_payload = encode_aggregate_heartbeat_params::<T>(
+                &proof.relayer,
+                &nodes,
+                &(nodes.len() as u32),
+                &block_number,
+            );
+            ensure!(
+                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
+                Error::<T>::UnauthorizedSignedTransaction
+            );
+
+            // The prover must be a registered node; its owner is the
+            // asserted owner of every node in the batch.
+            let prover_info = NodeRegistry::<T>::get(&proof.signer)
+                .ok_or(Error::<T>::ProverNotRegistered)?;
+            let asserted_owner = prover_info.owner.clone();
+
+            // Pre-flight validation: every node must be registered to the
+            // asserted owner. Dedup is via BTreeSet so the loop below stays
+            // O(N log N) and silently drops duplicate entries.
+            use sp_std::collections::btree_set::BTreeSet;
+            let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
+            for node in nodes.iter() {
+                let info = NodeRegistry::<T>::get(node)
+                    .ok_or(Error::<T>::NodeNotOwnedByProver)?;
+                ensure!(info.owner == asserted_owner, Error::<T>::NodeNotOwnedByProver);
+                unique.insert(node.clone());
+            }
+
+            // All validations passed; record heartbeats. From this point on
+            // we mutate state and cannot fail (modulo storage I/O).
+            let current_period = RewardPeriod::<T>::get().current;
+            let now = frame_system::Pallet::<T>::block_number();
+            let mut total_new_weight: u128 = 0;
+            let mut new_heartbeat_count: u64 = 0;
+
+            for node in unique {
+                NodeUptime::<T>::mutate(&current_period, &node, |maybe_info| {
+                    let info = maybe_info.get_or_insert_with(|| UptimeInfo {
+                        count: 0,
+                        last_reported: now,
+                        weight: 0,
+                    });
+                    info.count = info.count.saturating_add(1);
+                    info.last_reported = now;
+                    info.weight = info.weight.saturating_add(HEARTBEAT_BASE_WEIGHT);
+                });
+                total_new_weight = total_new_weight.saturating_add(HEARTBEAT_BASE_WEIGHT);
+                new_heartbeat_count = new_heartbeat_count.saturating_add(1);
+                Self::deposit_event(Event::HeartbeatReceived {
+                    reward_period_index: current_period,
+                    node,
+                });
+            }
+
+            TotalUptime::<T>::mutate(&current_period, |total| {
+                total.total_heartbeats =
+                    total.total_heartbeats.saturating_add(new_heartbeat_count);
+                total.total_weight = total.total_weight.saturating_add(total_new_weight);
+            });
+
+            Ok(())
+        }
+
     }
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         // Keep this logic light and bounded
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+            // Halving runs unconditionally before the rollover guard so that a
+            // halving + rollover that fall on the same block use the post-
+            // halved amount.
+            Self::apply_halving_if_due(n);
+
             if !RewardEnabled::<T>::get() {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
             }
@@ -778,19 +998,49 @@ pub mod pallet {
             );
             RewardPeriod::<T>::put(&next_reward_period);
 
-            // take a snapshot of the reward pot amount to pay for the previous reward period
+            // Fund the previous period's reward pot synchronously from the
+            // treasury source. The pot account is recorded either way so the
+            // period is recoverable via `top_up_reward_pot` if the transfer
+            // fails (treasury underfunded, ED violation, etc.).
+            let treasury = T::TreasurySource::get();
+            let pot = Self::compute_reward_account_id();
+            let funded_amount = match T::Currency::transfer(
+                &treasury,
+                &pot,
+                reward_amount,
+                ExistenceRequirement::KeepAlive,
+            ) {
+                Ok(()) => {
+                    OutstandingRewardToPay::<T>::mutate(|outstanding| {
+                        *outstanding = outstanding.saturating_add(reward_amount);
+                    });
+                    Self::deposit_event(Event::RewardPotFunded {
+                        period: previous_index,
+                        amount: reward_amount,
+                    });
+                    reward_amount
+                },
+                Err(reason) => {
+                    Self::deposit_event(Event::RewardPotFundingFailed {
+                        period: previous_index,
+                        requested_amount: reward_amount,
+                        reason,
+                    });
+                    BalanceOf::<T>::zero()
+                },
+            };
+
+            // Always record the period snapshot. On funding failure the
+            // entry carries `total_reward = 0` and `top_up_reward_pot` can
+            // later replace it with the actual funded amount.
             <RewardPot<T>>::insert(
                 previous_index,
                 RewardPotInfo::<BalanceOf<T>>::new(
-                    reward_amount,
+                    funded_amount,
                     previous_uptime_threshold,
                     Self::time_now_sec(),
                 ),
             );
-
-            OutstandingRewardToPay::<T>::mutate(|outstanding| {
-                *outstanding = outstanding.saturating_add(reward_amount);
-            });
 
             Self::deposit_event(Event::NewRewardPeriodStarted {
                 reward_period_index: next_reward_period.current,
@@ -800,6 +1050,19 @@ pub mod pallet {
             });
 
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
+        }
+
+        /// `on_idle` drain: when block production has remaining weight, walk
+        /// the oldest unpaid reward period and pay nodes one at a time until
+        /// (a) the weight budget is exhausted, (b) the per-block batch cap is
+        /// hit, or (c) the period is fully paid (in which case
+        /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`
+        /// and we may roll into the next period if weight remains).
+        fn on_idle(_n: BlockNumberFor<T>, remaining_weight: Weight) -> Weight {
+            if !RewardEnabled::<T>::get() {
+                return Weight::zero()
+            }
+            Self::drain_outstanding_payouts(remaining_weight)
         }
 
         fn offchain_worker(n: BlockNumberFor<T>) {
@@ -1047,6 +1310,20 @@ pub mod pallet {
 
                     Some((proof, encoded_data))
                 },
+                Call::heartbeat_for_owned_nodes {
+                    ref proof,
+                    ref nodes,
+                    ref block_number,
+                } => {
+                    let encoded_data = encode_aggregate_heartbeat_params::<T>(
+                        &proof.relayer,
+                        nodes,
+                        &(nodes.len() as u32),
+                        block_number,
+                    );
+
+                    Some((proof, encoded_data))
+                },
                 _ => None,
             }
         }
@@ -1118,6 +1395,22 @@ pub fn encode_signed_register_node_params<T: Config>(
     block_number: &BlockNumberFor<T>,
 ) -> Vec<u8> {
     (SIGNED_REGISTER_NODE_CONTEXT, relayer.clone(), node, owner, signing_key, block_number).encode()
+}
+
+pub fn encode_aggregate_heartbeat_params<T: Config>(
+    relayer: &T::AccountId,
+    nodes: &BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat>,
+    number_of_nodes: &u32,
+    block_number: &BlockNumberFor<T>,
+) -> Vec<u8> {
+    (
+        AGGREGATE_HEARTBEAT_CONTEXT,
+        relayer.clone(),
+        nodes,
+        number_of_nodes,
+        block_number,
+    )
+        .encode()
 }
 
 pub fn encode_signed_deregister_node_params<T: Config>(
