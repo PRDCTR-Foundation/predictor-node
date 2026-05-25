@@ -140,6 +140,31 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     block_number: _,
                 },
             ) => return Some(proof.clone()),
+            // NodeManager: avn-proxy routes the three signed extrinsics. The
+            // pallet enforces `sender == proof.signer`, which holds when
+            // avn-proxy dispatches the inner call with `origin = proof.signer`.
+            RuntimeCall::NodeManager(pallet_node_manager::pallet::Call::signed_register_node {
+                proof,
+                node: _,
+                owner: _,
+                signing_key: _,
+                block_number: _,
+            }) => return Some(proof.clone()),
+            RuntimeCall::NodeManager(
+                pallet_node_manager::pallet::Call::signed_deregister_nodes {
+                    proof,
+                    owner: _,
+                    nodes_to_deregister: _,
+                    block_number: _,
+                },
+            ) => return Some(proof.clone()),
+            RuntimeCall::NodeManager(
+                pallet_node_manager::pallet::Call::heartbeat_for_owned_nodes {
+                    proof,
+                    nodes: _,
+                    block_number: _,
+                },
+            ) => return Some(proof.clone()),
             _ => None,
         }
     }
@@ -158,8 +183,8 @@ impl InnerCallValidator for AvnProxyConfig {
                 ),
             RuntimeCall::SignedHybridRouter(..) =>
                 return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
-            // RuntimeCall::NodeManager(..) =>
-            //     return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::NodeManager(..) =>
+                return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedNeoSwaps(..) =>
                 return pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,

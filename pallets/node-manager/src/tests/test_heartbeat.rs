@@ -411,8 +411,7 @@ mod given_a_reward_period {
             let uptime_info =
                 <NodeUptime<TestRuntime>>::get(reward_period, &context.node_id).unwrap();
 
-            // PR1 (strip stake) also retires the genesis-bonus weight multiplier and
-            // the stake multiplier. Every heartbeat now contributes exactly
+            // Every heartbeat now contributes exactly
             // HEARTBEAT_BASE_WEIGHT regardless of serial number.
             let expected_weight = HEARTBEAT_BASE_WEIGHT;
 

@@ -69,7 +69,25 @@ frame_support::construct_runtime!(
 
 parameter_types! {
     pub const RewardPotId: PalletId = PalletId(*b"avtnodes");
+    pub TreasurySource: AccountId = treasury_account();
+    /// Small interval so tests can observe halving on a tight budget.
+    pub const HalvingInterval: u64 = 1_000;
+    /// Defaults to OFF; tests flip via set_halving_enabled.
+    pub const HalvingEnabledAtGenesis: bool = false;
+    pub const MaxNodesPerAggregateHeartbeat: u32 = 1024;
 }
+
+/// A pseudo-treasury account used as the funding source for the reward pot in
+/// the mock. Funded in genesis with a large balance so every reward-period
+/// rollover can succeed by default; tests that need an "underfunded" treasury
+/// drain it via `Balances::make_free_balance_be`.
+pub fn treasury_account() -> AccountId {
+    TestAccount::new([23u8; 32]).account_id()
+}
+
+/// Default treasury balance available in mock genesis (covers thousands of
+/// rollovers at the default reward_amount_per_period).
+pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * AVT;
 
 impl Config for TestRuntime {
     type RuntimeEvent = RuntimeEvent;
@@ -79,6 +97,10 @@ impl Config for TestRuntime {
     type Public = AccountId;
     type Signature = Signature;
     type RewardPotId = RewardPotId;
+    type TreasurySource = TreasurySource;
+    type HalvingInterval = HalvingInterval;
+    type HalvingEnabledAtGenesis = HalvingEnabledAtGenesis;
+    type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
     type WeightInfo = ();
@@ -186,10 +208,20 @@ pub struct ExtBuilder {
 
 impl ExtBuilder {
     pub fn build_default() -> Self {
-        let storage = frame_system::GenesisConfig::<TestRuntime>::default()
-            .build_storage()
-            .unwrap()
-            .into();
+        let mut storage: sp_runtime::Storage =
+            frame_system::GenesisConfig::<TestRuntime>::default()
+                .build_storage()
+                .unwrap()
+                .into();
+
+        // Pre-fund the treasury source so reward-period rollover transfers
+        // succeed by default. Tests can drain or override this balance to
+        // exercise the funding-failure path.
+        let _ = pallet_balances::GenesisConfig::<TestRuntime> {
+            balances: vec![(treasury_account(), TREASURY_GENESIS_BALANCE)],
+            ..Default::default()
+        }
+        .assimilate_storage(&mut storage);
 
         Self {
             storage,

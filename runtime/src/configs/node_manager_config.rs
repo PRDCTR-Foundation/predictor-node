@@ -1,23 +1,43 @@
-// Minimum runtime wiring for pallet-node-manager so the pallet's surviving PR2
-// extrinsics (register_node, signed_register_node, deregister_nodes,
-// signed_deregister_nodes, update_signing_key, offchain_submit_heartbeat,
-// set_admin_config) can be exercised in zombienet.
+// Runtime wiring for pallet-node-manager. Covers register/deregister/heartbeat
+// (incl. delegated heartbeats) extrinsics, treasury-funded reward-period
+// rollover with annual halving, and direct per-period reward payout.
 //
-// Off-plan: a full PR8 wiring requires TreasurySource / ForfeitureSink /
-// HalvingInterval / LockDuration / PenaltyMax / PenaltyPerWeek / MaxLocksPerOwner
-// / MaxNodesPerAggregateHeartbeat. None of those Config items exist on PR2 yet.
-// This stub fills only what PR2's Config trait still requires; the reward-period
-// rollover in on_initialize still depends on `RewardEnabled` being true and on
-// the reward-pot account being pre-funded by hand for any payout to happen.
+// The reward-pot account is not pre-funded by hand for the happy path - on each
+// period rollover the pallet pulls `reward_amount` from `TreasurySource` (the
+// TokenManager treasury) into the pot account, and the `on_idle` drain pays
+// each eligible node's share directly to its owner.
 
 use frame_support::parameter_types;
-use common_primitives::constants::NODE_MANAGER_PALLET_ID;
+use common_primitives::constants::{BLOCKS_PER_YEAR, NODE_MANAGER_PALLET_ID};
+use sp_runtime::traits::Get;
 
-use crate::{Balances, Runtime, RuntimeCall, RuntimeEvent, Signature, Timestamp};
+use crate::{
+    AccountId, Balances, BlockNumber, Runtime, RuntimeCall, RuntimeEvent, Signature, Timestamp,
+};
 
 parameter_types! {
     pub const NodeManagerRewardPotId: frame_support::PalletId = NODE_MANAGER_PALLET_ID;
     pub const NodeManagerSignedTxLifetime: u32 = 64;
+    /// Halve `NextRewardAmountPerPeriod` annually (365.25 days at 6s blocks).
+    pub const NodeManagerHalvingInterval: BlockNumber = BLOCKS_PER_YEAR;
+    /// Halving stays OFF until root flips it via `set_halving_enabled`. This
+    /// keeps the launch reward stable and gives ops a kill-switch.
+    pub const NodeManagerHalvingEnabledAtGenesis: bool = false;
+    /// Per-call cap on `heartbeat_for_owned_nodes`. Sized to comfortably
+    /// cover a single validator's full owned-node set in one call without
+    /// risking ExhaustsResources at the pre-dispatch weight check.
+    pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
+}
+
+/// Funding source for reward-period rollover: the TokenManager treasury
+/// account. Reusing this account (rather than introducing a new pallet-owned
+/// holding) keeps the rollover transfer auditable against the same balance the
+/// gas-fee recipient and other treasury flows already write to.
+pub struct NodeManagerTreasurySource;
+impl Get<AccountId> for NodeManagerTreasurySource {
+    fn get() -> AccountId {
+        pallet_token_manager::Pallet::<Runtime>::compute_treasury_account_id()
+    }
 }
 
 impl pallet_node_manager::Config for Runtime {
@@ -29,6 +49,10 @@ impl pallet_node_manager::Config for Runtime {
     type TimeProvider = Timestamp;
     type Signature = Signature;
     type RewardPotId = NodeManagerRewardPotId;
+    type TreasurySource = NodeManagerTreasurySource;
+    type HalvingInterval = NodeManagerHalvingInterval;
+    type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
+    type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
     type SignedTxLifetime = NodeManagerSignedTxLifetime;
     type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
 }
