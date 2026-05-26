@@ -86,3 +86,23 @@ jobs:
             ## sha256sum
             predictor-node: `${{ steps.sha256.outputs.collator_sha }}`
             predictor_runtime.compact.compressed.wasm: `${{ steps.sha256.outputs.wasm_sha }}`
+
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image with release tag
+        uses: docker/build-push-action@v6
+        with:
+          context: dist/
+          file: ./Containerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/predictor-node:${{ github.event.release.tag_name }}
+          cache-from: type=gha,scope=predictor-node-docker
+          cache-to: type=gha,mode=max,scope=predictor-node-docker
