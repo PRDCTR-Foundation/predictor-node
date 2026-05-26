@@ -2,29 +2,24 @@ name: release-please
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to target for release PR
+        required: true
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
 
 jobs:
-  release:
-    name: Release PR
+  release-please:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Release Please
-        uses: google-github-actions/release-please-action@v3
+      - uses: googleapis/release-please-action@v5
         with:
           release-type: rust
-          package-name: predictor-node
-          changelog-types: conventional
-          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.event.inputs.target_branch || github.ref_name }}
