@@ -267,3 +267,26 @@ the correct dependencies, activate direnv `direnv allow`.
 Please follow the [Substrate Docker instructions
 here](https://github.com/paritytech/polkadot-sdk/blob/master/substrate/docker/README.md) to
 build the Docker container with the Substrate Node Template binary.
+
+## Docker
+
+You can build and run the predictor-node using Docker. The provided `Containerfile` expects the release binary to be present in the build context root.
+
+### Build the binary and Docker image locally
+
+Build the Docker image:
+   ```sh
+   docker build -f Containerfile -t predictor-node:local target/release/
+   ```
+
+### Run the node in Docker
+
+```sh
+# Additional parameters might be needed to enable the ethereum bridge setup
+docker run --rm -it -p 9944:9944 -p 9933:9933 -p 30333:30333 predictor-node:local --dev
+```
+
+### Notes
+- The official CI/CD pipelines publish images to GitHub Container Registry (GHCR) tagged by commit SHA and release tag.
+- The Docker image expects the binary to be named `predictor-node` in the build context root.
+- For production or release images, use the published images from `ghcr.io/<owner>/predictor-node:<tag>`.
