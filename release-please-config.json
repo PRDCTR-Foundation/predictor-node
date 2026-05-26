@@ -1,10 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "cargo-workspace",
   "include-v-in-tag": true,
+  "plugins": ["cargo-workspace"],
   "packages": {
     ".": {
-      "release-type": "cargo-workspace"
+      "release-type": "rust"
     }
   }
 }
