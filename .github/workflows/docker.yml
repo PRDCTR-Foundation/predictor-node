@@ -36,7 +36,7 @@ jobs:
         with:
           script: |
             const workflow_id = 'cargo-build.yml';
-            const head_sha = '${{ github.event.release ? github.event.release.target_commitish : github.sha }}';
+            const head_sha = '${{ github.event.release && github.event.release.target_commitish || github.sha }}';
             const { owner, repo } = context.repo;
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
               owner,
