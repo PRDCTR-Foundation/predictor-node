@@ -1,0 +1,59 @@
+name: cargo-build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: cargo-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  production:
+    name: cargo build (release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: cargo-build-${{ runner.os }}-release-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            cargo-build-${{ runner.os }}-release-
+            cargo-build-${{ runner.os }}-
+
+      - name: Cargo build
+        run: |
+          cargo build --locked --release
+          mkdir -p dist
+          cp target/release/predictor-node dist/
+          find ./target -name predictor_runtime.compact.compressed.wasm -exec cp {} dist/predictor_runtime.compact.compressed.wasm \;
+          # Generate sha256 checksums
+          (cd dist && sha256sum predictor-node > predictor-node.sha256)
+          (cd dist && sha256sum predictor_runtime.compact.compressed.wasm > predictor_runtime.compact.compressed.wasm.sha256)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+          retention-days: 48

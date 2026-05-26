@@ -1,0 +1,88 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - name: Resolve release tag commit
+        id: tag-sha
+        run: |
+          TAG_SHA=$(git rev-list -n 1 "${{ github.event.release.tag_name }}")
+          echo "tag_sha=${TAG_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Find matching cargo-build run
+        id: build-run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflow_id = 'cargo-build.yml';
+            const head_sha = '${{ steps.tag-sha.outputs.tag_sha }}';
+            const { owner, repo } = context.repo;
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id,
+              event: 'push',
+              status: 'completed',
+              per_page: 100,
+            });
+            const match = runs.find((r) => r.head_sha === head_sha && r.conclusion === 'success');
+            if (!match) {
+              core.setFailed(`No successful cargo-build run found for commit ${head_sha}`);
+              return;
+            }
+            core.setOutput('run_id', String(match.id));
+
+      - name: Download build artifacts from matched run
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+          run-id: ${{ steps.build-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read checksums for release notes
+        id: sha256
+        run: |
+          COLLATOR_SHA=$(cat dist/predictor-node.sha256 | awk '{print $1}')
+          WASM_SHA=$(cat dist/predictor_runtime.compact.compressed.wasm.sha256 | awk '{print $1}')
+          echo "collator_sha=$COLLATOR_SHA" >> $GITHUB_OUTPUT
+          echo "wasm_sha=$WASM_SHA" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/predictor-node
+            dist/predictor-node.sha256
+            dist/predictor_runtime.compact.compressed.wasm
+            dist/predictor_runtime.compact.compressed.wasm.sha256
+          body: |
+            # Release Notes
+            This release contains the latest version of predictor-node.
+            ## sha256sum
+            predictor-node: `${{ steps.sha256.outputs.collator_sha }}`
+            predictor_runtime.compact.compressed.wasm: `${{ steps.sha256.outputs.wasm_sha }}`
