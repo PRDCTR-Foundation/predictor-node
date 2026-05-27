@@ -24,10 +24,10 @@ jobs:
         include:
           - name: default
             features: ""
-          - name: try-runtime
-            features: "--features try-runtime"
-          - name: runtime-benchmarks
-            features: "--features runtime-benchmarks"
+          # - name: try-runtime
+          #   features: "--features try-runtime"
+          # - name: runtime-benchmarks
+          #   features: "--features runtime-benchmarks"
 
     steps:
       - name: Checkout

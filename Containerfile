@@ -17,7 +17,7 @@ RUN apt-get update && \
 USER polkadot
 
 # copy the compiled binary to the container
-COPY --chown=polkadot:polkadot --chmod=774 target/release/predictor-node /usr/bin/predictor-node
+COPY --chown=polkadot:polkadot --chmod=774 predictor-node /usr/bin/predictor-node
 
 # check if executable works in this container
 RUN /usr/bin/predictor-node --version

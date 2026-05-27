@@ -53,7 +53,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: dist/
+          context: .
           file: ./Containerfile
           push: true
           tags: ${{ steps.tags.outputs.tags }}
