@@ -2,7 +2,7 @@
 authors = ["Aventus systems team"]
 edition = { workspace = true }
 name = "common-primitives"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 frame-support = { workspace = true }

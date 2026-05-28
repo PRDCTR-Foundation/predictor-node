@@ -7,4 +7,4 @@ authors = ["Zeitgeist PM <contact@zeitgeist.pm>", "Aventus systems team"]
 edition.workspace = true
 name = "node-macros"
 
-version = "0.1.0"
+version = "0.2.0"
