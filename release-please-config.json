@@ -15,7 +15,9 @@
       "components": [
         "node",
         "runtime",
-        "pallet"
+        "pallet",
+        "macros",
+        "primitive"
       ]
     }
   ],
@@ -37,6 +39,27 @@
       "release-type": "rust",
       "component": "runtime",
       "package-name": "predictor-runtime",
+      "changelog-path": "CHANGELOG.md",
+      "skip-github-release": true
+    },
+    "macros": {
+      "release-type": "rust",
+      "component": "macros",
+      "package-name": "node-macros",
+      "changelog-path": "CHANGELOG.md",
+      "skip-github-release": true
+    },
+    "primitives/common": {
+      "release-type": "rust",
+      "component": "primitive",
+      "package-name": "common-primitives",
+      "changelog-path": "CHANGELOG.md",
+      "skip-github-release": true
+    },
+    "primitives/prediction-market": {
+      "release-type": "rust",
+      "component": "primitive",
+      "package-name": "prediction-market-primitives",
       "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },

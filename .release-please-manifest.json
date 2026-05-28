@@ -1,6 +1,9 @@
 {
   "node": "0.1.0",
   "runtime": "0.1.0",
+  "macros": "0.1.0",
+  "primitives/common": "0.1.0",
+  "primitives/prediction-market": "0.1.0",
   "pallets/authorized": "0.1.0",
   "pallets/combinatorial-tokens": "0.1.0",
   "pallets/config": "0.1.0",
