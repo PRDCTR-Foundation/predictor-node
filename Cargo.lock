@@ -7654,7 +7654,6 @@ dependencies = [
  "orml-tokens",
  "orml-traits",
  "pallet-balances",
- "pallet-pm-combinatorial-tokens",
  "pallet-pm-market-commons",
  "pallet-timestamp",
  "parity-scale-codec",

@@ -22,7 +22,7 @@ common-primitives = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
-# Remove the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
+# Remove the mock feature to avoid a circular dependency
 # pallet-pm-order-book = { workspace = true, features = ["mock", "default"] }
 
 [features]
