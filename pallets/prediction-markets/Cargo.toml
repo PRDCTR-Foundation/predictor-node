@@ -40,7 +40,8 @@ sp-keystore = { workspace = true , optional = true }
 [dev-dependencies]
 more-asserts = { workspace = true }
 test-case = { workspace = true }
-pallet-prediction-markets = { workspace = true, features = ["mock", "default"] }
+# Remove the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
+# pallet-prediction-markets = { workspace = true, features = ["mock", "default"] }
 sp-keystore = { workspace = true, features = ["default"]}
 sp-avn-common = { workspace = true, features=["test-utils"] }
 
