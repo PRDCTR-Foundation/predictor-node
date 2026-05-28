@@ -105,5 +105,5 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets"
-version = "0.1.0"
+version = "0.2.0"
 
