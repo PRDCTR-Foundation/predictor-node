@@ -26,7 +26,7 @@
       "release-type": "rust",
       "component": "node",
       "package-name": "predictor-node",
-      "changelog-path": "../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
           "type": "toml",
@@ -39,105 +39,105 @@
       "release-type": "rust",
       "component": "runtime",
       "package-name": "predictor-runtime",
-      "changelog-path": "../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "macros": {
       "release-type": "rust",
       "component": "macros",
       "package-name": "node-macros",
-      "changelog-path": "../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "primitives/common": {
       "release-type": "rust",
       "component": "primitive",
       "package-name": "common-primitives",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "primitives/prediction-market": {
       "release-type": "rust",
       "component": "primitive",
       "package-name": "prediction-market-primitives",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/authorized": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-authorized",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/combinatorial-tokens": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-combinatorial-tokens",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/config": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-config",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/court": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-court",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/eth-asset-registry": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-eth-asset-registry",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/market-commons": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-market-commons",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/hybrid-router": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-hybrid-router",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/orderbook": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-order-book",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/neo-swaps": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-neo-swaps",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/prediction-markets": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-prediction-markets",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     },
     "pallets/global-disputes": {
       "release-type": "rust",
       "component": "pallet",
       "package-name": "pallet-pm-global-disputes",
-      "changelog-path": "../../CHANGELOG.md",
+      "changelog-path": "CHANGELOG.md",
       "skip-github-release": true
     }
   }
