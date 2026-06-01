@@ -20,6 +20,7 @@ jobs:
 
     env:
       CARGO_TERM_COLOR: always
+      # Override this repo variable when a node PR needs a matching predictor-tests branch.
       PREDICTOR_TESTS_REF: ${{ vars.PREDICTOR_TESTS_REF || 'main' }}
 
     steps:
