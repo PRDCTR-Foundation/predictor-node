@@ -19,6 +19,8 @@
 
 extern crate alloc;
 
+mod mock;
+mod tests;
 pub mod weights;
 
 pub use pallet::*;
@@ -73,8 +75,9 @@ pub mod pallet {
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 
     type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
-    type BalanceOf<T> =
-        <<T as pallet_pm_hybrid_router::Config>::AssetManager as MultiCurrency<AccountIdOf<T>>>::Balance;
+    type BalanceOf<T> = <<T as pallet_pm_hybrid_router::Config>::AssetManager as MultiCurrency<
+        AccountIdOf<T>,
+    >>::Balance;
     type MarketIdOf<T> =
         <<T as pallet_pm_hybrid_router::Config>::MarketCommons as MarketCommonsPalletApi>::MarketId;
     type AssetOf<T> = Asset<MarketIdOf<T>>;

@@ -7920,6 +7920,7 @@ dependencies = [
  "scale-info",
  "sp-avn-common",
  "sp-core",
+ "sp-io",
  "sp-runtime",
 ]
 
