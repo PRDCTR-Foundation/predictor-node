@@ -2,7 +2,7 @@
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>", "Aventus systems team"]
 edition = { workspace = true }
 name = "prediction-market-primitives"
-version = { workspace = true }
+version = "0.2.0"
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }

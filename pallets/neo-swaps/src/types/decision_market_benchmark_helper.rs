@@ -41,7 +41,7 @@ where
     /// to `value`. The pool is technically in invalid state.
     fn create_oracle(value: bool) -> DecisionMarketOracle<T> {
         let pool_id: MarketIdOf<T> = 0u8.into();
-        let collateral = Asset::Tru;
+        let collateral = Asset::Prd;
 
         // Create a `reserves` map so that `positive_outcome` has a higher price if and only if
         // `value` is `true`.

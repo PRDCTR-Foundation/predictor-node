@@ -24,7 +24,7 @@
 // For more information, please refer to <http://unlicense.org>
 
 // External crates imports
-use alloc::{collections::BTreeMap, vec, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
 use frame_support::{
     genesis_builder_helper::{build_state, get_preset},
     weights::Weight,

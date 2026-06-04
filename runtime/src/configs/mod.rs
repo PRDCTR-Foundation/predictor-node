@@ -46,7 +46,13 @@ use sp_core::crypto::KeyTypeId;
 use sp_runtime::{traits::One, transaction_validity::TransactionPriority, Perbill, Percent};
 use sp_version::RuntimeVersion;
 
-pub use prediction_market_primitives::{constants::*, types::*};
+pub use prediction_market_primitives::{
+    constants::*,
+    types::{
+        Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata, EthAddress,
+        MarketId, Moment, OrmlAmount,
+    },
+};
 
 pub use common_primitives::constants::{
     currency::*, BLOCKS_PER_DAY, BLOCKS_PER_HOUR, BLOCKS_PER_YEAR, MILLISECS_PER_BLOCK,
@@ -60,18 +66,16 @@ use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_prediction_markets::types::PredictionMarketsCombinatorialTokensBenchmarkHelper;
-use pallet_prediction_markets::CustomMetadata;
 use sp_avn_common::event_discovery::filters::AllPrimaryEventsFilter;
 // Local module imports
 use super::{
-    opaque::SessionKeys, AccountId, Amount, AssetManager, AssetRegistry, Aura, Authorized,
-    AuthorsManager, Avn, Balance, Balances, Block, BlockNumber, CombinatorialTokens, Court,
-    EthBridge, GlobalDisputes, Hash, Historical, ImOnline, MarketCommons, NeoSwaps, Nonce,
-    Offences, Orderbook, OriginCaller, PalletConfig, PalletInfo, PredictionMarkets, Preimage,
-    RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
-    RuntimeHoldReason, RuntimeOrigin, RuntimeTask, Scheduler, Signature, Summary, System,
-    Timestamp, TokenManager, Tokens, UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES,
-    NATIVE_EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
+    opaque::SessionKeys, AccountId, AssetManager, AssetRegistry, Aura, Authorized, AuthorsManager,
+    Avn, Balance, Balances, Block, BlockNumber, CombinatorialTokens, Court, EthBridge,
+    GlobalDisputes, Hash, Historical, ImOnline, MarketCommons, NeoSwaps, Nonce, Offences,
+    Orderbook, OriginCaller, PalletInfo, PredictionMarkets, Preimage, RandomnessCollectiveFlip,
+    Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin,
+    RuntimeTask, Scheduler, Signature, Summary, System, Timestamp, TokenManager, Tokens,
+    UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES, NATIVE_EXISTENTIAL_DEPOSIT, VERSION,
 };
 use crate::configs::misc::{MajorityQuorum, Treasury};
 use orml_traits::{parameter_type_with_key, LockIdentifier};
@@ -447,7 +451,7 @@ impl pallet_avn_proxy::Config for Runtime {
 parameter_type_with_key! {
     pub ExistentialDeposits: |currency_id: CurrencyId| -> Balance {
         match currency_id {
-            Asset::Tru => NATIVE_EXISTENTIAL_DEPOSIT,
+            Asset::Prd => NATIVE_EXISTENTIAL_DEPOSIT,
             Asset::ForeignAsset(id) => {
                 let maybe_metadata = <
                 pallet_pm_eth_asset_registry::Pallet<Runtime> as prediction_market_primitives::traits::InspectEthAsset
@@ -511,7 +515,7 @@ impl orml_tokens::Config for Runtime {
 }
 
 parameter_types! {
-    pub const GetNativeCurrencyId: CurrencyId = Asset::Tru;
+    pub const GetNativeCurrencyId: CurrencyId = Asset::Prd;
         pub const TreasuryPalletId: PalletId = TREASURY_PALLET_ID;
     pub TnfTreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
 }
