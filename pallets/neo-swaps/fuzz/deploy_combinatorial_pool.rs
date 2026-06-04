@@ -105,7 +105,7 @@ fuzz_target!(|params: DeployCombinatorialPoolFuzzParams| {
 
     ext.execute_with(|| {
         // We create the required markets and deposit enough funds for the user.
-        let collateral = Asset::Tru;
+        let collateral = Asset::Prd;
         for (&market_id, &category_count) in
             params.market_ids.iter().zip(params.category_counts.iter())
         {

@@ -13,8 +13,10 @@ chain_spec_command = "./target/release/predictor-node build-spec --chain local -
   name = "alice"
   validator = true
   args = ["--avn-port", "2020"]
+  keystore_key_types = ["aura", "audi", "imon", "gran", "avnk", "ethk_ec"]
 
   [[relaychain.nodes]]
   name = "bob"
   validator = true
   args = ["--avn-port", "2021"]
+  keystore_key_types = ["aura", "audi", "imon", "gran", "avnk", "ethk_ec"]
