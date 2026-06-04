@@ -74,7 +74,7 @@ sc-telemetry = { version = "25.0.0", default-features = false }
 sc-transaction-pool = { version = "37.0.0", default-features = false }
 sc-transaction-pool-api = { version = "37.0.0", default-features = false }
 sp-api = { version = "34.0.0", default-features = false }
-sp-arithmetic = { version = "26.0.0", default-features = false }
+sp-arithmetic = { version = "26.1.0", default-features = false }
 sp-block-builder = { version = "34.0.0", default-features = false }
 sp-blockchain = { version = "37.0.1", default-features = false }
 sp-consensus-aura = { version = "0.40.0", default-features = false }
@@ -149,12 +149,16 @@ pallet-pm-order-book = { path = "pallets/orderbook", default-features = false }
 pallet-pm-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
 pallet-pm-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
 pallet-pm-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
+zeitgeist-primitives = { package = "zeitgeist-primitives", git = "ssh://git@github.com/Predictor-Foundation/zeitgeist.git", branch = "predictor-framework-v0.6.1", default-features = false }
+zeitgeist-market-commons = { package = "zrml-market-commons", git = "ssh://git@github.com/Predictor-Foundation/zeitgeist.git", branch = "predictor-framework-v0.6.1", default-features = false }
+zeitgeist-hybrid-router = { package = "zrml-hybrid-router", git = "ssh://git@github.com/Predictor-Foundation/zeitgeist.git", branch = "predictor-framework-v0.6.1", default-features = false }
 
 # ORML (wasm)
 orml-benchmarking = { version = "=1.1.0", default-features = false }
 orml-currencies = { version = "=1.1.0", default-features = false }
 orml-tokens = { version = "=1.1.0", default-features = false }
 orml-traits = { version = "=1.1.0", default-features = false }
+orml-utilities = { version = "=1.2.1", default-features = false }
 orml-xtokens = { version = "=1.1.0", default-features = false }
 orml-asset-registry = { version = "=1.1.0", default-features = false }
 
@@ -195,10 +199,50 @@ hydra-dx-math = { git = "https://github.com/galacticcouncil/HydraDX-node", packa
 
 [patch."https://github.com/galacticcouncil/HydraDX-node"]
 # Ensure same Substrate dependencies are used everywhere
-sp-arithmetic = { version = "26.0.0" }
-sp-std = { version = "14.0.0" }
+sp-arithmetic = { version = "=26.1.0" }
+sp-std = { version = "=14.0.0" }
 
-# [patch."https://github.com/paritytech/polkadot-sdk"]
+[patch."https://github.com/paritytech/polkadot-sdk"]
+# Ensure Zeitgeist framework dependencies use the same Polkadot SDK source as Predictor.
+frame-support = { version = "=38.2.0" }
+frame-system = { version = "=38.0.0" }
+pallet-authorship = { version = "=38.0.0" }
+pallet-balances = { version = "=39.0.1" }
+pallet-insecure-randomness-collective-flip = { version = "=26.0.0" }
+pallet-session = { version = "=38.0.0" }
+pallet-timestamp = { version = "=37.0.0" }
+pallet-treasury = { version = "=37.0.0" }
+pallet-xcm = { version = "=17.0.5" }
+sp-api = { version = "=34.0.0" }
+sp-arithmetic = { version = "=26.1.0" }
+sp-application-crypto = { version = "=38.0.0" }
+sp-authority-discovery = { version = "=34.0.0" }
+sp-core = { version = "=34.0.0" }
+sp-externalities = { version = "=0.29.0" }
+sp-inherents = { version = "=34.0.0" }
+sp-io = { version = "=38.0.2" }
+sp-keystore = { version = "=0.40.0" }
+sp-session = { version = "=36.0.0" }
+sp-staking = { version = "=36.0.0" }
+sp-runtime-interface = { version = "=28.0.0" }
+sp-runtime = { version = "=39.0.5" }
+sp-state-machine = { version = "=0.43.0" }
+sp-storage = { version = "=21.0.0" }
+sp-std = { version = "=14.0.0" }
+sp-timestamp = { version = "=34.0.0" }
+sp-trie = { version = "=37.0.0" }
+sp-version = { version = "=37.0.0" }
+sp-weights = { version = "=31.1.0" }
+staging-xcm = { version = "=14.2.2" }
+staging-xcm-builder = { version = "=17.0.5" }
+staging-xcm-executor = { version = "=17.0.3" }
+
+[patch."https://github.com/zeitgeistpm/open-runtime-module-library"]
+# Ensure Zeitgeist framework dependencies use the same ORML source as Predictor.
+orml-currencies = { version = "=1.1.0" }
+orml-tokens = { version = "=1.1.0" }
+orml-traits = { version = "=1.1.0" }
+
 # pallet-asset-tx-payment = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-asset-tx-payment-asset-id-fix" }
 # # Updated `ParachainInherentDataProvider::create_at` parameters to include additional relay keys https://github.com/moonbeam-foundation/polkadot-sdk/compare/moonbeam-polkadot-stable2409...zeitgeistpm:polkadot-sdk:polkadot-stable2409-moonbeam-lazy-migrations
 # cumulus-client-parachain-inherent = { git = "https://github.com/zeitgeistpm/polkadot-sdk", branch = "polkadot-stable2409-moonbeam-lazy-migrations" }

@@ -3,6 +3,7 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 orml-traits = { workspace = true }
+orml-utilities = { workspace = true }
 parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
@@ -35,6 +36,9 @@ common-primitives = { workspace = true }
 sp-keystore = { workspace = true, optional = true }
 sp-avn-common = { workspace = true }
 pallet-avn = { workspace = true }
+zeitgeist-primitives = { workspace = true }
+zeitgeist-market-commons = { workspace = true }
+zeitgeist-hybrid-router = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
@@ -70,9 +74,11 @@ mock = [
     "pallet-pm-court/default",
     "pallet-pm-global-disputes/default",
     "sp-keystore/default",
+    "zeitgeist-hybrid-router/mock",
 ]
 parachain = [
     "pallet-prediction-markets/parachain",
+    "zeitgeist-hybrid-router/parachain",
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",
@@ -83,6 +89,7 @@ runtime-benchmarks = [
     "pallet-pm-combinatorial-tokens/runtime-benchmarks",
     "pallet-prediction-markets/runtime-benchmarks",
     "pallet-pm-eth-asset-registry?/runtime-benchmarks",
+    "zeitgeist-hybrid-router/runtime-benchmarks",
 ]
 std = [
     "frame-benchmarking?/std",
@@ -111,9 +118,14 @@ std = [
     "pallet-pm-authorized?/std",
     "pallet-pm-court?/std",
     "pallet-pm-global-disputes?/std",
+    "zeitgeist-primitives/std",
+    "zeitgeist-market-commons/std",
+    "zeitgeist-hybrid-router/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
+    "zeitgeist-market-commons/try-runtime",
+    "zeitgeist-hybrid-router/try-runtime",
 ]
 
 [package]
@@ -121,4 +133,3 @@ authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-hybrid-router"
 version = "0.2.0"
-

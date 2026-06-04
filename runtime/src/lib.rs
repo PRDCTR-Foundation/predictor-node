@@ -315,4 +315,7 @@ mod runtime {
 
     #[runtime::pallet_index(83)]
     pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
+
+    #[runtime::pallet_index(84)]
+    pub type ZeitgeistHybridRouter = zeitgeist_hybrid_router;
 }

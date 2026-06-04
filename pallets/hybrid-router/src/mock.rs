@@ -59,8 +59,8 @@ use prediction_market_primitives::{
     },
     traits::{DistributeFees, NoopLiquidityProvider},
     types::{
-        AccountIdTest, Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata,
-        MarketId, OrmlAmount, SignatureTest, TestAccountIdPK,
+        Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata, MarketId,
+        OrmlAmount, SignatureTest, TestAccountIdPK,
     },
 };
 use sp_runtime::{
@@ -74,7 +74,9 @@ use prediction_market_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
 use sp_core::H160;
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 
-pub use prediction_market_primitives::test_helper::{get_account, get_account_from_seed};
+pub use prediction_market_primitives::test_helper::get_account;
+#[cfg(feature = "runtime-benchmarks")]
+pub use prediction_market_primitives::test_helper::get_account_from_seed;
 pub const INITIAL_BALANCE: Balance = 100 * BASE;
 
 // pub const ALICE: AccountIdTest = 0;
@@ -170,7 +172,7 @@ where
         amount: Self::Balance,
     ) -> Self::Balance {
         let fees = calculate_fee::<T>(amount);
-        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
+        match <T as crate::Config>::AssetManager::transfer(asset, account, &F::get(), fees) {
             Ok(_) => fees,
             Err(_) => Zero::zero(),
         }
@@ -199,7 +201,7 @@ where
         amount: Self::Balance,
     ) -> Self::Balance {
         let fees = calculate_winning_fee::<T>(amount);
-        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
+        match <T as crate::Config>::AssetManager::transfer(asset, account, &F::get(), fees) {
             Ok(_) => fees,
             Err(_) => Zero::zero(),
         }
@@ -217,6 +219,7 @@ impl Contains<TestAccountIdPK> for DustRemovalWhitelist {
 construct_runtime!(
     pub enum Runtime {
         HybridRouter: pallet_pm_hybrid_router,
+        ZeitgeistHybridRouter: zeitgeist_hybrid_router,
         Orderbook: pallet_pm_order_book,
         NeoSwaps: pallet_pm_neo_swaps,
         AssetRegistry: pallet_pm_eth_asset_registry,
@@ -246,13 +249,28 @@ impl crate::Config for Runtime {
     type CompleteSetOperations = PredictionMarkets;
     type MarketCommons = MarketCommons;
     type Orderbook = Orderbook;
-    type RuntimeEvent = RuntimeEvent;
-    type MaxOrders = MaxOrders;
-    type PalletId = HybridRouterPalletId;
     type RuntimeCall = RuntimeCall;
     type Public = TestAccountIdPK;
     type Signature = SignatureTest;
     type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+}
+
+impl zeitgeist_hybrid_router::Config for Runtime {
+    type AssetManager =
+        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorAssetManagerAdapter<Runtime>;
+    #[cfg(feature = "runtime-benchmarks")]
+    type AmmPoolDeployer = NeoSwaps;
+    #[cfg(feature = "runtime-benchmarks")]
+    type CompleteSetOperations = PredictionMarkets;
+    type MarketCommons =
+        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorMarketCommonsAdapter<Runtime>;
+    type Amm = pallet_pm_hybrid_router::zeitgeist_adapters::PredictorAmmAdapter<Runtime>;
+    type Orderbook =
+        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorOrderbookAdapter<Runtime>;
+    type MaxOrders = MaxOrders;
+    type PalletId = HybridRouterPalletId;
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = zeitgeist_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_avn::Config for Runtime {

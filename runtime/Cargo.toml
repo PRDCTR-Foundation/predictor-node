@@ -96,6 +96,7 @@ pallet-prediction-markets = { workspace = true }
 pallet-pm-global-disputes = { workspace = true, optional = true }
 pallet-pm-neo-swaps = { workspace = true }
 pallet-pm-hybrid-router = { workspace = true }
+zeitgeist-hybrid-router = { workspace = true }
 pallet-collective = { workspace = true }
 pallet-insecure-randomness-collective-flip = { workspace = true }
 pallet-pm-eth-asset-registry = { workspace = true }
@@ -190,6 +191,7 @@ std = [
 	"pallet-pm-neo-swaps/std",
 	"pallet-pm-eth-asset-registry/std",
 	"pallet-pm-hybrid-router/std",
+	"zeitgeist-hybrid-router/std",
 	"pallet-pm-order-book/std",
 	"pallet-pm-combinatorial-tokens/std",
 
@@ -238,6 +240,7 @@ runtime-benchmarks = [
 	"pallet-pm-eth-asset-registry/runtime-benchmarks",
 	"pallet-pm-global-disputes/runtime-benchmarks",
 	"pallet-pm-hybrid-router/runtime-benchmarks",
+	"zeitgeist-hybrid-router/runtime-benchmarks",
 	"pallet-pm-neo-swaps/runtime-benchmarks",
 	"pallet-pm-order-book/runtime-benchmarks",
 ]
@@ -258,6 +261,7 @@ try-runtime = [
 	"orml-tokens/try-runtime",
 	"pallet-config/try-runtime",
 	"pallet-pm-combinatorial-tokens/try-runtime",
+	"zeitgeist-hybrid-router/try-runtime",
 ]
 
 # Enable the metadata hash generation.
