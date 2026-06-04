@@ -3,7 +3,6 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 orml-traits = { workspace = true }
-orml-utilities = { workspace = true }
 parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
@@ -33,19 +32,11 @@ pallet-pm-neo-swaps = { workspace = true, optional = true }
 pallet-pm-order-book = { workspace = true, optional = true }
 pallet-prediction-markets = { workspace = true, optional = true }
 common-primitives = { workspace = true }
-sp-keystore = { workspace = true, optional = true }
-sp-avn-common = { workspace = true }
-pallet-avn = { workspace = true }
-zeitgeist-primitives = { workspace = true }
-zeitgeist-market-commons = { workspace = true }
-zeitgeist-hybrid-router = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
 # Remove when pallet-pm-neo-swaps is added to the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
 # pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
-sp-keystore = { workspace = true, features = ["default"]}
-sp-avn-common = { workspace = true, features=["test-utils"] }
 
 [features]
 default = ["std"]
@@ -73,12 +64,9 @@ mock = [
     "pallet-pm-authorized/default",
     "pallet-pm-court/default",
     "pallet-pm-global-disputes/default",
-    "sp-keystore/default",
-    "zeitgeist-hybrid-router/mock",
 ]
 parachain = [
     "pallet-prediction-markets/parachain",
-    "zeitgeist-hybrid-router/parachain",
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",
@@ -89,7 +77,6 @@ runtime-benchmarks = [
     "pallet-pm-combinatorial-tokens/runtime-benchmarks",
     "pallet-prediction-markets/runtime-benchmarks",
     "pallet-pm-eth-asset-registry?/runtime-benchmarks",
-    "zeitgeist-hybrid-router/runtime-benchmarks",
 ]
 std = [
     "frame-benchmarking?/std",
@@ -102,8 +89,6 @@ std = [
     "prediction-market-primitives/std",
     "pallet-pm-market-commons/std",
     "common-primitives/std",
-    "pallet-avn/std",
-    "sp-avn-common/std",
     # Optional deps activated by `runtime-benchmarks`. See neo-swaps for
     # rationale.
     "xcm?/std",
@@ -118,14 +103,9 @@ std = [
     "pallet-pm-authorized?/std",
     "pallet-pm-court?/std",
     "pallet-pm-global-disputes?/std",
-    "zeitgeist-primitives/std",
-    "zeitgeist-market-commons/std",
-    "zeitgeist-hybrid-router/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
-    "zeitgeist-market-commons/try-runtime",
-    "zeitgeist-hybrid-router/try-runtime",
 ]
 
 [package]

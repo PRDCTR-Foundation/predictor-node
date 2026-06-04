@@ -17,22 +17,28 @@
 
 #![cfg(all(feature = "mock", test))]
 
-use crate::{mock::*, AccountIdOf, BalanceOf, MarketIdOf, *};
-use common_primitives::constants::currency::CENT_BASE;
-use frame_support::{assert_noop, assert_ok};
+use crate::{mock::*, types::*, utils::*, AccountIdOf, BalanceOf, MarketIdOf, *};
+use common_primitives::constants::currency::{BASE, CENT_BASE};
+use frame_support::{assert_noop, assert_ok, traits::fungible::Mutate};
+use orml_currencies::Error as CurrenciesError;
+use orml_tokens::Error as TokensError;
 use orml_traits::MultiCurrency;
-use pallet_pm_market_commons::MarketCommonsPalletApi;
+use pallet_pm_market_commons::{Error as MError, MarketCommonsPalletApi, Markets};
+use pallet_pm_neo_swaps::Event as NeoSwapsEvent;
+use pallet_pm_order_book::Orders;
 use pallet_prediction_markets::WhitelistedMarketCreators;
 use prediction_market_primitives::{
     constants::base_multiples::*,
+    orderbook::Order,
     types::{
-        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketType, MultiHash,
-        ScoringRule, TestAccountIdPK,
+        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
+        MultiHash, ScoringRule, TestAccountIdPK,
     },
 };
-use sp_runtime::Perbill;
+pub use sp_runtime::{traits::Hash, Perbill, SaturatedConversion};
 
-mod signed;
+mod buy;
+mod sell;
 
 const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
 

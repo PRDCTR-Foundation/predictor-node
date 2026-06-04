@@ -35,17 +35,14 @@ use frame_support::{
 use frame_system::RawOrigin;
 use orml_traits::MultiCurrency;
 use pallet_pm_market_commons::MarketCommonsPalletApi;
-use parity_scale_codec::{Decode, Encode};
 use prediction_market_primitives::{
     constants::base_multiples::*,
     math::fixed::{BaseProvider, FixedDiv, PredictionMarketBase},
     traits::{CompleteSetOperationsApi, DeployPoolApi, HybridRouterOrderbookApi},
     types::{Asset, Market, MarketCreation, MarketPeriod, MarketStatus, MarketType, ScoringRule},
 };
-use sp_avn_common::Proof;
-use sp_core::{crypto::DEV_PHRASE, ByteArray, H256};
-use sp_runtime::{Perbill, RuntimeAppPublic, SaturatedConversion};
-use zeitgeist_hybrid_router::Strategy;
+use sp_runtime::{Perbill, SaturatedConversion};
+use types::Strategy;
 
 // Same behavior as `assert_ok!`, except that it wraps the call inside a transaction layer. Required
 // when calling into functions marked `require_transactional` to avoid a `Transactional(NoLayer)`
@@ -93,7 +90,7 @@ where
         bonds: Default::default(),
         early_close: None,
     };
-    let maybe_market_id = <T as crate::Config>::MarketCommons::push_market(market);
+    let maybe_market_id = T::MarketCommons::push_market(market);
     maybe_market_id.unwrap()
 }
 
@@ -104,14 +101,14 @@ fn create_market_and_deploy_pool<T: Config>(
     amount: BalanceOf<T>,
 ) -> MarketIdOf<T> {
     let market_id = create_market::<T>(caller.clone(), base_asset, asset_count);
-    let total_cost = amount + <T as crate::Config>::AssetManager::minimum_balance(base_asset);
-    assert_ok!(<T as crate::Config>::AssetManager::deposit(base_asset, &caller, total_cost));
-    assert_ok_with_transaction!(<T as crate::Config>::CompleteSetOperations::buy_complete_set(
+    let total_cost = amount + T::AssetManager::minimum_balance(base_asset);
+    assert_ok!(T::AssetManager::deposit(base_asset, &caller, total_cost));
+    assert_ok_with_transaction!(T::CompleteSetOperations::buy_complete_set(
         caller.clone(),
         market_id,
         amount
     ));
-    assert_ok_with_transaction!(<T as crate::Config>::AmmPoolDeployer::deploy_pool(
+    assert_ok_with_transaction!(T::AmmPoolDeployer::deploy_pool(
         caller,
         market_id,
         amount,
@@ -121,58 +118,17 @@ fn create_market_and_deploy_pool<T: Config>(
     market_id
 }
 
-fn into_bytes<T: Config>(account: &<T as pallet_avn::Config>::AuthorityId) -> [u8; 32]
-where
-    T: Config + pallet_avn::Config,
-{
-    let bytes = account.encode();
-    let mut vector: [u8; 32] = Default::default();
-    vector.copy_from_slice(&bytes[0..32]);
-    return vector;
-}
-
-fn get_user_account<T: Config>() -> (<T as pallet_avn::Config>::AuthorityId, T::AccountId)
-where
-    T: Config + pallet_avn::Config,
-{
-    let mnemonic: &str = DEV_PHRASE;
-    let key_pair =
-        <T as pallet_avn::Config>::AuthorityId::generate_pair(Some(mnemonic.as_bytes().to_vec()));
-    let account_bytes = into_bytes::<T>(&key_pair);
-    let account_id = T::AccountId::decode(&mut &account_bytes.encode()[..]).unwrap();
-    return (key_pair, account_id);
-}
-
-fn get_relayer<T: Config>() -> T::AccountId {
-    let relayer_account: H256 = H256::repeat_byte(1);
-    return T::AccountId::decode(&mut relayer_account.as_bytes()).expect("valid relayer account id");
-}
-
-fn get_proof<T: Config>(
-    signer: T::AccountId,
-    relayer: T::AccountId,
-    signature: &[u8],
-) -> Proof<T::Signature, T::AccountId> {
-    return Proof {
-        signer: signer.clone(),
-        relayer: relayer.clone(),
-        signature: sp_core::sr25519::Signature::from_slice(signature).unwrap().into(),
-    };
-}
-
-#[benchmarks(where T: pallet_avn::Config + frame_system::Config)]
+#[benchmarks]
 mod benchmarks {
     use super::*;
 
     #[benchmark]
-    fn signed_buy(n: Linear<2, 16>, o: Linear<0, 10>) {
-        let relayer_account_id = get_relayer::<T>();
-        let (buyer_key_pair, buyer_account_id) = get_user_account::<T>();
-
+    fn buy(n: Linear<2, 16>, o: Linear<0, 10>) {
+        let buyer: T::AccountId = whitelisted_caller();
         let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
-            buyer_account_id.clone(),
+            buyer.clone(),
             base_asset,
             asset_count,
             _100.saturated_into(),
@@ -180,11 +136,7 @@ mod benchmarks {
 
         let asset = Asset::CategoricalOutcome(market_id, 0u16);
         let amount_in = _1000.saturated_into();
-        assert_ok!(<T as crate::Config>::AssetManager::deposit(
-            base_asset,
-            &buyer_account_id,
-            amount_in
-        ));
+        assert_ok!(T::AssetManager::deposit(base_asset, &buyer, amount_in));
 
         let spot_prices = create_spot_prices::<T>(asset_count);
         let first_spot_price = spot_prices[0];
@@ -200,12 +152,8 @@ mod benchmarks {
             let order_creator: T::AccountId = account("order_creator", *order_id as u32, 0);
             let surplus = ((i + 1) as u128) * _1_2;
             let taker_amount = taker_amount + surplus.saturated_into::<BalanceOf<T>>();
-            assert_ok!(<T as crate::Config>::AssetManager::deposit(
-                maker_asset,
-                &order_creator,
-                maker_amount
-            ));
-            assert_ok!(<T as crate::Config>::Orderbook::place_order(
+            assert_ok!(T::AssetManager::deposit(maker_asset, &order_creator, maker_amount));
+            assert_ok!(T::Orderbook::place_order(
                 order_creator,
                 market_id,
                 maker_asset,
@@ -215,26 +163,10 @@ mod benchmarks {
             ));
         }
         let strategy = Strategy::LimitOrder;
-        let signed_payload = encode_signed_buy_params::<T>(
-            &relayer_account_id,
-            0u64,
-            &market_id,
-            &asset_count,
-            &asset,
-            &amount_in,
-            &max_price,
-            &orders,
-            &strategy,
-        );
-
-        let signature = buyer_key_pair.sign(&signed_payload).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> =
-            get_proof::<T>(buyer_account_id.clone(), relayer_account_id, &signature);
 
         #[extrinsic_call]
-        signed_buy(
-            RawOrigin::Signed(buyer_account_id.clone()),
-            proof,
+        buy(
+            RawOrigin::Signed(buyer.clone()),
             market_id,
             asset_count,
             asset,
@@ -244,18 +176,20 @@ mod benchmarks {
             strategy,
         );
 
-        assert_eq!(MarketNonces::<T>::get(&buyer_account_id, &market_id), 1);
+        let buyer_limit_order = T::Orderbook::order(o as u128).unwrap();
+        assert_eq!(buyer_limit_order.market_id, market_id);
+        assert_eq!(buyer_limit_order.maker, buyer);
+        assert_eq!(buyer_limit_order.maker_asset, base_asset);
+        assert_eq!(buyer_limit_order.taker_asset, asset);
     }
 
     #[benchmark]
-    fn signed_sell(n: Linear<2, 10>, o: Linear<0, 10>) {
-        let relayer_account_id = get_relayer::<T>();
-        let (seller_key_pair, seller_account_id) = get_user_account::<T>();
-
+    fn sell(n: Linear<2, 10>, o: Linear<0, 10>) {
+        let seller: T::AccountId = whitelisted_caller();
         let base_asset = Asset::Prd;
         let asset_count = n.try_into().unwrap();
         let market_id = create_market_and_deploy_pool::<T>(
-            seller_account_id.clone(),
+            seller.clone(),
             base_asset,
             asset_count,
             _100.saturated_into(),
@@ -263,20 +197,12 @@ mod benchmarks {
 
         let asset = Asset::CategoricalOutcome(market_id, 0u16);
         let amount_in = (_1000 * 100).saturated_into();
-        assert_ok!(<T as crate::Config>::AssetManager::deposit(
-            asset,
-            &seller_account_id,
-            amount_in
-        ));
+        assert_ok!(T::AssetManager::deposit(asset, &seller, amount_in));
         // seller base asset amount needs to exist,
         // otherwise repatriate_reserved_named from order book fails
         // with DeadAccount for base asset repatriate to seller beneficiary
-        let min_balance = <T as crate::Config>::AssetManager::minimum_balance(base_asset);
-        assert_ok!(<T as crate::Config>::AssetManager::deposit(
-            base_asset,
-            &seller_account_id,
-            min_balance
-        ));
+        let min_balance = T::AssetManager::minimum_balance(base_asset);
+        assert_ok!(T::AssetManager::deposit(base_asset, &seller, min_balance));
 
         let spot_prices = create_spot_prices::<T>(asset_count);
         let first_spot_price = spot_prices[0];
@@ -292,12 +218,12 @@ mod benchmarks {
             let order_creator: T::AccountId = account("order_creator", *order_id as u32, 0);
             let surplus = ((i + 1) as u128) * _1_2;
             let taker_amount = taker_amount + surplus.saturated_into::<BalanceOf<T>>();
-            assert_ok!(<T as crate::Config>::AssetManager::deposit(
+            assert_ok!(T::AssetManager::deposit(
                 maker_asset,
                 &order_creator,
                 maker_amount + _100.saturated_into()
             ));
-            <T as crate::Config>::Orderbook::place_order(
+            T::Orderbook::place_order(
                 order_creator,
                 market_id,
                 maker_asset,
@@ -309,26 +235,9 @@ mod benchmarks {
         }
         let strategy = Strategy::LimitOrder;
 
-        let signed_payload = encode_signed_sell_params::<T>(
-            &relayer_account_id,
-            0u64,
-            &market_id,
-            &asset_count,
-            &asset,
-            &amount_in,
-            &min_price,
-            &orders,
-            &strategy,
-        );
-
-        let signature = seller_key_pair.sign(&signed_payload).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> =
-            get_proof::<T>(seller_account_id.clone(), relayer_account_id, &signature);
-
         #[extrinsic_call]
-        signed_sell(
-            RawOrigin::Signed(seller_account_id.clone()),
-            proof,
+        sell(
+            RawOrigin::Signed(seller.clone()),
             market_id,
             asset_count,
             asset,
@@ -338,7 +247,11 @@ mod benchmarks {
             strategy,
         );
 
-        assert_eq!(MarketNonces::<T>::get(&seller_account_id, &market_id), 1);
+        let seller_limit_order = T::Orderbook::order(o as u128).unwrap();
+        assert_eq!(seller_limit_order.market_id, market_id);
+        assert_eq!(seller_limit_order.maker, seller);
+        assert_eq!(seller_limit_order.maker_asset, asset);
+        assert_eq!(seller_limit_order.taker_asset, base_asset);
     }
 
     impl_benchmark_test_suite!(

@@ -39,7 +39,7 @@ use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
 use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
-use parity_scale_codec::{alloc::sync::Arc, Encode};
+use parity_scale_codec::Encode;
 use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
@@ -72,7 +72,6 @@ use sp_runtime::{
 use prediction_market_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
 
 use sp_core::H160;
-use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 
 pub use prediction_market_primitives::test_helper::get_account;
 #[cfg(feature = "runtime-benchmarks")]
@@ -172,7 +171,7 @@ where
         amount: Self::Balance,
     ) -> Self::Balance {
         let fees = calculate_fee::<T>(amount);
-        match <T as crate::Config>::AssetManager::transfer(asset, account, &F::get(), fees) {
+        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
             Ok(_) => fees,
             Err(_) => Zero::zero(),
         }
@@ -201,7 +200,7 @@ where
         amount: Self::Balance,
     ) -> Self::Balance {
         let fees = calculate_winning_fee::<T>(amount);
-        match <T as crate::Config>::AssetManager::transfer(asset, account, &F::get(), fees) {
+        match T::AssetManager::transfer(asset, account, &F::get(), fees) {
             Ok(_) => fees,
             Err(_) => Zero::zero(),
         }
@@ -219,7 +218,6 @@ impl Contains<TestAccountIdPK> for DustRemovalWhitelist {
 construct_runtime!(
     pub enum Runtime {
         HybridRouter: pallet_pm_hybrid_router,
-        ZeitgeistHybridRouter: zeitgeist_hybrid_router,
         Orderbook: pallet_pm_order_book,
         NeoSwaps: pallet_pm_neo_swaps,
         AssetRegistry: pallet_pm_eth_asset_registry,
@@ -236,7 +234,6 @@ construct_runtime!(
         Timestamp: pallet_timestamp,
         Tokens: orml_tokens,
         Treasury: pallet_treasury,
-        AVN: pallet_avn,
     }
 );
 
@@ -249,37 +246,10 @@ impl crate::Config for Runtime {
     type CompleteSetOperations = PredictionMarkets;
     type MarketCommons = MarketCommons;
     type Orderbook = Orderbook;
-    type RuntimeCall = RuntimeCall;
-    type Public = TestAccountIdPK;
-    type Signature = SignatureTest;
-    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
-}
-
-impl zeitgeist_hybrid_router::Config for Runtime {
-    type AssetManager =
-        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorAssetManagerAdapter<Runtime>;
-    #[cfg(feature = "runtime-benchmarks")]
-    type AmmPoolDeployer = NeoSwaps;
-    #[cfg(feature = "runtime-benchmarks")]
-    type CompleteSetOperations = PredictionMarkets;
-    type MarketCommons =
-        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorMarketCommonsAdapter<Runtime>;
-    type Amm = pallet_pm_hybrid_router::zeitgeist_adapters::PredictorAmmAdapter<Runtime>;
-    type Orderbook =
-        pallet_pm_hybrid_router::zeitgeist_adapters::PredictorOrderbookAdapter<Runtime>;
+    type RuntimeEvent = RuntimeEvent;
     type MaxOrders = MaxOrders;
     type PalletId = HybridRouterPalletId;
-    type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = zeitgeist_hybrid_router::weights::WeightInfo<Runtime>;
-}
-
-impl pallet_avn::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type AuthorityId = pallet_avn::sr25519::AuthorityId;
-    type EthereumPublicKeyChecker = ();
-    type NewSessionHandler = ();
-    type DisabledValidatorChecker = ();
-    type WeightInfo = ();
+    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_pm_order_book::Config for Runtime {
@@ -600,7 +570,6 @@ impl Default for ExtBuilder {
 #[allow(unused)]
 impl ExtBuilder {
     pub fn build(self) -> sp_io::TestExternalities {
-        let keystore = MemoryKeystore::new();
         let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
         let _ = env_logger::builder().is_test(true).try_init();
@@ -648,7 +617,6 @@ impl ExtBuilder {
         .unwrap();
 
         let mut test_ext: sp_io::TestExternalities = t.into();
-        test_ext.register_extension(KeystoreExt(Arc::new(keystore)));
         test_ext.execute_with(|| System::set_block_number(1));
         test_ext
     }
