@@ -691,7 +691,6 @@ impl pallet_prediction_markets::Config for Runtime {
     type DeployPool = NeoSwaps;
     type DisputeBond = DisputeBond;
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
     type GlobalDisputes = GlobalDisputes;
     type MaxCategories = MaxCategories;
     type MaxCreatorFee = MaxCreatorFee;
@@ -718,11 +717,16 @@ impl pallet_prediction_markets::Config for Runtime {
     type ValidityBond = ValidityBond;
     type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
     type AssetRegistry = AssetRegistry;
-    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
-    type Signature = Signature;
     type TokenInterface = TokenManager;
     type WinnerFeePercentage = WinnerFeePercentage;
     type WinnerFeeHandler = WinnerFee;
+}
+
+impl pallet_pm_signed_prediction_markets::Config for Runtime {
+    type RuntimeCall = RuntimeCall;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type WeightInfo = pallet_pm_signed_prediction_markets::weights::WeightInfo<Runtime>;
 }
 
 parameter_types! {

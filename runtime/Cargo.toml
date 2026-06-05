@@ -97,6 +97,7 @@ pallet-pm-global-disputes = { workspace = true, optional = true }
 pallet-pm-neo-swaps = { workspace = true }
 pallet-pm-hybrid-router = { workspace = true }
 pallet-pm-signed-hybrid-router = { workspace = true }
+pallet-pm-signed-prediction-markets = { workspace = true }
 pallet-collective = { workspace = true }
 pallet-insecure-randomness-collective-flip = { workspace = true }
 pallet-pm-eth-asset-registry = { workspace = true }
@@ -190,8 +191,9 @@ std = [
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-pm-neo-swaps/std",
 	"pallet-pm-eth-asset-registry/std",
-	"pallet-pm-hybrid-router/std",
-	"pallet-pm-signed-hybrid-router/std",
+    "pallet-pm-hybrid-router/std",
+    "pallet-pm-signed-hybrid-router/std",
+    "pallet-pm-signed-prediction-markets/std",
 	"pallet-pm-order-book/std",
 	"pallet-pm-combinatorial-tokens/std",
 
@@ -241,6 +243,7 @@ runtime-benchmarks = [
 	"pallet-pm-global-disputes/runtime-benchmarks",
 	"pallet-pm-hybrid-router/runtime-benchmarks",
 	"pallet-pm-signed-hybrid-router/runtime-benchmarks",
+	"pallet-pm-signed-prediction-markets/runtime-benchmarks",
 	"pallet-pm-neo-swaps/runtime-benchmarks",
 	"pallet-pm-order-book/runtime-benchmarks",
 ]
@@ -262,6 +265,7 @@ try-runtime = [
 	"pallet-config/try-runtime",
 	"pallet-pm-combinatorial-tokens/try-runtime",
 	"pallet-pm-signed-hybrid-router/try-runtime",
+	"pallet-pm-signed-prediction-markets/try-runtime",
 ]
 
 # Enable the metadata hash generation.

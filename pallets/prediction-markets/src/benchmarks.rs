@@ -24,11 +24,6 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use crate::signed_calls::{
-    BUY_COMPLETE_SET_CONTEXT, CREATE_MARKET_AND_DEPLOY_POOL_CONTEXT, REDEEM_SHARES,
-    REPORT_OUTCOME_CONTEXT, TRANSFER_TOKENS_CONTEXT, WITHDRAW_TOKENS_CONTEXT,
-};
-
 #[cfg(test)]
 use crate::Pallet as PredictionMarket;
 use alloc::{vec, vec::Vec};
@@ -42,7 +37,7 @@ use frame_support::{
     BoundedVec,
 };
 use frame_system::{pallet_prelude::BlockNumberFor, RawOrigin};
-use orml_traits::{asset_registry::AssetMetadata, MultiCurrency};
+use orml_traits::MultiCurrency;
 use pallet_pm_authorized::Pallet as AuthorizedPallet;
 use pallet_pm_global_disputes::GlobalDisputesPalletApi;
 use pallet_pm_market_commons::MarketCommonsPalletApi;
@@ -55,10 +50,9 @@ use prediction_market_primitives::{
         MarketType, MultiHash, OutcomeReport, ScoringRule,
     },
 };
-use sp_core::{crypto::DEV_PHRASE, ByteArray, H160, H256};
 use sp_runtime::{
     traits::{SaturatedConversion, Saturating, Zero},
-    DispatchError, Perbill, RuntimeAppPublic,
+    DispatchError, Perbill,
 };
 
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
@@ -199,27 +193,6 @@ fn setup_redeem_shares_common<T: Config + pallet_timestamp::Config>(
     Ok((caller, market_id))
 }
 
-fn create_market_and_pool<T: Config + pallet_timestamp::Config>(
-    caller_account_id: &Option<T::AccountId>,
-    categories: u32,
-) -> Result<(T::AccountId, MarketIdOf<T>), &'static str> {
-    let range_start: MomentOf<T> = pallet_pm_market_commons::Pallet::<T>::now();
-    let range_end: MomentOf<T> = 1_000_000u64.saturated_into();
-    let (caller, market_id) = create_market_common::<T>(
-        MarketCreation::Permissionless,
-        MarketType::Categorical(categories.saturated_into()),
-        ScoringRule::AmmCdaHybrid,
-        Some(MarketPeriod::Timestamp(range_start..range_end)),
-        Some(MarketDisputeMechanism::Court),
-        caller_account_id.clone(),
-    )?;
-
-    Call::<T>::buy_complete_set { market_id, amount: LIQUIDITY.saturated_into() }
-        .dispatch_bypass_filter(RawOrigin::Signed(caller.clone()).into())?;
-
-    Ok((caller, market_id))
-}
-
 fn setup_reported_categorical_market<T>(
     categories: u32,
     report_outcome: OutcomeReport,
@@ -258,45 +231,6 @@ fn create_spot_prices<T: Config>(asset_count: u16) -> Vec<BalanceOf<T>> {
         PredictionMarketBase::<u128>::get().unwrap() - (asset_count - 1) as u128 * CENT_BASE;
     result.push(remaining_u128.saturated_into());
     result
-}
-
-fn into_bytes<T: Config>(account: &<T as pallet_avn::Config>::AuthorityId) -> [u8; 32]
-where
-    T: Config + pallet_avn::Config,
-{
-    let bytes = account.encode();
-    let mut vector: [u8; 32] = Default::default();
-    vector.copy_from_slice(&bytes[0..32]);
-    return vector
-}
-
-fn get_user_account<T: Config>() -> (<T as pallet_avn::Config>::AuthorityId, T::AccountId)
-where
-    T: Config + pallet_avn::Config,
-{
-    let mnemonic: &str = DEV_PHRASE;
-    let key_pair =
-        <T as pallet_avn::Config>::AuthorityId::generate_pair(Some(mnemonic.as_bytes().to_vec()));
-    let account_bytes = into_bytes::<T>(&key_pair);
-    let account_id = T::AccountId::decode(&mut &account_bytes.encode()[..]).unwrap();
-    return (key_pair, account_id)
-}
-
-fn get_relayer<T: Config>() -> T::AccountId {
-    let relayer_account: H256 = H256::repeat_byte(1);
-    return T::AccountId::decode(&mut relayer_account.as_bytes()).expect("valid relayer account id")
-}
-
-fn get_proof<T: Config>(
-    signer: T::AccountId,
-    relayer: T::AccountId,
-    signature: &[u8],
-) -> Proof<T::Signature, T::AccountId> {
-    return Proof {
-        signer: signer.clone(),
-        relayer: relayer.clone(),
-        signature: sp_core::sr25519::Signature::from_slice(signature).unwrap().into(),
-    }
 }
 
 fn do_report_trusted_market<T: Config>(
@@ -392,7 +326,7 @@ where
 benchmarks! {
     where_clause {
         where
-            T: pallet_timestamp::Config + pallet_pm_authorized::Config + pallet_pm_court::Config + pallet_avn::Config + pallet_pm_eth_asset_registry::Config,
+            T: pallet_timestamp::Config + pallet_pm_authorized::Config + pallet_pm_court::Config + pallet_pm_eth_asset_registry::Config,
             <<T as pallet_pm_authorized::Config>::MarketCommons as MarketCommonsPalletApi>::MarketId:
                 From<<T as pallet_pm_market_commons::Config>::MarketId>,
     }
@@ -1443,76 +1377,6 @@ benchmarks! {
             CENT_BASE.saturated_into()
     )
 
-    signed_create_market_and_deploy_pool {
-        // Beware! This benchmark expects the `DeployPool` implementation to accept spot prices as
-        // low as `BASE / MaxCategories::get()`!
-        let m in 0..63; // Number of markets closing on the same block.
-        let n in 2..T::MaxCategories::get() as u32; // Number of assets in the market.
-
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let base_asset = Asset::Prd;
-        let range_start = (5 * MILLISECS_PER_BLOCK) as u64;
-        let range_end = (100 * MILLISECS_PER_BLOCK) as u64;
-        let period = MarketPeriod::Timestamp(range_start..range_end);
-        let asset_count = n.try_into().unwrap();
-        let market_type = MarketType::Categorical(asset_count);
-        let (caller, oracle, deadlines, metadata) = create_market_common_parameters::<T>(true, Some(caller_account_id.clone()))?;
-        let amount = (10u128 * BASE).saturated_into();
-
-        <T as pallet::Config>::AssetManager::deposit(
-            base_asset,
-            &caller,
-            amount,
-        )?;
-        WhitelistedMarketCreators::<T>::insert(&caller, ());
-        for i in 0..m {
-            MarketIdsPerCloseTimeFrame::<T>::try_mutate(
-                Pallet::<T>::calculate_time_frame_of_moment(range_end),
-                |ids| ids.try_push(i.into()),
-            ).unwrap();
-        }
-
-        let spot_prices = create_spot_prices::<T>(asset_count);
-        let swap_fee: BalanceOf<T> = CENT_BASE.saturated_into();
-        let dispute_resolution = MarketDisputeMechanism::Court;
-        let creator_fee = Perbill::zero();
-        let signed_payload = (
-            CREATE_MARKET_AND_DEPLOY_POOL_CONTEXT,
-            relayer_account_id.clone(),
-            0u64,
-            base_asset,
-            creator_fee.clone(),
-            oracle.clone(),
-            period.clone(),
-            deadlines,
-            metadata.clone(),
-            market_type.clone(),
-            Some(MarketDisputeMechanism::Court),
-            amount,
-            spot_prices.clone(),
-            swap_fee.clone(),
-        );
-
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-    }: _(
-            RawOrigin::Signed(caller),
-            proof,
-            base_asset,
-            creator_fee,
-            oracle,
-            period,
-            deadlines,
-            metadata,
-            market_type,
-            Some(dispute_resolution),
-            amount,
-            spot_prices,
-            swap_fee
-    )
-
     manually_close_market {
         let o in 1..63;
 
@@ -1604,181 +1468,6 @@ benchmarks! {
         assert_last_event::<T>(
             Event::MarketCreatorRemoved::<T> { removed_account }
         .into());
-    }
-
-    signed_transfer_asset {
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let token: EthAddress = H160::from([1u8; 20]);
-        let asset = T::AssetRegistry::asset_id(&token).unwrap();
-        let asset_metadata: AssetMetadata<
-        BalanceOf<T>,
-        CustomMetadata,
-        <T as pallet_pm_eth_asset_registry::Config>::StringLimit> = AssetMetadata {
-            decimals: 18,
-            name: BoundedVec::truncate_from("dummy token".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("DMY".as_bytes().to_vec()),
-            existential_deposit: 0u32.into(),
-            location: None,
-            additional: CustomMetadata { eth_address: token, allow_as_base_asset: true },
-        };
-
-        T::AssetManager::deposit(asset, &caller_account_id, (10000u128 * LIQUIDITY).saturated_into()).unwrap();
-        let recipient: T::AccountId = account("Recipient", 0, 0);
-        let amount: BalanceOf<T> = (1000u128 * LIQUIDITY).saturated_into();
-
-        let signed_payload = (
-            TRANSFER_TOKENS_CONTEXT,
-            &relayer_account_id,
-            0u64,
-            token,
-            caller_account_id.clone(),
-            recipient.clone(),
-            amount
-        );
-
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-    }: _(RawOrigin::Signed(caller_account_id.clone()), proof, token, recipient.clone(), amount)
-    verify {
-        let recipient_balance = T::AssetManager::free_balance(asset, &recipient);
-        assert_eq!(recipient_balance, amount);
-    }
-
-    signed_withdraw_tokens {
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let token: EthAddress = H160::from([1u8; 20]);
-        let asset = T::AssetRegistry::asset_id(&token).unwrap();
-        let asset_metadata: AssetMetadata<
-        BalanceOf<T>,
-        CustomMetadata,
-        <T as pallet_pm_eth_asset_registry::Config>::StringLimit> = AssetMetadata {
-            decimals: 18,
-            name: BoundedVec::truncate_from("dummy token".as_bytes().to_vec()),
-            symbol: BoundedVec::truncate_from("DMY".as_bytes().to_vec()),
-            existential_deposit: 0u32.into(),
-            location: None,
-            additional: CustomMetadata { eth_address: token, allow_as_base_asset: true },
-        };
-        let initial_balance: BalanceOf<T> = (10000u128 * LIQUIDITY).saturated_into();
-        T::AssetManager::deposit(asset, &caller_account_id, initial_balance).unwrap();
-        let amount: BalanceOf<T> = (1000u128 * LIQUIDITY).saturated_into();
-
-        let signed_payload =
-            (WITHDRAW_TOKENS_CONTEXT, relayer_account_id.clone(), 0u64, token, caller_account_id.clone(), amount);
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-    }: _(RawOrigin::Signed(caller_account_id.clone()), proof, token, amount)
-    verify {
-        let owner_balance = T::AssetManager::free_balance(asset, &caller_account_id);
-        assert_eq!(owner_balance, initial_balance - amount);
-    }
-
-    //signed_report
-    signed_report_market_with_dispute_mechanism {
-        let m in 0..63;
-
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let outcome = OutcomeReport::Categorical(0);
-        let market_id = do_report_market_with_dispute_mechanism::<T>(m, &Some(caller_account_id.clone()), Some(MarketDisputeMechanism::Court), false)?;
-
-        let signed_payload =
-            (REPORT_OUTCOME_CONTEXT, relayer_account_id.clone(), 0u64, market_id, outcome.clone());
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-        let call = Call::<T>::signed_report { proof, market_id, outcome };
-    }: {
-        call.dispatch_bypass_filter(RawOrigin::Signed(caller_account_id).into())?;
-    }
-
-    signed_report_trusted_market {
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let market_id = do_report_trusted_market::<T>(&Some(caller_account_id.clone()))?;
-        let outcome = OutcomeReport::Categorical(0);
-
-        let signed_payload =
-            (REPORT_OUTCOME_CONTEXT, relayer_account_id.clone(), 0u64, market_id, outcome.clone());
-        let market_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-        let call = Call::<T>::signed_report { proof, market_id, outcome };
-    }: {
-        call.dispatch_bypass_filter(RawOrigin::Signed(caller_account_id.clone()).into())?;
-    }
-    verify {
-        let new_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        assert_eq!(new_nonce, market_nonce + 1);
-    }
-
-    signed_redeem_shares_categorical {
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-        let (caller, market_id) = setup_redeem_shares_common::<T>(
-            MarketType::Categorical(T::MaxCategories::get()), &Some(caller_account_id.clone())
-        )?;
-        let market_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        let signed_payload =
-            (REDEEM_SHARES, relayer_account_id.clone(), 0u64, market_id);
-
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-
-    }: signed_redeem_shares(RawOrigin::Signed(caller.clone()), proof, market_id)
-    verify {
-        let new_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        assert_eq!(new_nonce, market_nonce + 1);
-    }
-
-    signed_redeem_shares_scalar {
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-        let (caller, market_id) = setup_redeem_shares_common::<T>(
-            MarketType::Scalar(0u128..=u128::MAX), &Some(caller_account_id.clone())
-        )?;
-        let market_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        let signed_payload =
-            (REDEEM_SHARES, relayer_account_id.clone(), 0u64, market_id);
-
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-
-    }: signed_redeem_shares(RawOrigin::Signed(caller.clone()), proof, market_id)
-    verify {
-        let new_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        assert_eq!(new_nonce, market_nonce + 1);
-    }
-
-    signed_buy_complete_set {
-        let a in (T::MinCategories::get().into())..T::MaxCategories::get().into();
-        let relayer_account_id = get_relayer::<T>();
-        let (caller_key_pair, caller_account_id) = get_user_account::<T>();
-
-        let (caller, market_id) = create_market_and_pool::<T>(
-            &Some(caller_account_id.clone()), a
-        )?;
-
-        let market_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        let amount = (10u128 * BASE).saturated_into();
-        let signed_payload =
-            (BUY_COMPLETE_SET_CONTEXT, relayer_account_id.clone(), 0u64, market_id, amount);
-
-        let signature = caller_key_pair.sign(&signed_payload.encode().as_slice()).unwrap().encode();
-        let proof: Proof<T::Signature, T::AccountId> = get_proof::<T>(caller_account_id.clone(), relayer_account_id, &signature);
-
-    }: signed_buy_complete_set(RawOrigin::Signed(caller.clone()), proof, market_id, amount)
-    verify {
-        let new_nonce = MarketNonces::<T>::get(caller_account_id.clone(), market_id);
-        assert_eq!(new_nonce, market_nonce + 1);
     }
 
     admin_update_market_oracle {

@@ -61,7 +61,7 @@ use prediction_market_primitives::{
     traits::{DeployPoolApi, DistributeFees},
     types::{
         Asset, BasicCurrencyAdapter, BlockTest, CurrencyId, CustomMetadata, MarketId, OrmlAmount,
-        SignatureTest, TestAccountIdPK,
+        TestAccountIdPK,
     },
 };
 use sp_arithmetic::{per_things::Percent, Perbill};
@@ -332,9 +332,6 @@ impl crate::Config for Runtime {
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
     type WeightInfo = prediction_markets::weights::WeightInfo<Runtime>;
-    type RuntimeCall = RuntimeCall;
-    type Public = TestAccountIdPK;
-    type Signature = SignatureTest;
     type TokenInterface = NoopTokenInterface;
     type WinnerFeePercentage = WinnerFeePercentage;
     type WinnerFeeHandler = WinningFees<Runtime, FeeAccount>;
