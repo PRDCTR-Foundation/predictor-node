@@ -7910,9 +7910,11 @@ dependencies = [
 name = "pallet-pm-signed-hybrid-router"
 version = "0.2.0"
 dependencies = [
+ "frame-benchmarking",
  "frame-support",
  "frame-system",
  "orml-traits",
+ "pallet-avn",
  "pallet-pm-hybrid-router",
  "pallet-pm-market-commons",
  "parity-scale-codec",

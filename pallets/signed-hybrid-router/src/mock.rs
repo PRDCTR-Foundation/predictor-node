@@ -18,6 +18,8 @@
 #![cfg(test)]
 
 use crate as pallet_pm_signed_hybrid_router;
+#[cfg(feature = "runtime-benchmarks")]
+use alloc::vec::Vec;
 use frame_support::{
     derive_impl, parameter_types, storage::PrefixIterator, traits::Everything, weights::Weight,
     PalletId,
@@ -27,6 +29,8 @@ use orml_traits::MultiCurrency;
 use pallet_pm_hybrid_router::weights::WeightInfoZeitgeist;
 use pallet_pm_market_commons::MarketCommonsPalletApi;
 use parity_scale_codec::Decode;
+#[cfg(feature = "runtime-benchmarks")]
+use prediction_market_primitives::traits::{CompleteSetOperationsApi, DeployPoolApi};
 use prediction_market_primitives::{
     hybrid_router_api_types::{AmmTrade, ApiError, OrderbookTrade},
     orderbook::{Order, OrderId},
@@ -330,8 +334,55 @@ impl WeightInfoZeitgeist for HybridRouterWeightInfo {
     }
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub struct BenchmarkHooks;
+
+#[cfg(feature = "runtime-benchmarks")]
+impl DeployPoolApi for BenchmarkHooks {
+    type AccountId = AccountId;
+    type Balance = Balance;
+    type MarketId = MarketId;
+
+    fn deploy_pool(
+        _who: Self::AccountId,
+        _market_id: Self::MarketId,
+        _amount: Self::Balance,
+        _swap_prices: Vec<Self::Balance>,
+        _swap_fee: Self::Balance,
+    ) -> DispatchResult {
+        unimplemented!("not needed by signed-hybrid-router unit tests")
+    }
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+impl CompleteSetOperationsApi for BenchmarkHooks {
+    type AccountId = AccountId;
+    type Balance = Balance;
+    type MarketId = MarketId;
+
+    fn buy_complete_set(
+        _who: Self::AccountId,
+        _market_id: Self::MarketId,
+        _amount: Self::Balance,
+    ) -> DispatchResult {
+        unimplemented!("not needed by signed-hybrid-router unit tests")
+    }
+
+    fn sell_complete_set(
+        _who: Self::AccountId,
+        _market_id: Self::MarketId,
+        _amount: Self::Balance,
+    ) -> DispatchResult {
+        unimplemented!("not needed by signed-hybrid-router unit tests")
+    }
+}
+
 impl pallet_pm_hybrid_router::Config for Runtime {
     type AssetManager = AssetManager;
+    #[cfg(feature = "runtime-benchmarks")]
+    type AmmPoolDeployer = BenchmarkHooks;
+    #[cfg(feature = "runtime-benchmarks")]
+    type CompleteSetOperations = BenchmarkHooks;
     type MarketCommons = MarketCommons;
     type Amm = Amm;
     type MaxOrders = MaxOrders;

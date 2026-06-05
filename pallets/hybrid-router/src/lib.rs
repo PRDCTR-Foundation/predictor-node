@@ -313,7 +313,6 @@ mod pallet {
 
             Ok(())
         }
-
     }
 
     impl<T> Pallet<T>
@@ -731,6 +730,5 @@ mod pallet {
 
             Ok(event_info)
         }
-
     }
 }

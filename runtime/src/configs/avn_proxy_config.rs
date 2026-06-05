@@ -102,16 +102,18 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 orders: _,
                 strategy: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::SignedHybridRouter(pallet_pm_signed_hybrid_router::Call::signed_sell {
-                proof,
-                market_id: _,
-                asset_count: _,
-                asset: _,
-                amount_in: _,
-                min_price: _,
-                orders: _,
-                strategy: _,
-            }) => return Some(proof.clone()),
+            RuntimeCall::SignedHybridRouter(
+                pallet_pm_signed_hybrid_router::Call::signed_sell {
+                    proof,
+                    market_id: _,
+                    asset_count: _,
+                    asset: _,
+                    amount_in: _,
+                    min_price: _,
+                    orders: _,
+                    strategy: _,
+                },
+            ) => return Some(proof.clone()),
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,

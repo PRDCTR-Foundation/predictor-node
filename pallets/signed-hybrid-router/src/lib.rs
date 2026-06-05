@@ -19,6 +19,8 @@
 
 extern crate alloc;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 mod mock;
 mod tests;
 pub mod weights;
@@ -336,7 +338,7 @@ pub mod pallet {
                     proof,
                     signed_payload.as_slice(),
                 )
-                .is_ok();
+                .is_ok()
             }
 
             false
