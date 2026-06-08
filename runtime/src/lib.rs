@@ -321,4 +321,7 @@ mod runtime {
 
     #[runtime::pallet_index(91)]
     pub type SignedPredictionMarkets = pallet_pm_signed_prediction_markets;
+
+    #[runtime::pallet_index(92)]
+    pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
 }

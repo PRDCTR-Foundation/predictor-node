@@ -325,10 +325,6 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type MaxSwapFee = NeoMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
-    type SignedTxLifetime = ConstU32<16>;
-    type Public = MockPublic;
-    type Signature = MockSignature;
-    type RuntimeCall = RuntimeCall;
     type PalletAdminGetter = PredictionMarkets;
     type OnLiquidityProvided = NoopLiquidityProvider<AccountIdTest, MarketId>;
 }
@@ -376,9 +372,6 @@ impl pallet_prediction_markets::Config for Runtime {
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
-    type RuntimeCall = RuntimeCall;
-    type Public = MockPublic;
-    type Signature = MockSignature;
     type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
     type TokenInterface = ();
     type WinnerFeePercentage = WinnerFeePercentage;

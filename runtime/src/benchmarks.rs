@@ -52,6 +52,7 @@ frame_benchmarking::define_benchmarks!(
     [pallet_pm_hybrid_router, HybridRouter]
     [pallet_pm_signed_hybrid_router, SignedHybridRouter]
     [pallet_pm_signed_prediction_markets, SignedPredictionMarkets]
+    [pallet_pm_signed_neo_swaps, SignedNeoSwaps]
     [pallet_pm_neo_swaps, NeoSwaps]
     [pallet_pm_order_book, Orderbook]
     [pallet_prediction_markets, PredictionMarkets]

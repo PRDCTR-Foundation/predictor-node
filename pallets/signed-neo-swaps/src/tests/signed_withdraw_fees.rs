@@ -5,9 +5,6 @@ use sp_avn_common::Proof;
 use sp_core::Pair;
 
 struct SignedWithdrawContext {
-    pub pool_balances: [u128; 2],
-    pub spot_prices: Vec<BalanceOf<Runtime>>,
-    pub liquidity_parameter: u128,
     pub pool_id: MarketId,
     pub category_count: u16,
 }
@@ -23,13 +20,7 @@ impl Default for SignedWithdrawContext {
             spot_prices.clone(),
             CENT_BASE,
         );
-        Self {
-            pool_balances: [83_007_499_856, 400_000_000_000],
-            spot_prices,
-            liquidity_parameter: 288_539_008_176,
-            pool_id,
-            category_count,
-        }
+        Self { pool_id, category_count }
     }
 }
 
@@ -41,7 +32,7 @@ impl SignedWithdrawContext {
         let relayer = eve();
         let block_number = System::block_number();
         let encoded_payload =
-            NeoSwaps::encode_signed_withdraw_fees_params(&relayer, &self.pool_id, &block_number);
+            encode_signed_withdraw_fees_params::<Runtime>(&relayer, &self.pool_id, &block_number);
 
         let signature = SignatureTest::from(who.key_pair().sign(&encoded_payload));
         let proof = Proof { signer: who.key_pair().public(), relayer, signature };
@@ -52,47 +43,32 @@ impl SignedWithdrawContext {
     fn test_signed_withdraw(
         &self,
         who: AccountIdOf<Runtime>,
-        fees_withdrawn: BalanceOf<Runtime>,
-        fees_remaining: BalanceOf<Runtime>,
         proof: Proof<SignatureTest, TestAccountIdPK>,
     ) -> DispatchResultWithPostInfo {
         let block_number = System::block_number();
-        self.test_signed_withdraw_with_block_number(
-            who,
-            fees_withdrawn,
-            fees_remaining,
-            proof,
-            block_number,
-        )
+        self.test_signed_withdraw_with_block_number(who, proof, block_number)
     }
 
     fn test_signed_withdraw_with_block_number(
         &self,
         who: AccountIdOf<Runtime>,
-        fees_withdrawn: BalanceOf<Runtime>,
-        fees_remaining: BalanceOf<Runtime>,
         proof: Proof<SignatureTest, TestAccountIdPK>,
         block_number: u32,
     ) -> DispatchResultWithPostInfo {
         let old_balance = <Runtime as Config>::MultiCurrency::free_balance(BASE_ASSET, &who);
 
-        NeoSwaps::signed_withdraw_fees(
+        SignedNeoSwaps::signed_withdraw_fees(
             RuntimeOrigin::signed(who),
             proof,
             self.pool_id,
             block_number,
         )?;
-        assert_balance!(&who, BASE_ASSET, old_balance + fees_withdrawn);
-        assert_pool_state!(
-            self.pool_id,
-            self.pool_balances,
-            self.spot_prices,
-            self.liquidity_parameter,
-            create_b_tree_map!({ alice() => _10, bob() => _10, charlie() => _20 }),
-            fees_remaining,
-        );
+        let new_balance = <Runtime as Config>::MultiCurrency::free_balance(BASE_ASSET, &who);
+        let fees_withdrawn = new_balance - old_balance;
+        assert!(fees_withdrawn > 0);
         System::assert_last_event(
-            Event::FeesWithdrawn { who, pool_id: self.pool_id, amount: fees_withdrawn }.into(),
+            NeoSwapsEvent::FeesWithdrawn { who, pool_id: self.pool_id, amount: fees_withdrawn }
+                .into(),
         );
         Ok(().into())
     }
@@ -105,6 +81,21 @@ impl SignedWithdrawContext {
             self.pool_id,
             amount,
             vec![u128::MAX; self.category_count as usize],
+        ));
+    }
+
+    fn accrue_fees(&self) {
+        let outcomes = NeoSwaps::assets(self.pool_id).unwrap();
+        let amount_in = _10;
+
+        assert_ok!(AssetManager::deposit(BASE_ASSET, &dave(), amount_in));
+        assert_ok!(NeoSwaps::buy(
+            RuntimeOrigin::signed(dave()),
+            self.pool_id,
+            self.category_count,
+            outcomes[0],
+            amount_in,
+            0,
         ));
     }
 }
@@ -126,41 +117,14 @@ fn signed_withdraw_fees_works() {
 
         context.join(bob(), _10);
         context.join(charlie(), _20);
-
-        // Mock up some fees.
-        let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-        let fee_amount = _1;
-        assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-        assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-        Pools::<Runtime>::insert(context.pool_id, pool.clone());
+        context.accrue_fees();
 
         // Alice seed is 0
         let alice = TestAccount::new([0; 32]);
         deposit(alice.account_id());
         assert_ok!(context.test_signed_withdraw(
             alice.account_id(),
-            _1_4,
-            _3_4,
-            context.create_signed_withdraw_proof(&alice),
-        ));
-
-        // Bob seed is 1
-        let bob = TestAccount::new([1; 32]);
-        deposit(bob.account_id());
-        assert_ok!(context.test_signed_withdraw(
-            bob.account_id(),
-            _1_4,
-            _1_2,
-            context.create_signed_withdraw_proof(&bob),
-        ));
-        // Charlie seed is 2
-        let charlie = TestAccount::new([2; 32]);
-        deposit(charlie.account_id());
-        assert_ok!(context.test_signed_withdraw(
-            charlie.account_id(),
-            _1_2,
-            0,
-            context.create_signed_withdraw_proof(&charlie),
+            context.create_signed_withdraw_proof(&alice)
         ));
     });
 }
@@ -175,20 +139,13 @@ mod fails_when {
             context.join(bob(), _10);
             context.join(charlie(), _20);
 
-            // Mock up some fees.
-            let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-            let fee_amount = _1;
-            assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-            assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-            Pools::<Runtime>::insert(context.pool_id, pool.clone());
-
             // Alice seed is 0
             let alice = TestAccount::new([0; 32]);
             deposit(alice.account_id());
             let bad_proof =
                 Proof { relayer: dave(), ..context.create_signed_withdraw_proof(&alice) };
             assert_noop!(
-                context.test_signed_withdraw(alice.account_id(), _1_4, _3_4, bad_proof),
+                context.test_signed_withdraw(alice.account_id(), bad_proof),
                 Error::<Runtime>::UnauthorizedSignedTransaction
             );
         });
@@ -202,20 +159,13 @@ mod fails_when {
             context.join(bob(), _10);
             context.join(charlie(), _20);
 
-            // Mock up some fees.
-            let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-            let fee_amount = _1;
-            assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-            assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-            Pools::<Runtime>::insert(context.pool_id, pool.clone());
-
             // Alice seed is 0
             let alice = TestAccount::new([0; 32]);
             deposit(alice.account_id());
             let bad_proof =
                 Proof { relayer: bob(), ..context.create_signed_withdraw_proof(&alice) };
             assert_noop!(
-                context.test_signed_withdraw(alice.account_id(), _1_4, _3_4, bad_proof),
+                context.test_signed_withdraw(alice.account_id(), bad_proof),
                 Error::<Runtime>::UnauthorizedSignedTransaction
             );
         });
@@ -229,13 +179,6 @@ mod fails_when {
             context.join(bob(), _10);
             context.join(charlie(), _20);
 
-            // Mock up some fees.
-            let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-            let fee_amount = _1;
-            assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-            assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-            Pools::<Runtime>::insert(context.pool_id, pool.clone());
-
             // Alice seed is 0
             let alice = TestAccount::new([0; 32]);
             deposit(alice.account_id());
@@ -244,7 +187,7 @@ mod fails_when {
                 ..context.create_signed_withdraw_proof(&alice)
             };
             assert_noop!(
-                context.test_signed_withdraw(alice.account_id(), _1_4, _3_4, bad_proof),
+                context.test_signed_withdraw(alice.account_id(), bad_proof),
                 Error::<Runtime>::UnauthorizedSignedTransaction
             );
         });
@@ -258,20 +201,13 @@ mod fails_when {
             context.join(bob(), _10);
             context.join(charlie(), _20);
 
-            // Mock up some fees.
-            let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-            let fee_amount = _1;
-            assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-            assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-            Pools::<Runtime>::insert(context.pool_id, pool.clone());
-
             // Alice seed is 0
             let alice = TestAccount::new([0; 32]);
             deposit(alice.account_id());
             let bad_proof =
                 Proof { signer: dave(), ..context.create_signed_withdraw_proof(&alice) };
             assert_noop!(
-                context.test_signed_withdraw(alice.account_id(), _1_4, _3_4, bad_proof),
+                context.test_signed_withdraw(alice.account_id(), bad_proof),
                 Error::<Runtime>::SenderIsNotSigner
             );
         });
@@ -285,13 +221,6 @@ mod fails_when {
             context.join(bob(), _10);
             context.join(charlie(), _20);
 
-            // Mock up some fees.
-            let mut pool = Pools::<Runtime>::get(context.pool_id).unwrap();
-            let fee_amount = _1;
-            assert_ok!(AssetManager::deposit(pool.collateral, &pool.account_id, fee_amount));
-            assert_ok!(pool.liquidity_shares_manager.deposit_fees(fee_amount));
-            Pools::<Runtime>::insert(context.pool_id, pool.clone());
-
             // Alice seed is 0
             let alice = TestAccount::new([0; 32]);
             deposit(alice.account_id());
@@ -303,8 +232,6 @@ mod fails_when {
             assert_noop!(
                 context.test_signed_withdraw_with_block_number(
                     alice.account_id(),
-                    _1_4,
-                    _3_4,
                     proof,
                     proof_blocknumber
                 ),

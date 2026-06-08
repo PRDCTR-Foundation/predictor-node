@@ -861,16 +861,20 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type PoolId = MarketId;
     type MaxSplits = MaxSplits;
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
     type MaxLiquidityTreeDepth = MaxLiquidityTreeDepth;
     type MaxSwapFee = NeoSwapsMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
+    type PalletAdminGetter = PredictionMarkets;
+    type OnLiquidityProvided = PredictionMarkets;
+}
+
+impl pallet_pm_signed_neo_swaps::Config for Runtime {
+    type RuntimeCall = RuntimeCall;
     type SignedTxLifetime = ConstU32<16>;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
-    type PalletAdminGetter = PredictionMarkets;
-    type OnLiquidityProvided = PredictionMarkets;
+    type WeightInfo = pallet_pm_signed_neo_swaps::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_pm_order_book::Config for Runtime {
