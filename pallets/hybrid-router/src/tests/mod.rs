@@ -32,10 +32,10 @@ use prediction_market_primitives::{
     orderbook::Order,
     types::{
         Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
-        MultiHash, ScoringRule, TestAccountIdPK,
+        MultiHash, ScoringRule,
     },
 };
-pub use sp_runtime::{traits::Hash, Perbill, SaturatedConversion};
+pub use sp_runtime::{Perbill, SaturatedConversion};
 
 mod buy;
 mod sell;
@@ -43,7 +43,7 @@ mod sell;
 const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
 
 fn create_market(
-    creator: TestAccountIdPK,
+    creator: AccountIdOf<Runtime>,
     base_asset: AssetOf<Runtime>,
     market_type: MarketType,
     scoring_rule: ScoringRule,

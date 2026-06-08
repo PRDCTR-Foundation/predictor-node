@@ -316,6 +316,6 @@ mod runtime {
     #[runtime::pallet_index(83)]
     pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
 
-    #[runtime::pallet_index(84)]
+    #[runtime::pallet_index(90)]
     pub type SignedHybridRouter = pallet_pm_signed_hybrid_router;
 }
