@@ -41,7 +41,6 @@ use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
 use parity_scale_codec::{alloc::sync::Arc, Encode};
-pub use prediction_market_primitives::test_helper::{get_account, get_account_from_seed};
 use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
@@ -60,8 +59,8 @@ use prediction_market_primitives::{
     },
     traits::{DeployPoolApi, DistributeFees},
     types::{
-        Asset, BasicCurrencyAdapter, BlockTest, CurrencyId, CustomMetadata, MarketId, OrmlAmount,
-        TestAccountIdPK,
+        AccountIdTest, Asset, BasicCurrencyAdapter, BlockTest, CurrencyId, CustomMetadata,
+        MarketId, OrmlAmount,
     },
 };
 use sp_arithmetic::{per_things::Percent, Perbill};
@@ -75,49 +74,58 @@ use std::cell::RefCell;
 
 use pallet_pm_eth_asset_registry;
 
-pub fn alice() -> TestAccountIdPK {
+pub fn get_account(index: u8) -> AccountIdTest {
+    index.into()
+}
+
+pub fn get_account_from_seed(seed: [u8; 32]) -> AccountIdTest {
+    let lower_128: u128 = u128::from_le_bytes(seed[..16].try_into().unwrap());
+    AccountIdTest::from(lower_128)
+}
+
+pub fn alice() -> AccountIdTest {
     get_account(0u8)
 }
-pub fn bob() -> TestAccountIdPK {
+pub fn bob() -> AccountIdTest {
     get_account(1u8)
 }
-pub fn charlie() -> TestAccountIdPK {
+pub fn charlie() -> AccountIdTest {
     get_account(2u8)
 }
-pub fn dave() -> TestAccountIdPK {
+pub fn dave() -> AccountIdTest {
     get_account(3u8)
 }
-pub fn eve() -> TestAccountIdPK {
+pub fn eve() -> AccountIdTest {
     get_account(4u8)
 }
-pub fn fred() -> TestAccountIdPK {
+pub fn fred() -> AccountIdTest {
     get_account(5u8)
 }
-pub fn sudo() -> TestAccountIdPK {
+pub fn sudo() -> AccountIdTest {
     get_account(69u8)
 }
-pub fn approve_origin() -> TestAccountIdPK {
+pub fn approve_origin() -> AccountIdTest {
     get_account(70u8)
 }
-pub fn reject_origin() -> TestAccountIdPK {
+pub fn reject_origin() -> AccountIdTest {
     get_account(71u8)
 }
-pub fn close_market_early_origin() -> TestAccountIdPK {
+pub fn close_market_early_origin() -> AccountIdTest {
     get_account(72u8)
 }
-pub fn close_origin() -> TestAccountIdPK {
+pub fn close_origin() -> AccountIdTest {
     get_account(73u8)
 }
-pub fn request_edit_origin() -> TestAccountIdPK {
+pub fn request_edit_origin() -> AccountIdTest {
     get_account(74u8)
 }
-pub fn resolve_origin() -> TestAccountIdPK {
+pub fn resolve_origin() -> AccountIdTest {
     get_account(75u8)
 }
-pub fn winning_fee_account() -> TestAccountIdPK {
+pub fn winning_fee_account() -> AccountIdTest {
     get_account(95u8)
 }
-pub fn market_admin() -> TestAccountIdPK {
+pub fn market_admin() -> AccountIdTest {
     get_account(17u8)
 }
 pub const INITIAL_BALANCE: u128 = 1_000 * BASE;
@@ -128,7 +136,7 @@ pub struct DeployPoolMock;
 #[allow(unused)]
 #[derive(Clone)]
 pub struct DeployPoolArgs {
-    who: TestAccountIdPK,
+    who: AccountIdTest,
     market_id: MarketId,
     amount: Balance,
     swap_prices: Vec<Balance>,
@@ -142,7 +150,7 @@ thread_local! {
 
 #[allow(unused)]
 impl DeployPoolApi for DeployPoolMock {
-    type AccountId = TestAccountIdPK;
+    type AccountId = AccountIdTest;
     type Balance = Balance;
     type MarketId = MarketId;
 
@@ -169,7 +177,7 @@ impl DeployPoolApi for DeployPoolMock {
 #[allow(unused)]
 impl DeployPoolMock {
     pub fn called_once_with(
-        who: TestAccountIdPK,
+        who: AccountIdTest,
         market_id: MarketId,
         amount: Balance,
         swap_prices: Vec<Balance>,
@@ -193,13 +201,13 @@ impl DeployPoolMock {
 }
 
 ord_parameter_types! {
-    pub const Sudo: TestAccountIdPK = sudo();
-    pub const ApproveOrigin: TestAccountIdPK = approve_origin();
-    pub const RejectOrigin: TestAccountIdPK = reject_origin();
-    pub const CloseMarketEarlyOrigin: TestAccountIdPK = close_market_early_origin();
-    pub const CloseOrigin: TestAccountIdPK = close_origin();
-    pub const RequestEditOrigin: TestAccountIdPK = request_edit_origin();
-    pub const ResolveOrigin: TestAccountIdPK = resolve_origin();
+    pub const Sudo: AccountIdTest = sudo();
+    pub const ApproveOrigin: AccountIdTest = approve_origin();
+    pub const RejectOrigin: AccountIdTest = reject_origin();
+    pub const CloseMarketEarlyOrigin: AccountIdTest = close_market_early_origin();
+    pub const CloseOrigin: AccountIdTest = close_origin();
+    pub const RequestEditOrigin: AccountIdTest = request_edit_origin();
+    pub const ResolveOrigin: AccountIdTest = resolve_origin();
 }
 
 parameter_types! {
@@ -209,9 +217,9 @@ parameter_types! {
     pub const ValidityBond: Balance = 53 * CENT_BASE;
     pub const DisputeBond: Balance = 109 * CENT_BASE;
     // TODO review this value
-    pub TreasuryAccount: TestAccountIdPK = Treasury::account_id();
+    pub TreasuryAccount: AccountIdTest = Treasury::account_id();
     pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
-    pub FeeAccount: TestAccountIdPK = winning_fee_account();
+    pub FeeAccount: AccountIdTest = winning_fee_account();
 }
 
 construct_runtime!(
@@ -243,14 +251,14 @@ impl pallet_avn::Config for Runtime {
 }
 
 pub struct NoopTokenInterface {}
-impl TokenInterface<H160, TestAccountIdPK> for NoopTokenInterface {
+impl TokenInterface<H160, AccountIdTest> for NoopTokenInterface {
     fn process_lift(_event: &EthEvent) -> DispatchResult {
         Ok(())
     }
 
     fn deposit_tokens(
         _token_id: H160,
-        _recipient_account_id: TestAccountIdPK,
+        _recipient_account_id: AccountIdTest,
         _raw_amount: u128,
     ) -> DispatchResult {
         Ok(())
@@ -293,15 +301,15 @@ where
 impl crate::Config for Runtime {
     type AdvisoryBond = AdvisoryBond;
     type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
-    type ApproveOrigin = EnsureSignedBy<ApproveOrigin, TestAccountIdPK>;
+    type ApproveOrigin = EnsureSignedBy<ApproveOrigin, AccountIdTest>;
     type AssetRegistry = AssetRegistry;
     type Authorized = Authorized;
     type CloseEarlyDisputeBond = CloseEarlyDisputeBond;
-    type CloseMarketEarlyOrigin = EnsureSignedBy<CloseMarketEarlyOrigin, TestAccountIdPK>;
+    type CloseMarketEarlyOrigin = EnsureSignedBy<CloseMarketEarlyOrigin, AccountIdTest>;
     type CloseEarlyProtectionTimeFramePeriod = CloseEarlyProtectionTimeFramePeriod;
     type CloseEarlyProtectionBlockPeriod = CloseEarlyProtectionBlockPeriod;
     type CloseEarlyRequestBond = CloseEarlyRequestBond;
-    type CloseOrigin = EnsureSignedBy<CloseOrigin, TestAccountIdPK>;
+    type CloseOrigin = EnsureSignedBy<CloseOrigin, AccountIdTest>;
     type Currency = Balances;
     type MaxCreatorFee = MaxCreatorFee;
     type Court = Court;
@@ -325,9 +333,9 @@ impl crate::Config for Runtime {
     type PalletId = PmPalletId;
     type CloseEarlyBlockPeriod = CloseEarlyBlockPeriod;
     type CloseEarlyTimeFramePeriod = CloseEarlyTimeFramePeriod;
-    type RejectOrigin = EnsureSignedBy<RejectOrigin, TestAccountIdPK>;
-    type RequestEditOrigin = EnsureSignedBy<RequestEditOrigin, TestAccountIdPK>;
-    type ResolveOrigin = EnsureSignedBy<ResolveOrigin, TestAccountIdPK>;
+    type RejectOrigin = EnsureSignedBy<RejectOrigin, AccountIdTest>;
+    type RequestEditOrigin = EnsureSignedBy<RequestEditOrigin, AccountIdTest>;
+    type ResolveOrigin = EnsureSignedBy<ResolveOrigin, AccountIdTest>;
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
@@ -339,7 +347,7 @@ impl crate::Config for Runtime {
 
 impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
-    type AccountId = TestAccountIdPK;
+    type AccountId = AccountIdTest;
     type BaseCallFilter = Everything;
     type Block = Block;
     type BlockHashCount = BlockHashCount;
@@ -394,7 +402,7 @@ impl pallet_pm_eth_asset_registry::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type CustomMetadata = CustomMetadata;
     type AssetId = CurrencyId;
-    type AuthorityOrigin = EnsureRoot<TestAccountIdPK>;
+    type AuthorityOrigin = EnsureRoot<AccountIdTest>;
     type Balance = Balance;
     type StringLimit = ConstU32<1024>;
     type AssetProcessor = NoopAssetProcessor;
@@ -441,12 +449,12 @@ impl pallet_timestamp::Config for Runtime {
 }
 
 ord_parameter_types! {
-    pub const AuthorizedDisputeResolutionUser: TestAccountIdPK = alice();
+    pub const AuthorizedDisputeResolutionUser: AccountIdTest = alice();
 }
 
 impl pallet_pm_authorized::Config for Runtime {
     type AuthorizedDisputeResolutionOrigin =
-        EnsureSignedBy<AuthorizedDisputeResolutionUser, TestAccountIdPK>;
+        EnsureSignedBy<AuthorizedDisputeResolutionUser, AccountIdTest>;
     type CorrectionPeriod = CorrectionPeriod;
     type Currency = Balances;
     type RuntimeEvent = RuntimeEvent;
@@ -474,7 +482,7 @@ impl pallet_pm_court::Config for Runtime {
     type MaxCourtParticipants = MaxCourtParticipants;
     type MaxYearlyInflation = MaxYearlyInflation;
     type MinJurorStake = MinJurorStake;
-    type MonetaryGovernanceOrigin = EnsureRoot<TestAccountIdPK>;
+    type MonetaryGovernanceOrigin = EnsureRoot<AccountIdTest>;
     type PalletId = CourtPalletId;
     type Random = RandomnessCollectiveFlip;
     type RequestInterval = RequestInterval;
@@ -509,12 +517,12 @@ impl pallet_pm_global_disputes::Config for Runtime {
 #[cfg(feature = "runtime-benchmarks")]
 pub struct BenchmarkHelper;
 #[cfg(feature = "runtime-benchmarks")]
-impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
+impl ArgumentsFactory<(), AccountIdTest> for BenchmarkHelper {
     fn create_asset_kind(_seed: u32) {
         // No-op
     }
 
-    fn create_beneficiary(seed: [u8; 32]) -> TestAccountIdPK {
+    fn create_beneficiary(seed: [u8; 32]) -> AccountIdTest {
         get_account_from_seed(seed)
     }
 }
@@ -522,8 +530,8 @@ impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
 impl pallet_treasury::Config for Runtime {
     type AssetKind = ();
     type BalanceConverter = UnityAssetBalanceConversion;
-    type Beneficiary = TestAccountIdPK;
-    type BeneficiaryLookup = IdentityLookup<TestAccountIdPK>;
+    type Beneficiary = AccountIdTest;
+    type BeneficiaryLookup = IdentityLookup<AccountIdTest>;
     type Burn = ();
     type BurnDestination = ();
     type Currency = Balances;
@@ -532,7 +540,7 @@ impl pallet_treasury::Config for Runtime {
     type PalletId = TreasuryPalletId;
     type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
     type PayoutPeriod = ();
-    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
     type SpendFunds = ();
     type SpendOrigin = NeverEnsureOrigin<Balance>;
     type SpendPeriod = ();
@@ -542,7 +550,7 @@ impl pallet_treasury::Config for Runtime {
 }
 
 pub struct ExtBuilder {
-    balances: Vec<(TestAccountIdPK, Balance)>,
+    balances: Vec<(AccountIdTest, Balance)>,
 }
 
 impl Default for ExtBuilder {
