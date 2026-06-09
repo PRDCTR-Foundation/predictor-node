@@ -66,7 +66,7 @@ use prediction_market_primitives::{
 #[cfg(feature = "runtime-benchmarks")]
 use sp_core::H256;
 use sp_runtime::{
-    traits::{BlakeTwo256, ConstU32, Get, IdentifyAccount, IdentityLookup, Lazy, Verify, Zero},
+    traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
     BuildStorage, DispatchError, Perbill, Percent, SaturatedConversion,
 };
 
@@ -217,50 +217,6 @@ pub struct DustRemovalWhitelist;
 impl Contains<AccountIdTest> for DustRemovalWhitelist {
     fn contains(account_id: &AccountIdTest) -> bool {
         *account_id == fee_account()
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    parity_scale_codec::Decode,
-    parity_scale_codec::Encode,
-    scale_info::TypeInfo,
-)]
-pub struct MockPublic(AccountIdTest);
-
-impl IdentifyAccount for MockPublic {
-    type AccountId = AccountIdTest;
-
-    fn into_account(self) -> Self::AccountId {
-        self.0
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    parity_scale_codec::Decode,
-    parity_scale_codec::Encode,
-    scale_info::TypeInfo,
-)]
-pub struct MockSignature;
-
-impl From<sp_core::sr25519::Signature> for MockSignature {
-    fn from(_signature: sp_core::sr25519::Signature) -> Self {
-        Self
-    }
-}
-
-impl Verify for MockSignature {
-    type Signer = MockPublic;
-
-    fn verify<L: Lazy<[u8]>>(&self, _msg: L, _signer: &AccountIdTest) -> bool {
-        true
     }
 }
 
