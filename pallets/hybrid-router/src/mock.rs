@@ -66,7 +66,7 @@ use prediction_market_primitives::{
 #[cfg(feature = "runtime-benchmarks")]
 use sp_core::H256;
 use sp_runtime::{
-    traits::{BlakeTwo256, ConstU32, Get, IdentifyAccount, IdentityLookup, Lazy, Verify, Zero},
+    traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
     BuildStorage, DispatchError, Perbill, Percent, SaturatedConversion,
 };
 
@@ -220,50 +220,6 @@ impl Contains<AccountIdTest> for DustRemovalWhitelist {
     }
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    parity_scale_codec::Decode,
-    parity_scale_codec::Encode,
-    scale_info::TypeInfo,
-)]
-pub struct MockPublic(AccountIdTest);
-
-impl IdentifyAccount for MockPublic {
-    type AccountId = AccountIdTest;
-
-    fn into_account(self) -> Self::AccountId {
-        self.0
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    parity_scale_codec::Decode,
-    parity_scale_codec::Encode,
-    scale_info::TypeInfo,
-)]
-pub struct MockSignature;
-
-impl From<sp_core::sr25519::Signature> for MockSignature {
-    fn from(_signature: sp_core::sr25519::Signature) -> Self {
-        Self
-    }
-}
-
-impl Verify for MockSignature {
-    type Signer = MockPublic;
-
-    fn verify<L: Lazy<[u8]>>(&self, _msg: L, _signer: &AccountIdTest) -> bool {
-        true
-    }
-}
-
 construct_runtime!(
     pub enum Runtime {
         HybridRouter: pallet_pm_hybrid_router,
@@ -325,10 +281,6 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type MaxSwapFee = NeoMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
-    type SignedTxLifetime = ConstU32<16>;
-    type Public = MockPublic;
-    type Signature = MockSignature;
-    type RuntimeCall = RuntimeCall;
     type PalletAdminGetter = PredictionMarkets;
     type OnLiquidityProvided = NoopLiquidityProvider<AccountIdTest, MarketId>;
 }
@@ -376,9 +328,6 @@ impl pallet_prediction_markets::Config for Runtime {
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
-    type RuntimeCall = RuntimeCall;
-    type Public = MockPublic;
-    type Signature = MockSignature;
     type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
     type TokenInterface = ();
     type WinnerFeePercentage = WinnerFeePercentage;
