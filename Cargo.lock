@@ -7927,6 +7927,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pm-signed-prediction-markets"
+version = "0.2.0"
+dependencies = [
+ "common-primitives",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-traits",
+ "pallet-avn",
+ "pallet-balances",
+ "pallet-pm-authorized",
+ "pallet-pm-court",
+ "pallet-pm-global-disputes",
+ "pallet-pm-market-commons",
+ "pallet-prediction-markets",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-arithmetic 26.1.0",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-prediction-markets"
 version = "0.2.0"
 dependencies = [
@@ -9085,6 +9112,7 @@ dependencies = [
  "pallet-pm-neo-swaps",
  "pallet-pm-order-book",
  "pallet-pm-signed-hybrid-router",
+ "pallet-pm-signed-prediction-markets",
  "pallet-prediction-markets",
  "pallet-preimage",
  "pallet-proxy",

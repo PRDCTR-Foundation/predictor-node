@@ -318,4 +318,7 @@ mod runtime {
 
     #[runtime::pallet_index(90)]
     pub type SignedHybridRouter = pallet_pm_signed_hybrid_router;
+
+    #[runtime::pallet_index(91)]
+    pub type SignedPredictionMarkets = pallet_pm_signed_prediction_markets;
 }

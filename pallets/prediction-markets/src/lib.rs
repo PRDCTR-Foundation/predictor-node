@@ -26,7 +26,6 @@ extern crate alloc;
 mod benchmarks;
 pub mod migrations;
 pub mod mock;
-pub mod signed_calls;
 mod tests;
 pub mod types;
 pub mod weights;
@@ -35,12 +34,12 @@ pub use pallet::*;
 
 #[frame_support::pallet]
 mod pallet {
-    use crate::{alloc::borrow::ToOwned, signed_calls::*, weights::*};
+    use crate::{alloc::borrow::ToOwned, weights::*};
     pub use alloc::{format, vec, vec::Vec};
     use common_primitives::constants::{currency::DECIMALS, MILLISECS_PER_BLOCK};
     use core::{cmp, marker::PhantomData};
     pub use frame_support::{
-        dispatch::{DispatchResultWithPostInfo, GetDispatchInfo, Pays},
+        dispatch::{DispatchResultWithPostInfo, Pays},
         ensure,
         pallet_prelude::{
             BuildGenesisConfig, ConstU32, OptionQuery, StorageDoubleMap, StorageMap, StorageValue,
@@ -49,8 +48,8 @@ mod pallet {
         require_transactional,
         storage::{with_transaction, TransactionOutcome},
         traits::{
-            tokens::BalanceStatus, Currency, EnsureOrigin, Get, Hooks, Imbalance, IsSubType,
-            IsType, NamedReservableCurrency, OnUnbalanced, StorageVersion,
+            tokens::BalanceStatus, Currency, EnsureOrigin, Get, Hooks, Imbalance, IsType,
+            NamedReservableCurrency, OnUnbalanced, StorageVersion,
         },
         transactional,
         weights::Weight,
@@ -81,12 +80,9 @@ mod pallet {
         },
     };
 
-    use scale_info::TypeInfo;
     use sp_arithmetic::per_things::{Perbill, Percent};
     use sp_core::H256;
-    use sp_runtime::traits::{
-        AccountIdConversion, CheckedSub, Dispatchable, IdentifyAccount, Member, Verify,
-    };
+    use sp_runtime::traits::{AccountIdConversion, CheckedSub};
     pub use sp_runtime::{
         traits::{Saturating, Zero},
         DispatchError, DispatchResult, SaturatedConversion,
@@ -94,10 +90,8 @@ mod pallet {
 
     use pallet_avn::BridgeInterfaceNotification;
     pub use parity_scale_codec::{Decode, Encode};
-    pub use scale_info::prelude::boxed::Box;
-    pub use sp_avn_common::{
-        event_types::{EthEvent, EventData, LiftedData, ProcessedEventHandler, TokenInterface},
-        verify_signature, InnerCallValidator, Proof,
+    pub use sp_avn_common::event_types::{
+        EthEvent, EventData, LiftedData, ProcessedEventHandler, TokenInterface,
     };
 
     /// The current storage version.
@@ -1340,105 +1334,6 @@ mod pallet {
             Ok(Some(T::WeightInfo::manually_close_market(close_ids_len)).into())
         }
 
-        #[pallet::weight(T::WeightInfo::signed_create_market_and_deploy_pool(
-            CacheSize::get(),
-            spot_prices.len() as u32,
-        ))]
-        #[transactional]
-        #[pallet::call_index(23)]
-        pub fn signed_create_market_and_deploy_pool(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            base_asset: AssetOf<T>,
-            creator_fee: Perbill,
-            oracle: T::AccountId,
-            period: MarketPeriodOf<T>,
-            deadlines: DeadlinesOf<T>,
-            metadata: MultiHash,
-            market_type: MarketType,
-            dispute_mechanism: Option<MarketDisputeMechanism>,
-            #[pallet::compact] amount: BalanceOf<T>,
-            spot_prices: Vec<BalanceOf<T>>,
-            #[pallet::compact] swap_fee: BalanceOf<T>,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin)?;
-            ensure!(who.clone() == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let stored_nonce = UserNonces::<T>::get(&proof.signer);
-            let signed_payload = encode_signed_create_market_and_deploy_pool_params::<T>(
-                &proof.relayer,
-                stored_nonce,
-                &base_asset,
-                &creator_fee,
-                &oracle,
-                &period,
-                &deadlines,
-                &metadata,
-                &market_type,
-                &dispute_mechanism,
-                &amount,
-                &spot_prices,
-                &swap_fee,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
-                Error::<T>::UnauthorizedSignedCreateMarketTransaction
-            );
-
-            let (ids_len, spot_prices_len) = Self::do_create_market_and_deploy_pool(
-                who.clone(),
-                base_asset,
-                creator_fee,
-                oracle,
-                period,
-                deadlines,
-                metadata,
-                market_type,
-                dispute_mechanism,
-                amount,
-                spot_prices,
-                swap_fee,
-            )?;
-
-            <UserNonces<T>>::mutate(who, |n| *n += 1);
-            Ok(Some(T::WeightInfo::create_market_and_deploy_pool(ids_len, spot_prices_len)).into())
-        }
-
-        #[pallet::call_index(24)]
-        #[pallet::weight(
-            T::WeightInfo::signed_report_market_with_dispute_mechanism(CacheSize::get())
-                .max(T::WeightInfo::signed_report_trusted_market())
-        )]
-        #[transactional]
-        pub fn signed_report(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            #[pallet::compact] market_id: MarketIdOf<T>,
-            outcome: OutcomeReport,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin.clone())?;
-            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
-
-            let signed_payload = encode_signed_report_params::<T>(
-                &proof.relayer,
-                &market_nonce,
-                &market_id,
-                &outcome,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload.as_slice())
-                    .is_ok(),
-                Error::<T>::UnauthorizedSignedReportTransaction
-            );
-
-            <MarketNonces<T>>::mutate(who.clone(), market_id, |n| *n += 1);
-            Self::do_report(who, origin, outcome, &market_id)
-        }
-
         #[pallet::call_index(25)]
         #[pallet::weight(T::WeightInfo::withdraw_tokens())]
         #[transactional]
@@ -1449,34 +1344,6 @@ mod pallet {
         ) -> DispatchResult {
             let who = ensure_signed(origin.clone())?;
             Self::do_withdraw_tokens(token, &who, amount)?;
-
-            Ok(())
-        }
-
-        #[pallet::call_index(26)]
-        #[pallet::weight(T::WeightInfo::signed_withdraw_tokens())]
-        #[transactional]
-        pub fn signed_withdraw_tokens(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            token: EthAddress,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
-            let who = ensure_signed(origin.clone())?;
-            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let nonce = UserNonces::<T>::get(&proof.signer);
-            let signed_payload =
-                encode_signed_withdraw_params::<T>(&proof.relayer, &nonce, &token, &who, &amount);
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload.as_slice())
-                    .is_ok(),
-                Error::<T>::UnauthorizedSignedWithdrawTransaction
-            );
-
-            Self::do_withdraw_tokens(token, &who, amount)?;
-            <UserNonces<T>>::mutate(&who, |n| *n += 1);
 
             Ok(())
         }
@@ -1542,104 +1409,6 @@ mod pallet {
             }
 
             Ok(())
-        }
-
-        #[pallet::call_index(30)]
-        #[pallet::weight(T::WeightInfo::signed_transfer_asset())]
-        #[transactional]
-        pub fn signed_transfer_asset(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            token: EthAddress,
-            to: T::AccountId,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
-            let who = ensure_signed(origin.clone())?;
-            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let nonce = UserNonces::<T>::get(&proof.signer);
-            let signed_payload = encode_signed_transfer_params::<T>(
-                &proof.relayer,
-                &nonce,
-                &token,
-                &who,
-                &to,
-                &amount,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload.as_slice())
-                    .is_ok(),
-                Error::<T>::UnauthorizedSignedTransferTransaction
-            );
-            Self::do_transfer_tokens(token, &who, &to, amount)?;
-            <UserNonces<T>>::mutate(&who, |n| *n += 1);
-
-            Ok(())
-        }
-
-        #[pallet::call_index(31)]
-        #[pallet::weight(T::WeightInfo::signed_redeem_shares_categorical()
-            .max(T::WeightInfo::signed_redeem_shares_scalar())
-        )]
-        #[transactional]
-        pub fn signed_redeem_shares(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            #[pallet::compact] market_id: MarketIdOf<T>,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin)?;
-            ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
-
-            let signed_payload =
-                encode_signed_redeem_shares_params::<T>(&proof.relayer, &market_nonce, &market_id);
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
-                Error::<T>::UnauthorizedSignedRedeemTransaction
-            );
-
-            let weight = Self::do_redeem(who.clone(), market_id)?;
-
-            MarketNonces::<T>::mutate(who, market_id, |nonce| *nonce += 1);
-
-            Ok(Some(weight).into())
-        }
-
-        #[pallet::call_index(32)]
-        #[pallet::weight(T::WeightInfo::signed_buy_complete_set(T::MaxCategories::get().into()))]
-        #[transactional]
-        pub fn signed_buy_complete_set(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            #[pallet::compact] market_id: MarketIdOf<T>,
-            #[pallet::compact] amount: BalanceOf<T>,
-        ) -> DispatchResultWithPostInfo {
-            let sender = ensure_signed(origin)?;
-            ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
-
-            let signed_payload = encode_signed_buy_complete_set_params::<T>(
-                &proof.relayer,
-                &market_nonce,
-                &market_id,
-                &amount,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
-                Error::<T>::UnauthorizedSignedRedeemTransaction
-            );
-
-            Self::do_buy_complete_set(sender.clone(), market_id, amount)?;
-            MarketNonces::<T>::mutate(sender, market_id, |nonce| *nonce += 1);
-
-            let market = <pallet_pm_market_commons::Pallet<T>>::market(&market_id)?;
-            let assets = market.outcome_assets();
-            let assets_len: u32 = assets.len().saturated_into();
-            Ok(Some(T::WeightInfo::signed_buy_complete_set(assets_len)).into())
         }
 
         #[pallet::call_index(33)]
@@ -1816,26 +1585,8 @@ mod pallet {
         #[pallet::constant]
         type DisputeBond: Get<BalanceOf<Self>>;
 
-        /// The overarching call type.
-        type RuntimeCall: Parameter
-            + Dispatchable<RuntimeOrigin = <Self as frame_system::Config>::RuntimeOrigin>
-            + IsSubType<Call<Self>>
-            + From<Call<Self>>
-            + GetDispatchInfo
-            + From<frame_system::Call<Self>>;
-
         /// Event
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
-        type Public: IdentifyAccount<AccountId = Self::AccountId>;
-
-        /// The signature type used by accounts/transactions.
-        type Signature: Verify<Signer = Self::Public>
-            + Member
-            + Decode
-            + Encode
-            + From<sp_core::sr25519::Signature>
-            + TypeInfo;
 
         /// See [`GlobalDisputesPalletApi`].
         type GlobalDisputes: GlobalDisputesPalletApi<
@@ -2080,30 +1831,14 @@ mod pallet {
         MarketNotInCloseTimeFrameList,
         /// The market period end was not already reached yet.
         MarketPeriodEndNotAlreadyReachedYet,
-        /// Transaction is not supported
-        TransactionNotSupported,
-        /// Nonce is not valid
-        InvalidNonce,
-        /// Sender and proof signer are not the same
-        SenderIsNotSigner,
         /// Only registered foreign assets can be withdrawn
         NotForeignAsset,
-        /// Signed withdraw transaction has failed verification
-        UnauthorizedSignedWithdrawTransaction,
-        /// Signed report transaction has failed verification
-        UnauthorizedSignedReportTransaction,
-        /// Signed create market transaction has failed verification
-        UnauthorizedSignedCreateMarketTransaction,
-        /// Signed create market transaction has failed verification
-        UnauthorizedSignedRedeemTransaction,
         /// Market admin must be set before managing whitelisted users
         MarketAdminNotSet,
         /// Whitelist extrisincs must come from market admin
         SenderNotMarketAdmin,
         /// Market creator is not whitelisted
         InvalidMarketCreator,
-        /// Signed transfer transaction has failed verification
-        UnauthorizedSignedTransferTransaction,
         /// Vault account must be set before using it
         VaultAccountNotSet,
         /// Winnings fee account must be set before using it
@@ -2292,22 +2027,6 @@ mod pallet {
         Blake2_128Concat,
         BlockNumberFor<T>,
         BoundedVec<MarketIdOf<T>, CacheSize>,
-        ValueQuery,
-    >;
-
-    #[pallet::storage]
-    #[pallet::getter(fn nonces)]
-    pub type UserNonces<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
-
-    #[pallet::storage]
-    #[pallet::getter(fn market_nonces)]
-    pub type MarketNonces<T: Config> = StorageDoubleMap<
-        _,
-        Blake2_128Concat,
-        T::AccountId,
-        Blake2_128Concat,
-        MarketIdOf<T>,
-        u64,
         ValueQuery,
     >;
 
@@ -2582,6 +2301,15 @@ mod pallet {
             T::AssetManager::transfer(asset, from, to, amount)?;
 
             Ok(())
+        }
+
+        pub fn transfer_tokens(
+            token: EthAddress,
+            from: &T::AccountId,
+            to: &T::AccountId,
+            amount: BalanceOf<T>,
+        ) -> DispatchResult {
+            Self::do_transfer_tokens(token, from, to, amount)
         }
 
         fn do_redeem(who: T::AccountId, market_id: MarketIdOf<T>) -> Result<Weight, DispatchError> {

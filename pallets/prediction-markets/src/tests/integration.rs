@@ -26,10 +26,7 @@ use pallet_pm_global_disputes::{
     types::{OutcomeInfo, Possession},
     GlobalDisputesPalletApi, Outcomes, PossessionOf,
 };
-use prediction_market_primitives::{
-    test_helper::get_account_from_seed,
-    types::{OutcomeReport, ScalarPosition},
-};
+use prediction_market_primitives::types::{OutcomeReport, ScalarPosition};
 use sp_runtime::Perquintill;
 
 #[test]

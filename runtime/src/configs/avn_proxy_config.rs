@@ -46,8 +46,8 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     t1_recipient: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_create_market_and_deploy_pool {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_create_market_and_deploy_pool {
                     proof,
                     base_asset: _,
                     creator_fee: _,
@@ -62,31 +62,36 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     swap_fee: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(pallet_prediction_markets::Call::signed_report {
-                proof,
-                market_id: _,
-                outcome: _,
-            }) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_transfer_asset {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_report {
+                    proof,
+                    market_id: _,
+                    outcome: _,
+                },
+            ) => return Some(proof.clone()),
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_transfer_asset {
                     proof,
                     token: _,
                     to: _,
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_redeem_shares { proof, market_id: _ },
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_redeem_shares {
+                    proof,
+                    market_id: _,
+                },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_withdraw_tokens {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_withdraw_tokens {
                     proof,
                     token: _,
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_buy_complete_set {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_buy_complete_set {
                     proof,
                     market_id: _,
                     amount: _,
@@ -145,8 +150,10 @@ impl InnerCallValidator for AvnProxyConfig {
         match **call {
             RuntimeCall::TokenManager(..) =>
                 return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::PredictionMarkets(..) =>
-                return pallet_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::SignedPredictionMarkets(..) =>
+                return pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(
+                    call,
+                ),
             RuntimeCall::SignedHybridRouter(..) =>
                 return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             // RuntimeCall::NodeManager(..) =>

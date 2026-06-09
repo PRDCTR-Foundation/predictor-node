@@ -86,18 +86,10 @@ pub trait WeightInfoZeitgeist {
     fn close_trusted_market(c: u32) -> Weight;
     fn create_market_and_deploy_pool(m: u32, n: u32) -> Weight;
     fn manually_close_market(o: u32) -> Weight;
-    fn signed_create_market_and_deploy_pool(m: u32, n: u32) -> Weight;
     fn withdraw_tokens() -> Weight;
-    fn signed_withdraw_tokens() -> Weight;
-    fn signed_redeem_shares_categorical() -> Weight;
-    fn signed_redeem_shares_scalar() -> Weight;
     fn set_config_option() -> Weight;
     fn whitelist_market_creator() -> Weight;
     fn remove_market_creator() -> Weight;
-    fn signed_transfer_asset() -> Weight;
-    fn signed_report_market_with_dispute_mechanism(m: u32) -> Weight;
-    fn signed_report_trusted_market() -> Weight;
-    fn signed_buy_complete_set(a: u32) -> Weight;
     fn set_winnings_fee_account() -> Weight;
     fn set_additional_swap_fee_account() -> Weight;
     fn admin_update_market_oracle() -> Weight;
@@ -849,21 +841,6 @@ impl<T: frame_system::Config> WeightInfoZeitgeist for WeightInfo<T> {
             .saturating_add(T::DbWeight::get().writes(2))
     }
 
-    fn signed_create_market_and_deploy_pool(_m: u32, n: u32) -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `378 + m * (16 ±0)`
-        //  Estimated: `148211 + n * (5196 ±0)`
-        // Minimum execution time: 276_356 nanoseconds.
-        Weight::from_parts(239_872_618, 148211)
-            // Standard Error: 165_406
-            .saturating_add(Weight::from_parts(47_247_235, 0).saturating_mul(n.into()))
-            .saturating_add(T::DbWeight::get().reads(7))
-            .saturating_add(T::DbWeight::get().reads((3_u64).saturating_mul(n.into())))
-            .saturating_add(T::DbWeight::get().writes(7))
-            .saturating_add(T::DbWeight::get().writes((3_u64).saturating_mul(n.into())))
-            .saturating_add(Weight::from_parts(0, 5196).saturating_mul(n.into()))
-    }
-
     fn withdraw_tokens() -> Weight {
         Weight::from_parts(68_771_000, 4714)
             .saturating_add(T::DbWeight::get().reads(2))
@@ -909,146 +886,6 @@ impl<T: frame_system::Config> WeightInfoZeitgeist for WeightInfo<T> {
             .saturating_add(T::DbWeight::get().writes(1_u64))
     }
 
-    /// Storage: `PredictionMarkets::UserNonces` (r:1 w:1)
-    /// Proof: `PredictionMarkets::UserNonces` (`max_values`: None, `max_size`: Some(56), added:
-    /// 2531, mode: `MaxEncodedLen`) Storage: `AssetRegistry::EthAddressToAssetId` (r:1 w:0)
-    /// Proof: `AssetRegistry::EthAddressToAssetId` (`max_values`: None, `max_size`: Some(47),
-    /// added: 2522, mode: `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:2 w:2)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `AssetRegistry::Metadata` (r:1 w:0)
-    /// Proof: `AssetRegistry::Metadata` (`max_values`: None, `max_size`: Some(2723), added: 5198,
-    /// mode: `MaxEncodedLen`) Storage: `System::Account` (r:2 w:1)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`)
-    fn signed_transfer_asset() -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `548`
-        //  Estimated: `6196`
-        // Minimum execution time: 138_280_000 picoseconds.
-        Weight::from_parts(155_927_000, 6196)
-            .saturating_add(T::DbWeight::get().reads(7_u64))
-            .saturating_add(T::DbWeight::get().writes(4_u64))
-    }
-
-    /// Storage: `PredictionMarkets::UserNonces` (r:1 w:1)
-    /// Proof: `PredictionMarkets::UserNonces` (`max_values`: None, `max_size`: Some(56), added:
-    /// 2531, mode: `MaxEncodedLen`) Storage: `AssetRegistry::EthAddressToAssetId` (r:1 w:0)
-    /// Proof: `AssetRegistry::EthAddressToAssetId` (`max_values`: None, `max_size`: Some(47),
-    /// added: 2522, mode: `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:1 w:1)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `AssetRegistry::Metadata` (r:1 w:0)
-    /// Proof: `AssetRegistry::Metadata` (`max_values`: None, `max_size`: Some(2723), added: 5198,
-    /// mode: `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:1 w:1)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`) Storage: `TokenManager::Balances` (r:1 w:1)
-    /// Proof: `TokenManager::Balances` (`max_values`: None, `max_size`: Some(84), added: 2559,
-    /// mode: `MaxEncodedLen`)
-    fn signed_withdraw_tokens() -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `558`
-        //  Estimated: `6188`
-        // Minimum execution time: 198_338_000 picoseconds.
-        Weight::from_parts(421_048_000, 6188)
-            .saturating_add(T::DbWeight::get().reads(6_u64))
-            .saturating_add(T::DbWeight::get().writes(4_u64))
-    }
-    /// Storage: `PredictionMarkets::MarketNonces` (r:1 w:1)
-    /// Proof: `PredictionMarkets::MarketNonces` (`max_values`: None, `max_size`: Some(88), added:
-    /// 2563, mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:1)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `Timestamp::Now` (r:1 w:0)
-    /// Proof: `Timestamp::Now` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode:
-    /// `MaxEncodedLen`) Storage: `PredictionMarkets::MarketIdsPerReportBlock` (r:1 w:1)
-    /// Proof: `PredictionMarkets::MarketIdsPerReportBlock` (`max_values`: None, `max_size`:
-    /// Some(1038), added: 3513, mode: `MaxEncodedLen`) The range of component `m` is `[0, 63]`.
-    fn signed_report_market_with_dispute_mechanism(_m: u32) -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `646`
-        //  Estimated: `4503`
-        // Minimum execution time: 116_940_000 picoseconds.
-        Weight::from_parts(160_076_189, 4503)
-            .saturating_add(T::DbWeight::get().reads(4_u64))
-            .saturating_add(T::DbWeight::get().writes(3_u64))
-    }
-    /// Storage: `PredictionMarkets::MarketNonces` (r:1 w:1)
-    /// Proof: `PredictionMarkets::MarketNonces` (`max_values`: None, `max_size`: Some(88), added:
-    /// 2563, mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:1)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `Balances::Reserves` (r:1 w:1)
-    /// Proof: `Balances::Reserves` (`max_values`: None, `max_size`: Some(1249), added: 3724, mode:
-    /// `MaxEncodedLen`) Storage: `System::Account` (r:1 w:1)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`)
-    fn signed_report_trusted_market() -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `725`
-        //  Estimated: `4714`
-        // Minimum execution time: 166_177_000 picoseconds.
-        Weight::from_parts(194_705_000, 4714)
-            .saturating_add(T::DbWeight::get().reads(4_u64))
-            .saturating_add(T::DbWeight::get().writes(4_u64))
-    }
-    /// Storage: `MarketCommons::Markets` (r:1 w:0)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:1 w:1)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `System::Account` (r:2 w:2)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:1 w:1)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`)
-    fn signed_redeem_shares_categorical() -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `2101`
-        //  Estimated: `6196`
-        // Minimum execution time: 98_576_000 picoseconds.
-        Weight::from_parts(110_665_000, 6196)
-            .saturating_add(T::DbWeight::get().reads(5_u64))
-            .saturating_add(T::DbWeight::get().writes(4_u64))
-    }
-    /// Storage: `MarketCommons::Markets` (r:1 w:0)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:2 w:2)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `System::Account` (r:2 w:2)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:2 w:2)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`)
-    fn signed_redeem_shares_scalar() -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `1216`
-        //  Estimated: `6196`
-        // Minimum execution time: 116_627_000 picoseconds.
-        Weight::from_parts(126_747_000, 6196)
-            .saturating_add(T::DbWeight::get().reads(7_u64))
-            .saturating_add(T::DbWeight::get().writes(6_u64))
-    }
-    /// Storage: `PredictionMarkets::MarketNonces` (r:1 w:1)
-    /// Proof: `PredictionMarkets::MarketNonces` (`max_values`: None, `max_size`: Some(88), added:
-    /// 2563, mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:0)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `System::Account` (r:2 w:2)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:64 w:64)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:64 w:64)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`) The range of component `a` is `[2, 64]`.
-    fn signed_buy_complete_set(a: u32) -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `1013 + a * (129 ±0)`
-        //  Estimated: `6196 + a * (2598 ±0)`
-        // Minimum execution time: 202_963_000 picoseconds.
-        Weight::from_parts(187_955_271, 6196)
-            // Standard Error: 59_949
-            .saturating_add(Weight::from_parts(14_113_418, 0).saturating_mul(a.into()))
-            .saturating_add(T::DbWeight::get().reads(4_u64))
-            .saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(a.into())))
-            .saturating_add(T::DbWeight::get().writes(3_u64))
-            .saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(a.into())))
-            .saturating_add(Weight::from_parts(0, 2598).saturating_mul(a.into()))
-    }
     /// Storage: `PredictionMarkets::MarketAdmin` (r:1 w:0)
     /// Proof: `PredictionMarkets::MarketAdmin` (`max_values`: Some(1), `max_size`: Some(32), added:
     /// 527, mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:1)
