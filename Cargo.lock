@@ -7763,7 +7763,6 @@ dependencies = [
  "orml-currencies",
  "orml-tokens",
  "orml-traits",
- "pallet-avn",
  "pallet-balances",
  "pallet-insecure-randomness-collective-flip",
  "pallet-pm-authorized",
@@ -7782,10 +7781,8 @@ dependencies = [
  "prediction-market-primitives",
  "scale-info",
  "serde",
- "sp-avn-common",
  "sp-core",
  "sp-io",
- "sp-keystore",
  "sp-runtime",
  "staging-xcm",
  "staging-xcm-builder",
@@ -7907,6 +7904,26 @@ dependencies = [
  "libfuzzer-sys",
  "pallet-pm-order-book",
  "prediction-market-primitives",
+]
+
+[[package]]
+name = "pallet-pm-signed-hybrid-router"
+version = "0.2.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-traits",
+ "pallet-avn",
+ "pallet-pm-hybrid-router",
+ "pallet-pm-market-commons",
+ "parity-scale-codec",
+ "prediction-market-primitives",
+ "scale-info",
+ "sp-avn-common",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
 ]
 
 [[package]]
@@ -9067,6 +9084,7 @@ dependencies = [
  "pallet-pm-market-commons",
  "pallet-pm-neo-swaps",
  "pallet-pm-order-book",
+ "pallet-pm-signed-hybrid-router",
  "pallet-prediction-markets",
  "pallet-preimage",
  "pallet-proxy",

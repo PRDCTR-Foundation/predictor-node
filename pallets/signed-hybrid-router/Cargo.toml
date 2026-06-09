@@ -1,0 +1,51 @@
+[dependencies]
+frame-benchmarking = { workspace = true, optional = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+orml-traits = { workspace = true }
+pallet-avn = { workspace = true }
+pallet-pm-hybrid-router = { workspace = true }
+pallet-pm-market-commons = { workspace = true }
+parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+prediction-market-primitives = { workspace = true }
+scale-info = { workspace = true, features = ["derive"] }
+sp-avn-common = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+
+[dev-dependencies]
+sp-avn-common = { workspace = true, features = ["test-utils"] }
+sp-io = { workspace = true }
+
+[features]
+default = ["std"]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+    "pallet-pm-hybrid-router/runtime-benchmarks",
+]
+std = [
+    "frame-benchmarking?/std",
+    "frame-support/std",
+    "frame-system/std",
+    "orml-traits/std",
+    "pallet-avn/std",
+    "pallet-pm-hybrid-router/std",
+    "pallet-pm-market-commons/std",
+    "parity-scale-codec/std",
+    "prediction-market-primitives/std",
+    "scale-info/std",
+    "sp-avn-common/std",
+    "sp-core/std",
+    "sp-runtime/std",
+]
+try-runtime = [
+    "frame-support/try-runtime",
+]
+
+[package]
+authors.workspace = true
+edition.workspace = true
+name = "pallet-pm-signed-hybrid-router"
+version = "0.2.0"

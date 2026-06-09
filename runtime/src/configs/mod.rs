@@ -890,10 +890,14 @@ impl pallet_pm_hybrid_router::Config for Runtime {
     type MaxOrders = MaxOrders;
     type RuntimeEvent = RuntimeEvent;
     type PalletId = HybridRouterPalletId;
+    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+}
+
+impl pallet_pm_signed_hybrid_router::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
-    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_signed_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_config::Config for Runtime {

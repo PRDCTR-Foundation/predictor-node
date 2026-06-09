@@ -92,7 +92,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_buy {
+            RuntimeCall::SignedHybridRouter(pallet_pm_signed_hybrid_router::Call::signed_buy {
                 proof,
                 market_id: _,
                 asset_count: _,
@@ -102,16 +102,18 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 orders: _,
                 strategy: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_sell {
-                proof,
-                market_id: _,
-                asset_count: _,
-                asset: _,
-                amount_in: _,
-                min_price: _,
-                orders: _,
-                strategy: _,
-            }) => return Some(proof.clone()),
+            RuntimeCall::SignedHybridRouter(
+                pallet_pm_signed_hybrid_router::Call::signed_sell {
+                    proof,
+                    market_id: _,
+                    asset_count: _,
+                    asset: _,
+                    amount_in: _,
+                    min_price: _,
+                    orders: _,
+                    strategy: _,
+                },
+            ) => return Some(proof.clone()),
             RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,
@@ -145,8 +147,8 @@ impl InnerCallValidator for AvnProxyConfig {
                 return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::PredictionMarkets(..) =>
                 return pallet_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::HybridRouter(..) =>
-                return pallet_pm_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::SignedHybridRouter(..) =>
+                return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             // RuntimeCall::NodeManager(..) =>
             //     return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NeoSwaps(..) =>

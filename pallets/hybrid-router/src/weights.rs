@@ -53,9 +53,6 @@ use frame_support::{traits::Get, weights::Weight};
 pub trait WeightInfoZeitgeist {
     fn buy(n: u32, o: u32) -> Weight;
     fn sell(n: u32, o: u32) -> Weight;
-
-    fn signed_buy(n: u32, o: u32) -> Weight;
-    fn signed_sell(n: u32, o: u32) -> Weight;
 }
 
 /// Weight functions for pallet_pm_hybrid_router (automatically generated)
@@ -141,90 +138,6 @@ impl<T: frame_system::Config> WeightInfoZeitgeist for WeightInfo<T> {
             .saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(n.into())))
             .saturating_add(T::DbWeight::get().writes((4_u64).saturating_mul(o.into())))
             .saturating_add(Weight::from_parts(0, 2612).saturating_mul(n.into()))
-            .saturating_add(Weight::from_parts(0, 3724).saturating_mul(o.into()))
-    }
-
-    /// Storage: `HybridRouter::MarketNonces` (r:1 w:1)
-    /// Proof: `HybridRouter::MarketNonces` (`max_values`: None, `max_size`: Some(88), added: 2563,
-    /// mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:0)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `System::Account` (r:13 w:13)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`) Storage: `Orderbook::Orders` (r:10 w:11)
-    /// Proof: `Orderbook::Orders` (`max_values`: None, `max_size`: Some(142), added: 2617, mode:
-    /// `MaxEncodedLen`) Storage: `NeoSwaps::Pools` (r:1 w:1)
-    /// Proof: `NeoSwaps::Pools` (`max_values`: None, `max_size`: Some(144746), added: 147221, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:27 w:27)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:16 w:16)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::Reserves` (r:10 w:10)
-    /// Proof: `Tokens::Reserves` (`max_values`: None, `max_size`: Some(1276), added: 3751, mode:
-    /// `MaxEncodedLen`) Storage: `Orderbook::NextOrderId` (r:1 w:1)
-    /// Proof: `Orderbook::NextOrderId` (`max_values`: Some(1), `max_size`: Some(16), added: 511,
-    /// mode: `MaxEncodedLen`) Storage: `Balances::Reserves` (r:1 w:1)
-    /// Proof: `Balances::Reserves` (`max_values`: None, `max_size`: Some(1249), added: 3724, mode:
-    /// `MaxEncodedLen`) The range of component `n` is `[2, 16]`.
-    /// The range of component `o` is `[0, 10]`.
-    fn signed_buy(n: u32, o: u32) -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `1447 + n * (166 ±0) + o * (474 ±0)`
-        //  Estimated: `148211 + n * (2598 ±0) + o * (3751 ±0)`
-        // Minimum execution time: 688_087_000 picoseconds.
-        Weight::from_parts(718_870_000, 148211)
-            // Standard Error: 1_393_861
-            .saturating_add(Weight::from_parts(34_084_144, 0).saturating_mul(n.into()))
-            // Standard Error: 2_286_012
-            .saturating_add(Weight::from_parts(463_352_584, 0).saturating_mul(o.into()))
-            .saturating_add(T::DbWeight::get().reads(9_u64))
-            .saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(n.into())))
-            .saturating_add(T::DbWeight::get().reads((4_u64).saturating_mul(o.into())))
-            .saturating_add(T::DbWeight::get().writes(9_u64))
-            .saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(n.into())))
-            .saturating_add(T::DbWeight::get().writes((4_u64).saturating_mul(o.into())))
-            .saturating_add(Weight::from_parts(0, 2598).saturating_mul(n.into()))
-            .saturating_add(Weight::from_parts(0, 3751).saturating_mul(o.into()))
-    }
-
-    /// Storage: `HybridRouter::MarketNonces` (r:1 w:1)
-    /// Proof: `HybridRouter::MarketNonces` (`max_values`: None, `max_size`: Some(88), added: 2563,
-    /// mode: `MaxEncodedLen`) Storage: `MarketCommons::Markets` (r:1 w:0)
-    /// Proof: `MarketCommons::Markets` (`max_values`: None, `max_size`: Some(678), added: 3153,
-    /// mode: `MaxEncodedLen`) Storage: `Tokens::Accounts` (r:21 w:21)
-    /// Proof: `Tokens::Accounts` (`max_values`: None, `max_size`: Some(123), added: 2598, mode:
-    /// `MaxEncodedLen`) Storage: `Orderbook::Orders` (r:10 w:11)
-    /// Proof: `Orderbook::Orders` (`max_values`: None, `max_size`: Some(142), added: 2617, mode:
-    /// `MaxEncodedLen`) Storage: `NeoSwaps::Pools` (r:1 w:1)
-    /// Proof: `NeoSwaps::Pools` (`max_values`: None, `max_size`: Some(144746), added: 147221, mode:
-    /// `MaxEncodedLen`) Storage: `System::Account` (r:13 w:13)
-    /// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode:
-    /// `MaxEncodedLen`) Storage: `Tokens::TotalIssuance` (r:10 w:10)
-    /// Proof: `Tokens::TotalIssuance` (`max_values`: None, `max_size`: Some(43), added: 2518, mode:
-    /// `MaxEncodedLen`) Storage: `Balances::Reserves` (r:10 w:10)
-    /// Proof: `Balances::Reserves` (`max_values`: None, `max_size`: Some(1249), added: 3724, mode:
-    /// `MaxEncodedLen`) Storage: `Orderbook::NextOrderId` (r:1 w:1)
-    /// Proof: `Orderbook::NextOrderId` (`max_values`: Some(1), `max_size`: Some(16), added: 511,
-    /// mode: `MaxEncodedLen`) Storage: `Tokens::Reserves` (r:1 w:1)
-    /// Proof: `Tokens::Reserves` (`max_values`: None, `max_size`: Some(1276), added: 3751, mode:
-    /// `MaxEncodedLen`) The range of component `n` is `[2, 10]`.
-    /// The range of component `o` is `[0, 10]`.
-    fn signed_sell(n: u32, o: u32) -> Weight {
-        // Proof Size summary in bytes:
-        //  Measured:  `1486 + n * (164 ±0) + o * (316 ±0)`
-        //  Estimated: `148211 + n * (2598 ±0) + o * (3724 ±0)`
-        // Minimum execution time: 620_606_000 picoseconds.
-        Weight::from_parts(737_892_000, 148211)
-            // Standard Error: 2_064_842
-            .saturating_add(Weight::from_parts(52_364_473, 0).saturating_mul(n.into()))
-            // Standard Error: 2_122_359
-            .saturating_add(Weight::from_parts(458_125_238, 0).saturating_mul(o.into()))
-            .saturating_add(T::DbWeight::get().reads(9_u64))
-            .saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(n.into())))
-            .saturating_add(T::DbWeight::get().reads((4_u64).saturating_mul(o.into())))
-            .saturating_add(T::DbWeight::get().writes(9_u64))
-            .saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(n.into())))
-            .saturating_add(T::DbWeight::get().writes((4_u64).saturating_mul(o.into())))
-            .saturating_add(Weight::from_parts(0, 2598).saturating_mul(n.into()))
             .saturating_add(Weight::from_parts(0, 3724).saturating_mul(o.into()))
     }
 }
