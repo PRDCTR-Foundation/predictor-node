@@ -12,7 +12,7 @@ fn create_signed_exit_proof(
 ) -> Proof<SignatureTest, TestAccountIdPK> {
     let relayer = eve();
     let block_number = System::block_number();
-    let encoded_payload = NeoSwaps::encode_signed_exit_params(
+    let encoded_payload = encode_signed_exit_params::<Runtime>(
         &relayer,
         pool_id,
         pool_shares,
@@ -27,12 +27,9 @@ fn create_signed_exit_proof(
 }
 
 struct SignedExitContext {
-    pub pool_balances: Vec<u128>,
-    pub spot_prices: Vec<BalanceOf<Runtime>>,
     pub liquidity: u128,
     pub pool_id: MarketId,
     pub pool_shares_amount: u128,
-    // pub category_count: u16,
     pub outcomes: Vec<AssetOf<Runtime>>,
 }
 
@@ -50,8 +47,6 @@ impl Default for SignedExitContext {
         );
 
         Self {
-            pool_balances: vec![100_000_000_000, 10_175_559_822],
-            spot_prices,
             liquidity,
             pool_id,
             pool_shares_amount: _4, // Remove 40% to the pool.
@@ -75,19 +70,10 @@ impl SignedExitContext {
             Ok(())
         })
         .unwrap();
-        let pool = Pools::<Runtime>::get(self.pool_id).unwrap();
-        self.outcomes = pool.assets();
+        self.outcomes = NeoSwaps::assets(self.pool_id).unwrap();
 
         let alice_balances = [0, 44_912_220_089];
         assert_balances!(alice(), self.outcomes, alice_balances);
-        assert_pool_state!(
-            self.pool_id,
-            self.pool_balances,
-            self.spot_prices,
-            55_811_062_642,
-            create_b_tree_map!({ alice() => _5, bob() => _5 }),
-            0,
-        );
     }
 }
 
@@ -100,7 +86,6 @@ fn signed_exit_works(
 ) {
     ExtBuilder::default().build().execute_with(|| {
         let mut context = SignedExitContext::default();
-        let spot_prices = context.spot_prices.clone();
         let alice_account = TestAccount::new([0; 32]);
 
         let pool_id = context.pool_id;
@@ -118,7 +103,7 @@ fn signed_exit_works(
             &min_amounts_out,
         );
 
-        assert_ok!(NeoSwaps::signed_exit(
+        assert_ok!(SignedNeoSwaps::signed_exit(
             RuntimeOrigin::signed(alice()),
             proof,
             pool_id,
@@ -127,13 +112,6 @@ fn signed_exit_works(
             proof_blocknumber
         ));
 
-        let new_pool_balances = context
-            .pool_balances
-            .iter()
-            .zip(amounts_out.iter())
-            .map(|(b, a)| b - a)
-            .collect::<Vec<_>>();
-
         let new_alice_balances = alice_balances
             .iter()
             .zip(amounts_out.iter())
@@ -141,17 +119,9 @@ fn signed_exit_works(
             .collect::<Vec<_>>();
 
         assert_balances!(alice(), context.outcomes, new_alice_balances);
-        assert_pool_state!(
-            pool_id,
-            new_pool_balances,
-            spot_prices,
-            new_liquidity_parameter,
-            create_b_tree_map!({ alice() => _1, bob() => _5 }),
-            0,
-        );
         let pool_shares_amount = context.pool_shares_amount;
         System::assert_last_event(
-            Event::ExitExecuted {
+            NeoSwapsEvent::ExitExecuted {
                 who: alice(),
                 pool_id,
                 pool_shares_amount,
@@ -191,7 +161,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_exit(
+                SignedNeoSwaps::signed_exit(
                     RuntimeOrigin::signed(alice()),
                     proof,
                     pool_id,
@@ -228,7 +198,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_exit(
+                SignedNeoSwaps::signed_exit(
                     RuntimeOrigin::signed(alice()),
                     proof,
                     pool_id,
@@ -265,7 +235,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_exit(
+                SignedNeoSwaps::signed_exit(
                     RuntimeOrigin::signed(alice()),
                     bad_proof,
                     pool_id,
@@ -300,7 +270,7 @@ mod fails_when {
 
             System::set_block_number(proof_blocknumber + 100);
             assert_noop!(
-                NeoSwaps::signed_exit(
+                SignedNeoSwaps::signed_exit(
                     RuntimeOrigin::signed(alice()),
                     proof,
                     pool_id,

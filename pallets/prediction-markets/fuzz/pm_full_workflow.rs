@@ -26,15 +26,15 @@ use pallet_prediction_markets::mock::{ExtBuilder, PredictionMarkets, RuntimeOrig
 use prediction_market_primitives::{
     constants::mock::MaxCreatorFee,
     types::{
-        Asset, Deadlines, MarketCreation, MarketDisputeMechanism, MarketPeriod, MarketType,
-        MultiHash, OutcomeReport, ScoringRule, TestAccountIdPK,
+        AccountIdTest, Asset, Deadlines, MarketCreation, MarketDisputeMechanism, MarketPeriod,
+        MarketType, MultiHash, OutcomeReport, ScoringRule,
     },
 };
 use sp_arithmetic::Perbill;
 
 #[inline]
-fn account(seed: u8) -> TestAccountIdPK {
-    TestAccountIdPK::from_raw([seed; 32])
+fn account(seed: u8) -> AccountIdTest {
+    seed.into()
 }
 
 fuzz_target!(|data: Data| {

@@ -315,4 +315,13 @@ mod runtime {
 
     #[runtime::pallet_index(83)]
     pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
+
+    #[runtime::pallet_index(90)]
+    pub type SignedHybridRouter = pallet_pm_signed_hybrid_router;
+
+    #[runtime::pallet_index(91)]
+    pub type SignedPredictionMarkets = pallet_pm_signed_prediction_markets;
+
+    #[runtime::pallet_index(92)]
+    pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
 }

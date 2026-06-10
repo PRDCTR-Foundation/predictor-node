@@ -23,14 +23,13 @@ use crate::{
         traits::LiquidityTreeHelper,
         types::{LiquidityTreeError, Node},
     },
-    mock::Runtime,
+    mock::{get_account, Runtime},
     traits::LiquiditySharesManager,
     LiquidityTreeOf,
 };
 use alloc::collections::BTreeMap;
 use frame_support::assert_err;
 use prediction_market_primitives::constants::base_multiples::*;
-pub use prediction_market_primitives::test_helper::get_account;
 use sp_runtime::traits::Zero;
 mod deposit_fees;
 mod exit;

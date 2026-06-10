@@ -27,7 +27,7 @@ jobs:
           - name: default
             extra_flags: "--features mock -- --skip test_genesis_config_builds"
           - name: runtime-benchmarks
-            extra_flags: "--features [mock, runtime-benchmarks] -- --skip test_genesis_config_builds"
+            extra_flags: "--features mock,runtime-benchmarks -- --skip test_genesis_config_builds"
 
     steps:
       - name: Checkout

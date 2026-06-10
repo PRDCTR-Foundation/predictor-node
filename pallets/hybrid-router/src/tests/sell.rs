@@ -16,7 +16,7 @@
 // along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use prediction_market_primitives::{test_helper::get_account_from_seed, types::Asset};
+use prediction_market_primitives::types::Asset;
 
 #[test]
 fn sell_to_amm_and_then_fill_specified_order() {
@@ -802,8 +802,7 @@ fn sell_emits_event() {
         let taker_asset = asset;
         let taker_amount = _100.saturated_into::<BalanceOf<Runtime>>();
         for (i, _) in orders.iter().enumerate() {
-            let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&(i as u32));
-            let order_creator = get_account_from_seed(seed.into());
+            let order_creator = get_account(i.try_into().unwrap());
             let surplus = ((i + 1) as u128) * _1_2;
             let taker_amount = taker_amount + surplus.saturated_into::<BalanceOf<Runtime>>();
             assert_ok!(AssetManager::deposit(maker_asset, &order_creator, maker_amount + _100));

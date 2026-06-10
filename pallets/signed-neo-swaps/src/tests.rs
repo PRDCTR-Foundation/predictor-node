@@ -1,58 +1,63 @@
-// Copyright 2023-2025 Forecasting Technologies LTD.
+// Copyright 2024-2025 Forecasting Technologies LTD.
 //
-// This file is part of Zeitgeist.
+// This file is part of Predictor.
 //
-// Zeitgeist is free software: you can redistribute it and/or modify it
+// Predictor is free software: you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the
 // Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
-// Zeitgeist is distributed in the hope that it will be useful, but
+// Predictor is distributed in the hope that it will be useful, but
 // WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 // General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Zeitgeist. If not, see <https://www.gnu.org/licenses/>.
+// along with Predictor. If not, see <https://www.gnu.org/licenses/>.
 
-#![cfg(all(feature = "mock", test))]
+#![cfg(test)]
 
-mod buy;
-mod buy_and_sell;
-mod combo_buy;
-mod combo_sell;
-mod deploy_combinatorial_pool;
-mod deploy_pool;
-mod exit;
-mod join;
-mod liquidity_tree_interactions;
-mod pallet_admin_tests;
-mod sell;
-mod withdraw_fees;
-
-use crate::{consts::*, mock::*, traits::*, *};
+use crate::{mock::*, *};
+use alloc::vec::Vec;
 use common_primitives::constants::currency::CENT_BASE;
 use frame_support::{assert_noop, assert_ok};
 use orml_traits::MultiCurrency;
-use pallet_pm_combinatorial_tokens::types::Fuel;
-use pallet_pm_market_commons::{MarketCommonsPalletApi, Markets};
+use pallet_pm_market_commons::MarketCommonsPalletApi;
+use pallet_pm_neo_swaps::{
+    AccountIdOf, AssetOf, BalanceOf, Config, Error as NeoSwapsError, Event as NeoSwapsEvent,
+};
 use pallet_prediction_markets::WhitelistedMarketCreators;
 use prediction_market_primitives::{
     constants::base_multiples::*,
-    math::fixed::{FixedDiv, FixedMul},
     types::{
-        AccountIdTest, Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus,
-        MarketType, MultiHash, ScalarPosition, ScoringRule,
+        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
+        MultiHash, ScoringRule, TestAccountIdPK,
     },
 };
-
-const BASE_ASSET: Asset<MarketId> = Asset::Prd;
-// const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
-pub use sp_runtime::traits::Hash;
 use sp_runtime::Perbill;
 
+const BASE_ASSET: Asset<MarketId> = Asset::Prd;
+
+macro_rules! assert_balances {
+    ($account:expr, $assets:expr, $balances:expr $(,)?) => {
+        assert_eq!(
+            $assets.len(),
+            $balances.len(),
+            "assert_balances: Assets and balances length mismatch"
+        );
+        for (&asset, &expected_balance) in $assets.iter().zip($balances.iter()) {
+            let actual_balance = AssetManager::free_balance(asset, &$account);
+            assert_eq!(
+                actual_balance, expected_balance,
+                "assert_balances: Balance mismatch for asset {:?}",
+                asset,
+            );
+        }
+    };
+}
+
 fn create_market(
-    creator: AccountIdTest,
+    creator: TestAccountIdPK,
     base_asset: Asset<MarketId>,
     market_type: MarketType,
     scoring_rule: ScoringRule,
@@ -89,7 +94,7 @@ fn create_market_and_deploy_pool(
     amount: BalanceOf<Runtime>,
     spot_prices: Vec<BalanceOf<Runtime>>,
     swap_fee: BalanceOf<Runtime>,
-) -> MarketIdOf<Runtime> {
+) -> MarketId {
     let market_id = create_market(creator, base_asset, market_type, ScoringRule::AmmCdaHybrid);
     assert_ok!(PredictionMarkets::buy_complete_set(
         RuntimeOrigin::signed(alice()),
@@ -100,43 +105,10 @@ fn create_market_and_deploy_pool(
         RuntimeOrigin::signed(alice()),
         market_id,
         amount,
-        spot_prices.clone(),
+        spot_prices,
         swap_fee,
     ));
     market_id
-}
-
-fn create_markets_and_deploy_combinatorial_pool(
-    creator: AccountIdOf<Runtime>,
-    base_asset: Asset<MarketId>,
-    market_types: Vec<MarketType>,
-    amount: BalanceOf<Runtime>,
-    spot_prices: Vec<BalanceOf<Runtime>>,
-    swap_fee: BalanceOf<Runtime>,
-) -> (Vec<MarketId>, <Runtime as Config>::PoolId) {
-    let mut market_ids = vec![];
-    let mut asset_count = 1u16;
-    for market_type in market_types.iter() {
-        let market_id =
-            create_market(creator, base_asset, market_type.clone(), ScoringRule::AmmCdaHybrid);
-        let market = <Runtime as Config>::MarketCommons::market(&market_id).unwrap();
-        asset_count *= market.outcomes();
-
-        market_ids.push(market_id);
-    }
-
-    let pool_id = <Pallet<Runtime> as PoolStorage>::next_pool_id();
-    assert_ok!(NeoSwaps::deploy_combinatorial_pool(
-        RuntimeOrigin::signed(alice()),
-        asset_count,
-        market_ids.clone(),
-        amount,
-        spot_prices.clone(),
-        swap_fee,
-        Fuel::new(16, false),
-    ));
-
-    (market_ids, pool_id)
 }
 
 fn deposit_complete_set(
@@ -152,3 +124,7 @@ fn deposit_complete_set(
         amount,
     ));
 }
+
+mod signed_exit;
+mod signed_join;
+mod signed_withdraw_fees;

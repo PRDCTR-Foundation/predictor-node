@@ -149,6 +149,9 @@ pallet-pm-order-book = { path = "pallets/orderbook", default-features = false }
 pallet-pm-combinatorial-tokens = { path = "pallets/combinatorial-tokens", default-features = false }
 pallet-pm-neo-swaps = { path = "pallets/neo-swaps", default-features = false }
 pallet-pm-hybrid-router = { path = "pallets/hybrid-router", default-features = false }
+pallet-pm-signed-hybrid-router = { path = "pallets/signed-hybrid-router", default-features = false }
+pallet-pm-signed-prediction-markets = { path = "pallets/signed-prediction-markets", default-features = false }
+pallet-pm-signed-neo-swaps = { path = "pallets/signed-neo-swaps", default-features = false }
 
 # ORML (wasm)
 orml-benchmarking = { version = "=1.1.0", default-features = false }
