@@ -290,3 +290,23 @@ docker run --rm -it -p 9944:9944 -p 9933:9933 -p 30333:30333 predictor-node:loca
 - The official CI/CD pipelines publish images to GitHub Container Registry (GHCR) tagged by commit SHA and release tag.
 - The Docker image expects the binary to be named `predictor-node` in the build context root.
 - For production or release images, use the published images from `ghcr.io/<owner>/predictor-node:<tag>`.
+
+
+## Key Generation Helper
+
+The `scripts/generate-keys.sh` helper generates development/testnet validator key bundles for bootstrapping a Predictor network. It creates a SUDO account, the requested number of Author key bundles, and a `bridgeConfig.authors` JSON object containing the Ethereum and T2 public key details needed when configuring the bridge.
+
+This script is intended for **DEV/TESTNET use only**. The generated output contains private keys and seed phrases and must never be committed.
+
+### Prerequisites
+
+The script requires:
+
+- `subkey` for Substrate account/session key generation
+- `cast` from Foundry for Ethereum address/public key derivation
+
+### Usage
+
+```bash
+chmod +x scripts/generate-keys.sh
+./scripts/generate-keys.sh 5
