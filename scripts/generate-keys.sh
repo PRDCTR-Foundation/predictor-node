@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 AUTHOR_COUNT="${1:-}"
 OUTPUT_FILE="${2:-authors.keys}"
