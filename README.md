@@ -307,6 +307,5 @@ The script requires:
 
 ### Usage
 
-```bash
-chmod +x scripts/generate-keys.sh
-./scripts/generate-keys.sh 5
+    chmod +x scripts/generate-keys.sh
+    ./scripts/generate-keys.sh 5
