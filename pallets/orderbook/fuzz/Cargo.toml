@@ -16,7 +16,7 @@ authors = ["Automatically generated"]
 edition.workspace = true
 name = "pallet-pm-order-book-fuzz"
 publish = false
-version = "0.6.2"
+version = "0.6.3"
 
 [package.metadata]
 cargo-fuzz = true
