@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.0...v1.0.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* **ci:** Publish release issues ([#65](https://github.com/Predictor-Foundation/predictor-node/issues/65)) ([d25cb99](https://github.com/Predictor-Foundation/predictor-node/commit/d25cb99beb450be67a0bd5d4c95af0d1f5d48e01))
+
 ## [1.0.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.3.0...v1.0.0) (2026-06-15)
 
 

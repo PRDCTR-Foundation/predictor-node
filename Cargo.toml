@@ -4,7 +4,7 @@ authors = ["Galactic Markets Systems Team"]
 homepage = "https://predictor.io/"
 repository = "https://github.com/Predictor-Foundation/predictor-node"
 edition = "2021"
-version = "1.0.0"
+version = "1.0.1"
 
 [workspace]
 members = [
