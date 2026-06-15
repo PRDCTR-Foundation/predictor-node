@@ -32,7 +32,7 @@ authors = ["Forecasting Technologies Ltd"]
 edition.workspace = true
 name = "pallet-pm-combinatorial-tokens-fuzz"
 publish = false
-version = "0.6.3"
+version = "0.6.4"
 
 [package.metadata]
 cargo-fuzz = true

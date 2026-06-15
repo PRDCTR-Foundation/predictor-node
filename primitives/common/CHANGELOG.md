@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.3.0...v0.4.0) (2026-06-15)
+
+
+### Features
+
+* **combinatorial-tokens:** apply Truth customisations to 0.6.1 ([#20](https://github.com/Predictor-Foundation/predictor-node/issues/20)) ([45312e1](https://github.com/Predictor-Foundation/predictor-node/commit/45312e11f87c3f89636855df3f98560ea9ea7b81))
+* Introduce public testnet chainspec ([#61](https://github.com/Predictor-Foundation/predictor-node/issues/61)) ([e274606](https://github.com/Predictor-Foundation/predictor-node/commit/e27460682c497209bd06213abd3ff8ef7e613e9d))
+* port primitive customization from Truth Network ([4c300c8](https://github.com/Predictor-Foundation/predictor-node/commit/4c300c86007967aedf1bc1a26263dde80d1cc28a))
+* ports & cleanups dependencies for primitives, fixes wasm issues ([#30](https://github.com/Predictor-Foundation/predictor-node/issues/30)) ([aa09159](https://github.com/Predictor-Foundation/predictor-node/commit/aa091591c7ae03a50960643f272a2181f97b1b06))
+* **primitive:** port primitive customisation from Truth Network ([#10](https://github.com/Predictor-Foundation/predictor-node/issues/10)) ([168141e](https://github.com/Predictor-Foundation/predictor-node/commit/168141ea69ac9b054a8846dd857d5a43bf84238c))
+* **runtime:** move chain spec genesis to runtime presets ([#39](https://github.com/Predictor-Foundation/predictor-node/issues/39)) ([85beae0](https://github.com/Predictor-Foundation/predictor-node/commit/85beae04b0de75bd8922bef0217f91d1b3ed0e50))
+
+
+### Bug Fixes
+
+* initial pipelines issues - pt4 ([#53](https://github.com/Predictor-Foundation/predictor-node/issues/53)) ([96dcf63](https://github.com/Predictor-Foundation/predictor-node/commit/96dcf63151a20e97dd6ad0505dc48ade5b447b48))
+
 ## [0.3.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.2.0...v0.3.0) (2026-06-15)
 
 

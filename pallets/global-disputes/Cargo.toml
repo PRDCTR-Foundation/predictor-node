@@ -47,5 +47,5 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-global-disputes"
-version = "0.2.1"
+version = "0.2.2"
 
