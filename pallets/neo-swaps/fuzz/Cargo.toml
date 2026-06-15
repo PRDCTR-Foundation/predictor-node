@@ -32,7 +32,7 @@ authors = ["Forecasting Technologies Ltd"]
 edition.workspace = true
 name = "pallet-pm-neo-swaps-fuzz"
 publish = false
-version = "0.6.2"
+version = "0.6.3"
 
 [package.metadata]
 cargo-fuzz = true

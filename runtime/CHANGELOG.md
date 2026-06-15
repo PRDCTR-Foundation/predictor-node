@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.2.0...v1.0.0) (2026-06-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* refactor pm pallets ([#58](https://github.com/Predictor-Foundation/predictor-node/issues/58))
+
+### Features
+
+* Introduce public testnet chainspec ([#61](https://github.com/Predictor-Foundation/predictor-node/issues/61)) ([e274606](https://github.com/Predictor-Foundation/predictor-node/commit/e27460682c497209bd06213abd3ff8ef7e613e9d))
+* refactor pm pallets ([#58](https://github.com/Predictor-Foundation/predictor-node/issues/58)) ([f12ce2f](https://github.com/Predictor-Foundation/predictor-node/commit/f12ce2fb0726335c6d720da17b123aaf29ea695a))
+
 ## [0.2.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.1.0...v0.2.0) (2026-05-28)
 
 

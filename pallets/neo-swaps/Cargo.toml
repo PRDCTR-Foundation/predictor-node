@@ -122,5 +122,5 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-neo-swaps"
-version = "0.2.0"
+version = "1.0.0"
 
