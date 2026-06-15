@@ -15,5 +15,5 @@ std = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets-runtime-api"
-version = "0.1.0"
+version.workspace = true
 
