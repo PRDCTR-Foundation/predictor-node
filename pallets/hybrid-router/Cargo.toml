@@ -35,8 +35,7 @@ common-primitives = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
-# Remove when pallet-pm-neo-swaps is added to the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
-# pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
+pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
 
 [features]
 default = ["std"]
