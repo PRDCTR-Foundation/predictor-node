@@ -62,3 +62,19 @@ pub fn staging_testnet_config() -> Result<ChainSpec, String> {
     .with_genesis_config_preset_name(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET)
     .build())
 }
+
+pub fn public_testnet_config() -> Result<ChainSpec, String> {
+    let properties = prd_chain_properties();
+
+    Ok(ChainSpec::builder(
+        WASM_BINARY.ok_or_else(|| "Public wasm not available".to_string())?,
+        None,
+    )
+    .with_name("Cassandra - Predictor Public Testnet")
+    .with_id("predictor_cassandra_public_testnet")
+    .with_protocol_id("prd-public-cassandra-testnet")
+    .with_properties(properties)
+    .with_chain_type(ChainType::Live)
+    .with_genesis_config_preset_name(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET)
+    .build())
+}
