@@ -17,7 +17,7 @@ authors = ["Automatically generated"]
 edition.workspace = true
 name = "pallet-prediction-markets-fuzz"
 publish = false
-version = "0.6.3"
+version.workspace = true
 
 [package.metadata]
 cargo-fuzz = true

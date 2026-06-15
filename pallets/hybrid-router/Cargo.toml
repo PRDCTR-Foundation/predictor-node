@@ -112,4 +112,4 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-hybrid-router"
-version = "1.0.0"
+version.workspace = true

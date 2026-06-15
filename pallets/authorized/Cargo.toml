@@ -41,4 +41,4 @@ authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-authorized"
 
-version = "0.2.1"
+version.workspace = true
