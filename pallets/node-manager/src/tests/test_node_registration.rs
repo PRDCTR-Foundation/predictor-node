@@ -362,3 +362,55 @@ mod rotating_signing_key {
         }
     }
 }
+
+mod node_cap {
+    use super::*;
+
+    #[test]
+    fn registration_fails_at_cap_and_deregistration_frees_capacity() {
+        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+        ext.execute_with(|| {
+            let context = Context::default();
+            assert_ok!(NodeManager::register_node(
+                context.origin.clone(),
+                context.node_id,
+                context.owner,
+                context.signing_key.clone(),
+            ));
+
+            // Pretend the rest of the network has filled the cap.
+            let cap = <TestRuntime as pallet::Config>::MaxRegisteredNodes::get();
+            TotalRegisteredNodes::<TestRuntime>::put(cap);
+
+            let blocked_node = TestAccount::new([203u8; 32]).account_id();
+            let blocked_key =
+                <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(None);
+            assert_noop!(
+                NodeManager::register_node(
+                    context.origin.clone(),
+                    blocked_node,
+                    context.owner,
+                    blocked_key.clone(),
+                ),
+                Error::<TestRuntime>::MaxNodesReached
+            );
+
+            // Deregistering an existing node frees one slot under the cap.
+            let nodes = BoundedVec::truncate_from(vec![context.node_id]);
+            assert_ok!(NodeManager::deregister_nodes(
+                context.origin.clone(),
+                context.owner,
+                nodes,
+            ));
+            assert_eq!(TotalRegisteredNodes::<TestRuntime>::get(), cap - 1);
+
+            assert_ok!(NodeManager::register_node(
+                context.origin,
+                blocked_node,
+                context.owner,
+                blocked_key,
+            ));
+            assert_eq!(TotalRegisteredNodes::<TestRuntime>::get(), cap);
+        });
+    }
+}

@@ -7,7 +7,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 
-use parity_scale_codec::{Decode, Encode, FullCodec};
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
@@ -20,14 +19,13 @@ use frame_system::{
     pallet_prelude::*,
 };
 use pallet_avn::{self as avn};
+use parity_scale_codec::{Decode, Encode, FullCodec};
 use sp_application_crypto::RuntimeAppPublic;
 use sp_core::MaxEncodedLen;
 use sp_runtime::{
     offchain::storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
     scale_info::TypeInfo,
-    traits::{
-        AccountIdConversion, Dispatchable, IdentifyAccount, Verify, Zero,
-    },
+    traits::{AccountIdConversion, Dispatchable, IdentifyAccount, Verify, Zero},
     transaction_validity::{
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
@@ -52,6 +50,9 @@ mod mock;
 #[path = "tests/test_admin.rs"]
 mod test_admin;
 #[cfg(test)]
+#[path = "tests/test_delegated_heartbeat.rs"]
+mod test_delegated_heartbeat;
+#[cfg(test)]
 #[path = "tests/test_heartbeat.rs"]
 mod test_heartbeat;
 #[cfg(test)]
@@ -61,14 +62,14 @@ mod test_node_deregistration;
 #[path = "tests/test_node_registration.rs"]
 mod test_node_registration;
 #[cfg(test)]
-#[path = "tests/test_delegated_heartbeat.rs"]
-mod test_delegated_heartbeat;
+#[path = "tests/test_on_idle_drain.rs"]
+mod test_on_idle_drain;
 #[cfg(test)]
 #[path = "tests/test_reward_halving.rs"]
 mod test_reward_halving;
 #[cfg(test)]
-#[path = "tests/test_on_idle_drain.rs"]
-mod test_on_idle_drain;
+#[path = "tests/test_reward_lock.rs"]
+mod test_reward_lock;
 #[cfg(test)]
 #[path = "tests/test_top_up_reward_pot.rs"]
 mod test_top_up_reward_pot;
@@ -257,12 +258,47 @@ pub mod pallet {
     #[pallet::storage]
     pub type HalvingEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+    /// Rewards earned by an owner while the global lock window is active.
+    /// The funds themselves stay in the reward-pot account; this map records
+    /// each owner's claim, realised via `withdraw_rewards`.
+    #[pallet::storage]
+    pub type LockedRewards<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, ValueQuery>;
+
+    /// Sum of all `LockedRewards` entries - the pot's outstanding locked
+    /// liability. The reward-pot balance must always cover this plus any
+    /// undrained period pots.
+    #[pallet::storage]
+    pub type TotalLockedRewards<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+    /// The single global reward-lock window (one-off, anchored to the
+    /// migration Global Start Date). While unset, payouts are locked
+    /// defensively and withdrawal is blocked - root must configure the
+    /// window before any locked reward can be released.
+    #[pallet::storage]
+    pub type LockSchedule<T: Config> = StorageValue<_, LockScheduleInfo, OptionQuery>;
+
+    /// Destination for forfeited (early-withdrawn) reward amounts - the
+    /// foundation forfeiture-liquidity wallet on mainnet. Falls back to
+    /// `T::TreasurySource` while unset, which keeps forfeits in-system.
+    #[pallet::storage]
+    pub type ForfeitureDestination<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
+
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
         pub max_batch_size: u32,
         pub reward_period: u32,
         pub heartbeat_period: u32,
         pub reward_amount_per_period: BalanceOf<T>,
+        /// Unix-seconds anchor of the global reward-lock window. `None`
+        /// leaves the schedule unset (payouts lock, withdrawals blocked,
+        /// until root configures it).
+        pub lock_schedule_start: Option<Duration>,
+        /// Week-one forfeiture percentage of the lock window.
+        pub lock_initial_penalty_percent: u32,
+        /// Destination for forfeited amounts; `None` falls back to
+        /// `T::TreasurySource` at withdrawal time.
+        pub forfeiture_destination: Option<T::AccountId>,
     }
 
     impl<T: Config> Default for GenesisConfig<T> {
@@ -272,6 +308,9 @@ pub mod pallet {
                 reward_period: 2,
                 heartbeat_period: 1,
                 reward_amount_per_period: Default::default(),
+                lock_schedule_start: None,
+                lock_initial_penalty_percent: 52,
+                forfeiture_destination: None,
             }
         }
     }
@@ -279,6 +318,14 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
+            // The reward pot is a pallet-derived account that only ever
+            // receives funds at runtime. On a chain with a zero existential
+            // deposit, a credit to a provider-less account does not persist
+            // (the transfer succeeds but the funds are lost), so the pot
+            // gets its provider reference at genesis - the same pattern
+            // pallet-treasury uses for its pot account.
+            frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
+
             assert!(self.reward_period > self.heartbeat_period);
             let default_threshold = Pallet::<T>::get_default_threshold();
 
@@ -303,6 +350,17 @@ pub mod pallet {
             <RewardPeriod<T>>::put(reward_period);
             OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
             HalvingEnabled::<T>::put(T::HalvingEnabledAtGenesis::get());
+
+            assert!(self.lock_initial_penalty_percent <= 100, "lock penalty must be a percentage");
+            if let Some(start) = self.lock_schedule_start {
+                LockSchedule::<T>::put(LockScheduleInfo::new(
+                    start,
+                    self.lock_initial_penalty_percent,
+                ));
+            }
+            if let Some(ref destination) = self.forfeiture_destination {
+                ForfeitureDestination::<T>::put(destination.clone());
+            }
         }
     }
 
@@ -377,6 +435,27 @@ pub mod pallet {
         },
         /// `HalvingEnabled` toggled by root
         HalvingEnabledSet { enabled: bool },
+        /// A reward accrued into `LockedRewards` instead of free balance
+        /// (the global lock window is active or not yet configured).
+        RewardLocked {
+            reward_period: RewardPeriodIndex,
+            owner: T::AccountId,
+            node: NodeId<T>,
+            amount: BalanceOf<T>,
+        },
+        /// Locked rewards withdrawn. `net` went to the owner, `forfeited`
+        /// (`penalty` of `gross`) to the forfeiture destination.
+        RewardWithdrawn {
+            owner: T::AccountId,
+            gross: BalanceOf<T>,
+            net: BalanceOf<T>,
+            forfeited: BalanceOf<T>,
+            penalty: Perbill,
+        },
+        /// The global lock window set by root
+        LockScheduleSet { start: Duration, initial_penalty_percent: u32 },
+        /// Forfeiture destination set by root
+        ForfeitureDestinationSet { destination: T::AccountId },
     }
 
     #[pallet::error]
@@ -455,13 +534,21 @@ pub mod pallet {
         ProverNotRegistered,
         /// A node in the batch is not registered or not owned by the prover
         NodeNotOwnedByProver,
+        /// The caller has no locked rewards to withdraw
+        NoLockedRewards,
+        /// The global lock window has not been configured yet
+        LockScheduleNotSet,
+        /// Requested withdrawal exceeds the caller's locked balance
+        WithdrawAmountExceedsLocked,
+        /// Lock schedule parameters are invalid (penalty must be <= 100%)
+        InvalidLockSchedule,
+        /// The network-wide registered-node cap has been reached
+        MaxNodesReached,
     }
 
     #[pallet::config]
     pub trait Config:
-        frame_system::Config
-        + avn::Config
-        + SendTransactionTypes<Call<Self>>
+        frame_system::Config + avn::Config + SendTransactionTypes<Call<Self>>
     {
         /// Runtime event type
         type RuntimeEvent: From<Event<Self>>
@@ -507,6 +594,12 @@ pub mod pallet {
         /// validation work.
         #[pallet::constant]
         type MaxNodesPerAggregateHeartbeat: Get<u32>;
+        /// Hard cap on concurrently registered nodes. The hard-fork proposal
+        /// fixes the Predictor network at 30,000 nodes; registration fails
+        /// once `TotalRegisteredNodes` reaches this value, and deregistering
+        /// frees capacity.
+        #[pallet::constant]
+        type MaxRegisteredNodes: Get<u32>;
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
@@ -544,6 +637,8 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_reward_amount())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_enabled())
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
+            .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
+            .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
         )]
         pub fn set_admin_config(
             origin: OriginFor<T>,
@@ -617,6 +712,24 @@ pub mod pallet {
 
                     Self::deposit_event(Event::MinUptimeThresholdSet { threshold });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_min_threshold()).into())
+                },
+                AdminConfig::LockSchedule(schedule) => {
+                    ensure!(
+                        schedule.initial_penalty_percent <= 100,
+                        Error::<T>::InvalidLockSchedule
+                    );
+                    <LockSchedule<T>>::put(schedule);
+                    Self::deposit_event(Event::LockScheduleSet {
+                        start: schedule.start,
+                        initial_penalty_percent: schedule.initial_penalty_percent,
+                    });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_lock_schedule()).into())
+                },
+                AdminConfig::ForfeitureDestination(destination) => {
+                    <ForfeitureDestination<T>>::put(destination.clone());
+                    Self::deposit_event(Event::ForfeitureDestinationSet { destination });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
+                        .into())
                 },
             }
         }
@@ -828,13 +941,8 @@ pub mod pallet {
 
             let treasury = T::TreasurySource::get();
             let pot = Self::compute_reward_account_id();
-            T::Currency::transfer(
-                &treasury,
-                &pot,
-                amount,
-                ExistenceRequirement::KeepAlive,
-            )
-            .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
+            T::Currency::transfer(&treasury, &pot, amount, ExistenceRequirement::KeepAlive)
+                .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
 
             pot_info.total_reward = amount;
             RewardPot::<T>::insert(period, pot_info);
@@ -902,8 +1010,8 @@ pub mod pallet {
 
             // The prover must be a registered node; its owner is the
             // asserted owner of every node in the batch.
-            let prover_info = NodeRegistry::<T>::get(&proof.signer)
-                .ok_or(Error::<T>::ProverNotRegistered)?;
+            let prover_info =
+                NodeRegistry::<T>::get(&proof.signer).ok_or(Error::<T>::ProverNotRegistered)?;
             let asserted_owner = prover_info.owner.clone();
 
             // Pre-flight validation: every node must be registered to the
@@ -912,8 +1020,7 @@ pub mod pallet {
             use sp_std::collections::btree_set::BTreeSet;
             let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
             for node in nodes.iter() {
-                let info = NodeRegistry::<T>::get(node)
-                    .ok_or(Error::<T>::NodeNotOwnedByProver)?;
+                let info = NodeRegistry::<T>::get(node).ok_or(Error::<T>::NodeNotOwnedByProver)?;
                 ensure!(info.owner == asserted_owner, Error::<T>::NodeNotOwnedByProver);
                 unique.insert(node.clone());
             }
@@ -945,14 +1052,79 @@ pub mod pallet {
             }
 
             TotalUptime::<T>::mutate(&current_period, |total| {
-                total.total_heartbeats =
-                    total.total_heartbeats.saturating_add(new_heartbeat_count);
+                total.total_heartbeats = total.total_heartbeats.saturating_add(new_heartbeat_count);
                 total.total_weight = total.total_weight.saturating_add(total_new_weight);
             });
 
             Ok(())
         }
 
+        /// Withdraw locked rewards. `amount = None` withdraws the caller's
+        /// full locked balance; `Some(limit)` withdraws exactly `limit`.
+        /// The forfeiture rate of the global lock window at the time of the
+        /// call applies to the withdrawn slice: `forfeited = penalty x gross`
+        /// goes to the forfeiture destination, the remainder to the caller's
+        /// free balance. From week 53 of the window onward the penalty is
+        /// zero and a withdrawal returns the full amount.
+        ///
+        /// Fails while the global lock window is unconfigured: rewards
+        /// accrued before the window is set stay locked until root sets it.
+        #[pallet::call_index(13)]
+        #[pallet::weight(<T as Config>::WeightInfo::withdraw_rewards())]
+        pub fn withdraw_rewards(
+            origin: OriginFor<T>,
+            amount: Option<BalanceOf<T>>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            let locked = LockedRewards::<T>::get(&who);
+            ensure!(!locked.is_zero(), Error::<T>::NoLockedRewards);
+            let schedule = LockSchedule::<T>::get().ok_or(Error::<T>::LockScheduleNotSet)?;
+
+            let gross = amount.unwrap_or(locked);
+            ensure!(!gross.is_zero(), Error::<T>::ZeroAmount);
+            ensure!(gross <= locked, Error::<T>::WithdrawAmountExceedsLocked);
+
+            let penalty = schedule.penalty_at(Self::time_now_sec());
+            let forfeited = penalty.mul_floor(gross);
+            let net = gross.saturating_sub(forfeited);
+
+            // Both transfers come out of the reward-pot account, where locked
+            // rewards physically live. Extrinsic transactionality reverts the
+            // first transfer if the second fails.
+            let reward_pot = Self::compute_reward_account_id();
+            if !net.is_zero() {
+                T::Currency::transfer(&reward_pot, &who, net, ExistenceRequirement::KeepAlive)?;
+            }
+            if !forfeited.is_zero() {
+                let destination =
+                    ForfeitureDestination::<T>::get().unwrap_or_else(T::TreasurySource::get);
+                T::Currency::transfer(
+                    &reward_pot,
+                    &destination,
+                    forfeited,
+                    ExistenceRequirement::KeepAlive,
+                )?;
+            }
+
+            let remaining = locked.saturating_sub(gross);
+            if remaining.is_zero() {
+                LockedRewards::<T>::remove(&who);
+            } else {
+                LockedRewards::<T>::insert(&who, remaining);
+            }
+            TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_sub(gross));
+
+            Self::deposit_event(Event::RewardWithdrawn {
+                owner: who,
+                gross,
+                net,
+                forfeited,
+                penalty,
+            });
+
+            Ok(())
+        }
     }
 
     #[pallet::hooks]
@@ -1175,10 +1347,7 @@ pub mod pallet {
             nodes: &BoundedVec<NodeId<T>, MaxNodesToDeregister>,
         ) -> DispatchResult {
             for node in nodes {
-                ensure!(
-                    <OwnedNodes<T>>::contains_key(owner, node),
-                    Error::<T>::NodeNotRegistered
-                );
+                ensure!(<OwnedNodes<T>>::contains_key(owner, node), Error::<T>::NodeNotRegistered);
 
                 let info = NodeRegistry::<T>::take(node).ok_or(Error::<T>::NodeNotRegistered)?;
                 Self::remove_signing_key_index(node, &info.signing_key)?;
@@ -1215,6 +1384,10 @@ pub mod pallet {
             ensure!(
                 !SigningKeyToNodeId::<T>::contains_key(&signing_key),
                 Error::<T>::SigningKeyAlreadyInUse
+            );
+            ensure!(
+                TotalRegisteredNodes::<T>::get() < T::MaxRegisteredNodes::get(),
+                Error::<T>::MaxNodesReached
             );
 
             <OwnedNodes<T>>::insert(&owner, &node, ());
@@ -1310,11 +1483,7 @@ pub mod pallet {
 
                     Some((proof, encoded_data))
                 },
-                Call::heartbeat_for_owned_nodes {
-                    ref proof,
-                    ref nodes,
-                    ref block_number,
-                } => {
+                Call::heartbeat_for_owned_nodes { ref proof, ref nodes, ref block_number } => {
                     let encoded_data = encode_aggregate_heartbeat_params::<T>(
                         &proof.relayer,
                         nodes,
@@ -1366,7 +1535,6 @@ pub mod pallet {
             Self::insert_signing_key_index(node, new_key)?;
             Ok(())
         }
-
     }
 
     impl<T: Config> InnerCallValidator for Pallet<T> {
@@ -1384,7 +1552,6 @@ pub mod pallet {
             false
         }
     }
-
 }
 
 pub fn encode_signed_register_node_params<T: Config>(
@@ -1403,14 +1570,7 @@ pub fn encode_aggregate_heartbeat_params<T: Config>(
     number_of_nodes: &u32,
     block_number: &BlockNumberFor<T>,
 ) -> Vec<u8> {
-    (
-        AGGREGATE_HEARTBEAT_CONTEXT,
-        relayer.clone(),
-        nodes,
-        number_of_nodes,
-        block_number,
-    )
-        .encode()
+    (AGGREGATE_HEARTBEAT_CONTEXT, relayer.clone(), nodes, number_of_nodes, block_number).encode()
 }
 
 pub fn encode_signed_deregister_node_params<T: Config>(

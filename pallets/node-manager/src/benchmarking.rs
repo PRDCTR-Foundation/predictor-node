@@ -44,10 +44,7 @@ fn set_registrar<T: Config>(registrar: T::AccountId) {
 
 fn register_new_node<T: Config>(node: NodeId<T>, owner: T::AccountId) -> T::SignerId {
     let key = T::SignerId::generate_pair(None);
-    <NodeRegistry<T>>::insert(
-        node.clone(),
-        NodeInfo::new(owner.clone(), key.clone(), 0u32),
-    );
+    <NodeRegistry<T>>::insert(node.clone(), NodeInfo::new(owner.clone(), key.clone(), 0u32));
     <OwnedNodes<T>>::insert(owner.clone(), node, ());
     <OwnedNodesCount<T>>::mutate(owner, |count| *count += 1);
 
@@ -386,6 +383,50 @@ benchmarks! {
         let node_info = <NodeRegistry<T>>::get(&node).expect("Node must be registered");
         assert!(node_info.signing_key == new_signing_key);
         assert_last_event::<T>(Event::SigningKeyUpdated {owner, node}.into());
+    }
+
+    set_admin_config_lock_schedule {
+        let schedule = LockScheduleInfo::new(1_000_000u64, 52u32);
+        let config = AdminConfig::LockSchedule(schedule);
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert!(<LockSchedule<T>>::get() == Some(schedule));
+    }
+
+    set_admin_config_forfeiture_destination {
+        let destination: T::AccountId = account("forfeiture", 0, 0);
+        let config = AdminConfig::ForfeitureDestination(destination.clone());
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert!(<ForfeitureDestination<T>>::get() == Some(destination));
+    }
+
+    withdraw_rewards {
+        enable_rewards::<T>();
+        fund_reward_pot::<T>();
+
+        let owner: T::AccountId = account("owner", 1, 1);
+        let destination: T::AccountId = account("forfeiture", 0, 0);
+        <ForfeitureDestination<T>>::put(destination.clone());
+        // Active window at the week-one rate: worst case, both transfers run.
+        <LockSchedule<T>>::put(LockScheduleInfo::new(0u64, 52u32));
+
+        // A concrete amount: `minimum_balance()` can be zero (e.g. the mock),
+        // which would make the locked claim vanish.
+        let locked: BalanceOf<T> = 1_000_000_000u32.into();
+        let reward_pot = Pallet::<T>::compute_reward_account_id();
+        T::Currency::make_free_balance_be(
+            &reward_pot,
+            locked * 10u32.into() + T::Currency::minimum_balance(),
+        );
+        T::Currency::make_free_balance_be(&owner, T::Currency::minimum_balance());
+        <LockedRewards<T>>::insert(&owner, locked);
+        <TotalLockedRewards<T>>::put(locked);
+    }: withdraw_rewards(RawOrigin::Signed(owner.clone()), None)
+    verify {
+        assert!(<LockedRewards<T>>::get(&owner).is_zero());
+        assert!(<TotalLockedRewards<T>>::get().is_zero());
+        assert!(!T::Currency::free_balance(&destination).is_zero());
     }
 }
 
