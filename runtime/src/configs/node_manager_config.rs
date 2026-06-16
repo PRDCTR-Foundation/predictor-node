@@ -27,6 +27,9 @@ parameter_types! {
     /// cover a single validator's full owned-node set in one call without
     /// risking ExhaustsResources at the pre-dispatch weight check.
     pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
+    /// Network-wide registered-node cap, fixed at 30,000 by the PRDCTR
+    /// hard-fork proposal. Deregistration frees capacity under the cap.
+    pub const NodeManagerMaxRegisteredNodes: u32 = 30_000;
 }
 
 /// Funding source for reward-period rollover: the TokenManager treasury
@@ -53,6 +56,7 @@ impl pallet_node_manager::Config for Runtime {
     type HalvingInterval = NodeManagerHalvingInterval;
     type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
+    type MaxRegisteredNodes = NodeManagerMaxRegisteredNodes;
     type SignedTxLifetime = NodeManagerSignedTxLifetime;
     type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
 }
