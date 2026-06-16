@@ -54,6 +54,37 @@ impl<T: Config> Pallet<T> {
     ) -> DispatchResult {
         let node_owner = node_info.owner.clone();
 
+        // While the global lock window is active - or not yet configured
+        // (lock-by-default, so rewards can't escape the lock through an ops
+        // mis-ordering) - rewards accrue in `LockedRewards` and the funds
+        // stay in the reward pot, to be released via `withdraw_rewards`.
+        // Once the window's penalty decays to zero the lock is spent and
+        // payouts credit free balance directly again.
+        let lock_active = match LockSchedule::<T>::get() {
+            None => true,
+            Some(schedule) => !schedule.is_expired(Self::time_now_sec()),
+        };
+
+        if lock_active {
+            // A zero reward still emits the event for visibility, and skips
+            // the storage writes (nothing to accrue).
+            if !amount.is_zero() {
+                LockedRewards::<T>::mutate(&node_owner, |locked| {
+                    *locked = locked.saturating_add(amount)
+                });
+                TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_add(amount));
+            }
+
+            Self::deposit_event(Event::RewardLocked {
+                reward_period: *period,
+                owner: node_owner,
+                node: node_id,
+                amount,
+            });
+
+            return Ok(())
+        }
+
         // A zero reward still emits the event for visibility, and skips the
         // transfer (nothing to move).
         if !amount.is_zero() {
@@ -78,7 +109,8 @@ impl<T: Config> Pallet<T> {
 
     /// Worst-case weight charged per `on_idle` per-node iteration. Set
     /// conservatively above the sum of a NodeRegistry read, a NodeUptime read,
-    /// one `Currency::transfer` (reward pot -> owner), and the event deposit.
+    /// one `Currency::transfer` (reward pot -> owner) or the equivalent pair
+    /// of locked-accrual writes, and the event deposit.
     /// `worst_case_iteration_weight`.
     pub fn worst_case_iteration_weight() -> Weight {
         // Equivalent to ~200 ms of weight per iteration - a generous safety
@@ -132,11 +164,7 @@ impl<T: Config> Pallet<T> {
             };
 
         if let Err(e) = Self::pay_reward(&period, node.clone(), &node_info, amount, percentage) {
-            Self::deposit_event(Event::ErrorPayingReward {
-                reward_period: period,
-                node,
-                error: e,
-            });
+            Self::deposit_event(Event::ErrorPayingReward { reward_period: period, node, error: e });
             return Err(())
         }
         Ok(amount)
@@ -245,11 +273,10 @@ impl<T: Config> Pallet<T> {
             }
 
             // Reconcile per-period bookkeeping for this iteration:
-            //  - drop the NodeUptime entries we just paid, so they're not
-            //    rescanned (and so the pointer's "node not in storage" invariant
-            //    holds on the next block).
-            //  - either advance the pointer (drain not yet done) or call
-            //    complete_reward_payout (period drained).
+            //  - drop the NodeUptime entries we just paid, so they're not rescanned (and so the
+            //    pointer's "node not in storage" invariant holds on the next block).
+            //  - either advance the pointer (drain not yet done) or call complete_reward_payout
+            //    (period drained).
             Self::remove_paid_nodes(period, &paid_nodes);
             if iterator_exhausted {
                 Self::complete_reward_payout(period);
@@ -361,7 +388,16 @@ impl<T: Config> Pallet<T> {
         let two = BalanceOf::<T>::from(2u32);
         NextRewardAmountPerPeriod::<T>::mutate(|amt| {
             for _ in 0..pending {
-                *amt = amt.checked_div(&two).unwrap_or_else(BalanceOf::<T>::zero);
+                // Floor at one base unit: the reward must asymptotically
+                // approach zero without ever reaching it (Truth paper /
+                // Andrey's halving directive). A zero amount stays zero -
+                // the floor only protects a non-zero reward from vanishing.
+                let halved = amt.checked_div(&two).unwrap_or_else(BalanceOf::<T>::zero);
+                if halved.is_zero() && !amt.is_zero() {
+                    *amt = BalanceOf::<T>::from(1u32);
+                    break
+                }
+                *amt = halved;
             }
         });
         RewardAmountHalvingsApplied::<T>::put(expected);

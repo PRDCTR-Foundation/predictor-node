@@ -7,6 +7,7 @@ use sp_runtime::Saturating;
 pub const HEARTBEAT_BASE_WEIGHT: u128 = 100_000_000;
 pub type Duration = u64;
 pub type RewardPeriodIndex = u64;
+pub const SECONDS_PER_WEEK: Duration = 7 * 24 * 60 * 60;
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 /// The current era index and transition information
@@ -105,16 +106,7 @@ impl<Balance: Copy> RewardPotInfo<Balance> {
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct UptimeInfo<BlockNumber> {
     /// Number of uptime reported
@@ -131,17 +123,7 @@ impl<BlockNumber: Copy> UptimeInfo<BlockNumber> {
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct PaymentPointer<AccountId> {
     pub period_index: RewardPeriodIndex,
     pub node: AccountId,
@@ -158,17 +140,7 @@ impl<AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo> PaymentPointer<Acc
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct NodeInfo<SignerId, AccountId> {
     /// The node owner
     pub owner: AccountId,
@@ -201,19 +173,48 @@ pub enum AdminConfig<AccountId, Balance> {
     NextRewardAmountPerPeriod(Balance),
     RewardEnabled(bool),
     MinUptimeThreshold(Perbill),
+    LockSchedule(LockScheduleInfo),
+    ForfeitureDestination(AccountId),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+/// The single global reward-lock window. Rewards paid out while the window is
+/// active accumulate in `LockedRewards` instead of the owner's free balance;
+/// withdrawing early forfeits a percentage that decays by 1% per elapsed week
+/// (52% in week one -> 0% from week 53 on, mirroring the T1 migration-claim
+/// schedule). Once the penalty reaches zero the lock is expired and payouts
+/// credit free balance directly again.
+pub struct LockScheduleInfo {
+    /// Window anchor as a unix timestamp in seconds (the migration
+    /// "Global Start Date"). A start in the future charges the week-one rate.
+    pub start: Duration,
+    /// Forfeiture percentage during the first week (52 per the proposal).
+    pub initial_penalty_percent: u32,
+}
+
+impl LockScheduleInfo {
+    pub fn new(start: Duration, initial_penalty_percent: u32) -> Self {
+        LockScheduleInfo { start, initial_penalty_percent }
+    }
+
+    /// Forfeiture rate for a withdrawal happening at `now` (unix seconds).
+    /// Decays by one percentage point per full week elapsed since `start`.
+    pub fn penalty_at(&self, now: Duration) -> Perbill {
+        let elapsed_weeks = now.saturating_sub(self.start) / SECONDS_PER_WEEK;
+        let percent = self
+            .initial_penalty_percent
+            .saturating_sub(elapsed_weeks.min(u32::MAX as u64) as u32);
+        Perbill::from_percent(percent)
+    }
+
+    /// The lock no longer withholds anything once the penalty hits zero.
+    pub fn is_expired(&self, now: Duration) -> bool {
+        self.penalty_at(now).is_zero()
+    }
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct TotalUptimeInfo {
     /// Total number of uptime reported for reward period
@@ -227,4 +228,3 @@ impl TotalUptimeInfo {
         TotalUptimeInfo { total_heartbeats, total_weight }
     }
 }
-

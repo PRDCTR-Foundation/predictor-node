@@ -22,12 +22,7 @@ fn register_node(registrar: AccountId, owner_seed: u8, node_seed: u8, key_seed: 
     let owner = TestAccount::new([owner_seed; 32]).account_id();
     let node = TestAccount::new([node_seed; 32]).account_id();
     let key = UintAuthorityId(key_seed as u64);
-    assert_ok!(NodeManager::register_node(
-        RawOrigin::Signed(registrar).into(),
-        node,
-        owner,
-        key,
-    ));
+    assert_ok!(NodeManager::register_node(RawOrigin::Signed(registrar).into(), node, owner, key,));
     node
 }
 
@@ -64,20 +59,14 @@ fn fast_periods() {
         AdminConfig::NextRewardAmountPerPeriod(1_000 * AVT),
     ));
     // Generous batch cap so the per-test scenarios don't accidentally hit it.
-    assert_ok!(NodeManager::set_admin_config(
-        RawOrigin::Root.into(),
-        AdminConfig::BatchSize(64),
-    ));
+    assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), AdminConfig::BatchSize(64),));
 }
 
 /// Set MaxBatchSize directly (bypassing admin invariants) for tests that
 /// want a small cap. AdminConfig::BatchSize bounds to [1, 1000] so this is
 /// only useful for picking values inside that range.
 fn set_batch_size(n: u32) {
-    assert_ok!(NodeManager::set_admin_config(
-        RawOrigin::Root.into(),
-        AdminConfig::BatchSize(n),
-    ));
+    assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), AdminConfig::BatchSize(n),));
 }
 
 /// With `with_genesis_config()` the chain starts on period 0 with
@@ -108,6 +97,8 @@ fn drain_pays_all_nodes_within_one_block() {
     ext.execute_with(|| {
         let registrar = setup_registrar();
         fast_periods();
+        // Expired lock window: payouts credit free balance directly.
+        expire_lock_schedule();
         let n1 = register_node(registrar, 101, 1, 11);
         let n2 = register_node(registrar, 102, 2, 12);
         let n3 = register_node(registrar, 103, 3, 13);
@@ -197,10 +188,7 @@ fn drain_respects_max_batch_size() {
         // Subsequent calls finish the period.
         let _ = NodeManager::drain_outstanding_payouts(budget); // pays next 2
         let _ = NodeManager::drain_outstanding_payouts(budget); // pays last 1, completes
-        assert_eq!(
-            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
-            period.saturating_add(1),
-        );
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period.saturating_add(1),);
         assert!(LastPaidPointer::<TestRuntime>::get().is_none());
     });
 }
@@ -224,10 +212,7 @@ fn drain_respects_weight_budget() {
         // 2 nodes paid in period 1 -> 2 remain.
         let remaining = NodeUptime::<TestRuntime>::iter_prefix(period).count();
         assert_eq!(remaining, 2, "drain should have paid only 2 of 4 nodes");
-        assert_eq!(
-            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
-            period,
-        );
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period,);
     });
 }
 
@@ -285,6 +270,8 @@ fn drain_pays_correct_amount_to_owners() {
     ext.execute_with(|| {
         let registrar = setup_registrar();
         fast_periods();
+        // Expired lock window: payouts credit free balance directly.
+        expire_lock_schedule();
         let n1 = register_node(registrar, 121, 30, 70);
         let n2 = register_node(registrar, 122, 31, 71);
         let owner_a = TestAccount::new([121u8; 32]).account_id();

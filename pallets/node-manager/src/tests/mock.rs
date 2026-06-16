@@ -3,11 +3,11 @@
 #![cfg(test)]
 
 use crate::{self as pallet_node_manager, *};
-use parity_scale_codec::Decode;
-pub use parity_scale_codec::alloc::sync::Arc;
 use frame_support::{derive_impl, parameter_types, weights::Weight, PalletId};
 use frame_system as system;
 use pallet_session as session;
+pub use parity_scale_codec::alloc::sync::Arc;
+use parity_scale_codec::Decode;
 pub use parking_lot::RwLock;
 pub use sp_core::{
     offchain::{
@@ -75,6 +75,9 @@ parameter_types! {
     /// Defaults to OFF; tests flip via set_halving_enabled.
     pub const HalvingEnabledAtGenesis: bool = false;
     pub const MaxNodesPerAggregateHeartbeat: u32 = 1024;
+    /// Production value (30k per the hard-fork proposal). Cap tests set
+    /// `TotalRegisteredNodes` storage directly instead of mass-registering.
+    pub const MaxRegisteredNodes: u32 = 30_000;
 }
 
 /// A pseudo-treasury account used as the funding source for the reward pot in
@@ -101,6 +104,7 @@ impl Config for TestRuntime {
     type HalvingInterval = HalvingInterval;
     type HalvingEnabledAtGenesis = HalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
+    type MaxRegisteredNodes = MaxRegisteredNodes;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
     type WeightInfo = ();
@@ -239,6 +243,7 @@ impl ExtBuilder {
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
             reward_amount_per_period: 20 * AVT,
+            ..Default::default()
         }
         .assimilate_storage(&mut self.storage);
         self
@@ -310,6 +315,37 @@ impl ExtBuilder {
     }
 }
 
+/// Advance the mock clock by whole weeks (the lock-penalty granularity).
+pub(crate) fn advance_time_weeks(weeks: u64) {
+    let now_ms = Timestamp::get();
+    Timestamp::set_timestamp(now_ms + weeks * crate::types::SECONDS_PER_WEEK * 1_000);
+}
+
+/// Set the global lock window anchored `weeks_ago` full weeks before the
+/// current mock time. With the default 52% week-one penalty, `weeks_ago = 0`
+/// is the week-one rate and `weeks_ago >= 52` is fully decayed (expired).
+/// The mock clock starts near zero, so the clock is first advanced far enough
+/// that the anchor doesn't saturate at zero.
+pub(crate) fn set_lock_schedule(weeks_ago: u64, initial_penalty_percent: u32) {
+    let needed_ms = weeks_ago * crate::types::SECONDS_PER_WEEK * 1_000;
+    if Timestamp::get() < needed_ms {
+        Timestamp::set_timestamp(needed_ms);
+    }
+    let now = NodeManager::time_now_sec();
+    let start = now.saturating_sub(weeks_ago * crate::types::SECONDS_PER_WEEK);
+    LockSchedule::<TestRuntime>::put(crate::types::LockScheduleInfo::new(
+        start,
+        initial_penalty_percent,
+    ));
+}
+
+/// Expired lock window: the penalty has decayed to zero, so reward payouts
+/// credit free balance directly (the pre-lock behaviour most existing tests
+/// assert).
+pub(crate) fn expire_lock_schedule() {
+    set_lock_schedule(52, 52);
+}
+
 /// Rolls desired block number of times.
 pub(crate) fn roll_forward(num_blocks_to_roll: u64) {
     let mut current_block = System::block_number();
@@ -340,4 +376,3 @@ pub fn mock_get_finalised_block(state: &mut OffchainState, response: &Option<Vec
         ..Default::default()
     });
 }
-
