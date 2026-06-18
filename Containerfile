@@ -1,5 +1,7 @@
 FROM docker.io/library/ubuntu:24.04
 
+LABEL org.opencontainers.image.source="https://github.com/predictor-foundation/predictor-node"
+
 # install tools and dependencies
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \

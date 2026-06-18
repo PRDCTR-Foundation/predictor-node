@@ -75,6 +75,14 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
     .with_protocol_id("prd-public-cassandra-testnet")
     .with_properties(properties)
     .with_chain_type(ChainType::Live)
+    .with_boot_nodes(vec![
+        "/dns/ohio.testnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx"
+            .parse()
+            .expect("static bootnode address is valid"),
+        "/dns/oregon.testnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
+            .parse()
+            .expect("static bootnode address is valid"),
+    ])
     .with_genesis_config_preset_name(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET)
     .build())
 }
