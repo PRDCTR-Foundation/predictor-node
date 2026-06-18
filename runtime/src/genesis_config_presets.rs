@@ -277,11 +277,11 @@ fn public_testnet_initial_authorities(
 	),(
 		// Author-5 5Ey1kbXzRR3zie4UnHJTFqiBxQ6ezWyaCqis51C8eVxHac3Y
 		hex!["805d780900f281567adcca5c91f6296fb3ecc693ddc2ea493fd4ce1015e59944"].into(),
-		hex!["c88510affc6377d814686c2b6f865125205c7108ae7a80bc94d74d99c8f97e39"].unchecked_into(),
 		hex!["7c4238de215a3bfa1ac2545ec453f73efcb6e95908c3cc79a85cb182cf36e535"].unchecked_into(),
 		hex!["226aa01ed45e3271cb850ff8be966506a9b5661cb1ac9313d609a4c975288ae2"].unchecked_into(),
-		hex!["626fc5477c2173f79e1211dd89d443069dbf16f09c45fd2a50c5f4f147ddb36e"].unchecked_into(),
 		hex!["68ea271b4296bba79b42696fd2aba7faa8f5c6c4d909259f034e98b84b843c4d"].unchecked_into(),
+		hex!["626fc5477c2173f79e1211dd89d443069dbf16f09c45fd2a50c5f4f147ddb36e"].unchecked_into(),
+		hex!["c88510affc6377d814686c2b6f865125205c7108ae7a80bc94d74d99c8f97e39"].unchecked_into(),
 	)];
     initial_authorities
 }
