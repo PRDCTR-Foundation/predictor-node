@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.1...v1.0.2) (2026-06-18)
+
+
+### Bug Fixes
+
+* **ci:** Public testnet alignment ([#68](https://github.com/Predictor-Foundation/predictor-node/issues/68)) ([55adcfe](https://github.com/Predictor-Foundation/predictor-node/commit/55adcfee88bd85010c047786f9b966a38fc99704))
+
 ## [1.0.1](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.0...v1.0.1) (2026-06-15)
 
 
