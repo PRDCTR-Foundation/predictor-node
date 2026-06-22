@@ -1,7 +1,5 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 use frame_system::RawOrigin;
@@ -23,12 +21,7 @@ fn register_node_for(
 ) -> AccountId {
     let node = TestAccount::new([node_seed; 32]).account_id();
     let key = UintAuthorityId(key_seed as u64);
-    assert_ok!(NodeManager::register_node(
-        RawOrigin::Signed(registrar).into(),
-        node,
-        owner,
-        key,
-    ));
+    assert_ok!(NodeManager::register_node(RawOrigin::Signed(registrar).into(), node, owner, key,));
     node
 }
 
@@ -353,12 +346,7 @@ fn rejects_unsigned_origin() {
         let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
 
         assert_noop!(
-            NodeManager::heartbeat_for_owned_nodes(
-                RawOrigin::None.into(),
-                proof,
-                nodes,
-                bn,
-            ),
+            NodeManager::heartbeat_for_owned_nodes(RawOrigin::None.into(), proof, nodes, bn,),
             sp_runtime::DispatchError::BadOrigin,
         );
     });
@@ -387,7 +375,7 @@ fn skips_second_heartbeat_within_spacing_window() {
         // First heartbeat records the node.
         assert_ok!(NodeManager::heartbeat_for_owned_nodes(
             RawOrigin::Signed(prover).into(),
-            proof.clone(),
+            proof,
             nodes.clone(),
             bn,
         ));
@@ -495,7 +483,10 @@ fn skips_heartbeat_at_uptime_threshold() {
         let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime present");
         assert_eq!(info.count, threshold, "count must not exceed the threshold");
         let total = TotalUptime::<TestRuntime>::get(period);
-        assert_eq!(total.total_heartbeats, threshold, "maxed node must not inflate the denominator");
+        assert_eq!(
+            total.total_heartbeats, threshold,
+            "maxed node must not inflate the denominator"
+        );
     });
 }
 
@@ -538,8 +529,7 @@ fn heterogeneous_batch_records_eligible_skips_offending() {
 
         TotalUptime::<TestRuntime>::mutate(period, |t| {
             t.total_heartbeats = t.total_heartbeats.saturating_add(threshold + 1);
-            t.total_weight =
-                t.total_weight.saturating_add(maxed_weight + HEARTBEAT_BASE_WEIGHT);
+            t.total_weight = t.total_weight.saturating_add(maxed_weight + HEARTBEAT_BASE_WEIGHT);
         });
 
         // Two fresh, eligible nodes (plus the prover, also eligible).
@@ -597,7 +587,10 @@ fn happy_path_one_thousand_nodes() {
             // Distinct seed-byte tuples to keep AccountIds unique.
             let lo = (i & 0xff) as u8;
             let hi = ((i >> 8) & 0xff) as u8;
-            let seed = [222, lo, hi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let seed = [
+                222, lo, hi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ];
             let key_seed = (i as u64) + 1_000_000;
             let node = AccountId::from_raw(TestAccount::new(seed).key_pair().public().0);
             let _ = node;

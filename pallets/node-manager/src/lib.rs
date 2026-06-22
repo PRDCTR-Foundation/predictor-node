@@ -87,7 +87,7 @@ pub mod sr25519 {
 #[cfg(not(feature = "std"))]
 use sp_std::prelude::*;
 
-const HEARTBEAT_CONTEXT: &'static [u8] = b"NodeManager_heartbeat";
+const HEARTBEAT_CONTEXT: &[u8] = b"NodeManager_heartbeat";
 const MAX_BATCH_SIZE: u32 = 1_000;
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
@@ -96,7 +96,7 @@ pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
 
 /// Offchain-worker storage key under which the local node's registered AccountId is persisted.
-pub const REGISTERED_NODE_KEY: &'static [u8; 26] = b"ocw_pallet_registered_node";
+pub const REGISTERED_NODE_KEY: &[u8; 26] = b"ocw_pallet_registered_node";
 
 // Error codes returned by validate unsigned methods
 /// Invalid signature for `heartbeat` transaction
@@ -658,6 +658,10 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
             .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
         )]
+        // The `.into()` calls on the `Ok(Some(weight).into())` arms are required for the
+        // `DispatchResultWithPostInfo` return type; clippy misattributes them as useless through
+        // the pallet macro expansion.
+        #[allow(clippy::useless_conversion)]
         pub fn set_admin_config(
             origin: OriginFor<T>,
             config: AdminConfig<T::AccountId, BalanceOf<T>>,
@@ -772,7 +776,7 @@ pub mod pallet {
             let node_info = NodeRegistry::<T>::get(&node).ok_or(Error::<T>::NodeNotRegistered)?;
             let now = frame_system::Pallet::<T>::block_number();
 
-            let weight = <NodeUptime<T>>::mutate(&current_reward_period, &node, |maybe_info| {
+            let weight = <NodeUptime<T>>::mutate(current_reward_period, &node, |maybe_info| {
                 let info = maybe_info.get_or_insert_with(|| UptimeInfo {
                     count: 0,
                     last_reported: now,
@@ -791,7 +795,7 @@ pub mod pallet {
                 node_weight
             });
 
-            <TotalUptime<T>>::mutate(&current_reward_period, |total| {
+            <TotalUptime<T>>::mutate(current_reward_period, |total| {
                 total.total_heartbeats = total.total_heartbeats.saturating_add(1);
                 total.total_weight = total.total_weight.saturating_add(weight);
             });
@@ -1080,7 +1084,7 @@ pub mod pallet {
             let mut new_heartbeat_count: u64 = 0;
 
             for node in unique {
-                NodeUptime::<T>::mutate(&current_period, &node, |maybe_info| {
+                NodeUptime::<T>::mutate(current_period, &node, |maybe_info| {
                     let info = maybe_info.get_or_insert_with(|| UptimeInfo {
                         count: 0,
                         last_reported: now,
@@ -1098,7 +1102,7 @@ pub mod pallet {
                 });
             }
 
-            TotalUptime::<T>::mutate(&current_period, |total| {
+            TotalUptime::<T>::mutate(current_period, |total| {
                 total.total_heartbeats = total.total_heartbeats.saturating_add(new_heartbeat_count);
                 total.total_weight = total.total_weight.saturating_add(total_new_weight);
             });
@@ -1215,7 +1219,7 @@ pub mod pallet {
                 next_uptime_threshold,
                 next_reward_amount,
             );
-            RewardPeriod::<T>::put(&next_reward_period);
+            RewardPeriod::<T>::put(next_reward_period);
 
             // Fund the previous period's reward pot synchronously from the
             // treasury source. The pot account is recorded either way so the
@@ -1297,7 +1301,7 @@ pub mod pallet {
         fn offchain_worker(n: BlockNumberFor<T>) {
             log::info!("🛠️  OCW for node manager");
 
-            if <RewardEnabled<T>>::get() == false {
+            if !<RewardEnabled<T>>::get() {
                 log::warn!("🛠️  OCW - rewards are disabled, skipping");
                 return
             }
@@ -1310,7 +1314,7 @@ pub mod pallet {
     impl<T: Config> ValidateUnsigned for Pallet<T> {
         type Call = Call<T>;
         fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-            if <RewardEnabled<T>>::get() == false {
+            if !<RewardEnabled<T>>::get() {
                 return InvalidTransaction::Custom(ERROR_CODE_REWARD_DISABLED).into()
             }
 
@@ -1322,7 +1326,7 @@ pub mod pallet {
                     heartbeat_count,
                     signature,
                 } => {
-                    let node_info = NodeRegistry::<T>::get(&node);
+                    let node_info = NodeRegistry::<T>::get(node);
                     match node_info {
                         Some(info) => {
                             if Self::validate_heartbeats(
@@ -1347,14 +1351,14 @@ pub mod pallet {
                                 .into()
                             }
 
-                            return ValidTransaction::with_tag_prefix("NodeManagerHeartbeat")
+                            ValidTransaction::with_tag_prefix("NodeManagerHeartbeat")
                                 .and_provides((
                                     HEARTBEAT_CONTEXT,
                                     node,
                                     reward_period_index,
                                     heartbeat_count,
                                 ))
-                                .priority(TransactionPriority::max_value() - reduce_priority)
+                                .priority(TransactionPriority::MAX - reduce_priority)
                                 .longevity(64_u64)
                                 .build()
                         },
@@ -1486,7 +1490,7 @@ pub mod pallet {
             signature: &<T::SignerId as RuntimeAppPublic>::Signature,
         ) -> bool {
             let signature_valid =
-                data.using_encoded(|encoded_data| signer.verify(&encoded_data, &signature));
+                data.using_encoded(|encoded_data| signer.verify(&encoded_data, signature));
 
             log::trace!(
                 "🪲 Validating signature: [ data {:?} - account {:?} - signature {:?} ] Result: {}",
@@ -1495,16 +1499,14 @@ pub mod pallet {
                 signature,
                 signature_valid
             );
-            return signature_valid
+            signature_valid
         }
 
+        #[allow(clippy::type_complexity)]
         pub fn get_encoded_call_param(
             call: &<T as Config>::RuntimeCall,
         ) -> Option<(&Proof<T::Signature, T::AccountId>, Vec<u8>)> {
-            let call = match call.is_sub_type() {
-                Some(call) => call,
-                None => return None,
-            };
+            let call = call.is_sub_type()?;
 
             match call {
                 Call::signed_register_node {
@@ -1600,8 +1602,8 @@ pub mod pallet {
         fn signature_is_valid(call: &Box<Self::Call>) -> bool {
             if let Some((proof, signed_payload)) = Self::get_encoded_call_param(call) {
                 return verify_signature::<T::Signature, T::AccountId>(
-                    &proof,
-                    &signed_payload.as_slice(),
+                    proof,
+                    signed_payload.as_slice(),
                 )
                 .is_ok()
             }

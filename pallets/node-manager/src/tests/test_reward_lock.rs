@@ -5,8 +5,6 @@
 //! is active or unset, `withdraw_rewards(Option<limit>)` with the decaying
 //! forfeiture, forfeiture routing, and self-expiry back to direct payout.
 
-#![cfg(test)]
-
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok, weights::Weight};
 use frame_system::RawOrigin;
@@ -98,14 +96,15 @@ fn payout_locks_when_schedule_unset() {
         let pot_before = NodeManager::reward_pot_balance();
         // Period 0 was funded at rollover but has zero uptime, so the drain
         // reclaims it to the treasury; only that amount leaves the pot.
-        let reclaimed = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
+        let reclaimed =
+            RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
 
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
         // Lock-by-default: nothing reaches free balance, the claim accrues.
-        let locked = LockedRewards::<TestRuntime>::get(&owner);
+        let locked = LockedRewards::<TestRuntime>::get(owner);
         assert!(locked > 0, "reward should have accrued into LockedRewards");
-        assert_eq!(Balances::free_balance(&owner), 0, "free balance must stay untouched");
+        assert_eq!(Balances::free_balance(owner), 0, "free balance must stay untouched");
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), locked);
         // The locked claim's funds never left the pot (only the reclaimed
         // empty-period reward did).
@@ -137,9 +136,9 @@ fn payout_locks_during_active_window() {
         let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
-        let locked = LockedRewards::<TestRuntime>::get(&owner);
+        let locked = LockedRewards::<TestRuntime>::get(owner);
         assert!(locked > 0);
-        assert_eq!(Balances::free_balance(&owner), 0);
+        assert_eq!(Balances::free_balance(owner), 0);
         System::assert_has_event(
             Event::RewardLocked { reward_period: period, owner, node, amount: locked }.into(),
         );
@@ -160,9 +159,9 @@ fn payout_direct_after_window_expiry() {
         let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
-        let paid = Balances::free_balance(&owner);
+        let paid = Balances::free_balance(owner);
         assert!(paid > 0, "expired window must pay free balance directly");
-        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 0);
         System::assert_has_event(
             Event::RewardPaid { reward_period: period, owner, node, amount: paid }.into(),
         );
@@ -182,7 +181,7 @@ fn locked_rewards_accumulate_across_periods() {
         // First period accrues...
         setup_unpaid_period_with_nodes(&[(node, 1)]);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
-        let after_first = LockedRewards::<TestRuntime>::get(&owner);
+        let after_first = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_first > 0);
 
         // ...and a second period's reward stacks on the same claim.
@@ -191,10 +190,10 @@ fn locked_rewards_accumulate_across_periods() {
         roll_forward(20);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
-        let after_second = LockedRewards::<TestRuntime>::get(&owner);
+        let after_second = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_second > after_first, "second period must accumulate");
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), after_second);
-        assert_eq!(Balances::free_balance(&owner), 0);
+        assert_eq!(Balances::free_balance(owner), 0);
     });
 }
 
@@ -211,17 +210,17 @@ fn reclaim_returns_funds_when_pot_holds_only_the_reclaimable_amount() {
         let pot = NodeManager::compute_reward_account_id();
         let amount = 20 * AVT;
         Balances::make_free_balance_be(&pot, amount);
-        assert_eq!(Balances::free_balance(&pot), amount, "pot holds only the reclaimable amount");
+        assert_eq!(Balances::free_balance(pot), amount, "pot holds only the reclaimable amount");
 
-        let treasury_before = Balances::free_balance(&treasury_account());
+        let treasury_before = Balances::free_balance(treasury_account());
         NodeManager::reclaim_undistributed_reward(7, amount);
 
         assert_eq!(
-            Balances::free_balance(&treasury_account()),
+            Balances::free_balance(treasury_account()),
             treasury_before + amount,
             "funds returned to treasury",
         );
-        assert_eq!(Balances::free_balance(&pot), 0, "pot drained to zero");
+        assert_eq!(Balances::free_balance(pot), 0, "pot drained to zero");
         System::assert_has_event(
             Event::UndistributedRewardReclaimed { reward_period: 7, amount }.into(),
         );
@@ -245,15 +244,15 @@ fn withdraw_full_at_week_one_forfeits_52_percent() {
         seed_locked(&owner, 100 * AVT);
         set_lock_schedule(0, 52);
 
-        let treasury_before = Balances::free_balance(&treasury_account());
+        let treasury_before = Balances::free_balance(treasury_account());
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
 
-        assert_eq!(Balances::free_balance(&owner), 48 * AVT);
+        assert_eq!(Balances::free_balance(owner), 48 * AVT);
         // No ForfeitureDestination configured: forfeit falls back to the
         // treasury source.
-        assert_eq!(Balances::free_balance(&treasury_account()) - treasury_before, 52 * AVT,);
-        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
-        assert!(!LockedRewards::<TestRuntime>::contains_key(&owner));
+        assert_eq!(Balances::free_balance(treasury_account()) - treasury_before, 52 * AVT,);
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 0);
+        assert!(!LockedRewards::<TestRuntime>::contains_key(owner));
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
         System::assert_has_event(
             Event::RewardWithdrawn {
@@ -280,14 +279,14 @@ fn withdraw_partial_with_limit_applies_penalty_to_slice() {
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), Some(40 * AVT),));
 
         // forfeit = 26% of 40 = 10.4; net = 29.6.
-        assert_eq!(Balances::free_balance(&owner), 29 * AVT + 6 * AVT / 10);
-        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 60 * AVT);
+        assert_eq!(Balances::free_balance(owner), 29 * AVT + 6 * AVT / 10);
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 60 * AVT);
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 60 * AVT);
 
         // The remainder withdraws at the same rate.
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
         assert_eq!(
-            Balances::free_balance(&owner),
+            Balances::free_balance(owner),
             (29 * AVT + 6 * AVT / 10) + (60 * AVT - 60 * AVT * 26 / 100),
         );
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
@@ -303,14 +302,14 @@ fn withdraw_near_and_after_window_end() {
         seed_locked(&owner_a, 100 * AVT);
         set_lock_schedule(51, 52);
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner_a).into(), None));
-        assert_eq!(Balances::free_balance(&owner_a), 99 * AVT);
+        assert_eq!(Balances::free_balance(owner_a), 99 * AVT);
 
         // Week 53+ (>= 52 elapsed weeks): zero penalty, full amount.
         let owner_b = TestAccount::new([108u8; 32]).account_id();
         seed_locked(&owner_b, 100 * AVT);
         advance_time_weeks(1);
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner_b).into(), None));
-        assert_eq!(Balances::free_balance(&owner_b), 100 * AVT);
+        assert_eq!(Balances::free_balance(owner_b), 100 * AVT);
         System::assert_has_event(
             Event::RewardWithdrawn {
                 owner: owner_b,
@@ -337,11 +336,11 @@ fn withdraw_routes_forfeit_to_configured_destination() {
             AdminConfig::ForfeitureDestination(destination),
         ));
 
-        let treasury_before = Balances::free_balance(&treasury_account());
+        let treasury_before = Balances::free_balance(treasury_account());
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
 
-        assert_eq!(Balances::free_balance(&destination), 52 * AVT);
-        assert_eq!(Balances::free_balance(&treasury_account()), treasury_before);
+        assert_eq!(Balances::free_balance(destination), 52 * AVT);
+        assert_eq!(Balances::free_balance(treasury_account()), treasury_before);
     });
 }
 
@@ -360,11 +359,11 @@ fn withdraw_full_succeeds_when_pot_holds_exactly_the_locked_amount() {
         let destination = TestAccount::new([115u8; 32]).account_id();
         let gross = 100 * AVT;
 
-        LockedRewards::<TestRuntime>::insert(&owner, gross);
+        LockedRewards::<TestRuntime>::insert(owner, gross);
         TotalLockedRewards::<TestRuntime>::put(gross);
         let pot = NodeManager::compute_reward_account_id();
         Balances::make_free_balance_be(&pot, gross);
-        assert_eq!(Balances::free_balance(&pot), gross, "pot holds only the locked amount");
+        assert_eq!(Balances::free_balance(pot), gross, "pot holds only the locked amount");
 
         set_lock_schedule(0, 52); // week-one: 52% forfeit, 48% net.
         assert_ok!(NodeManager::set_admin_config(
@@ -374,10 +373,10 @@ fn withdraw_full_succeeds_when_pot_holds_exactly_the_locked_amount() {
 
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
 
-        assert_eq!(Balances::free_balance(&owner), 48 * AVT, "net reaches the owner");
-        assert_eq!(Balances::free_balance(&destination), 52 * AVT, "forfeit reaches destination");
-        assert_eq!(Balances::free_balance(&pot), 0, "pot drained to zero");
-        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
+        assert_eq!(Balances::free_balance(owner), 48 * AVT, "net reaches the owner");
+        assert_eq!(Balances::free_balance(destination), 52 * AVT, "forfeit reaches destination");
+        assert_eq!(Balances::free_balance(pot), 0, "pot drained to zero");
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 0);
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
     });
 }
@@ -400,7 +399,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         // Existing: first period accrues into the locked balance.
         setup_unpaid_period_with_nodes(&[(node, 1)]);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
-        let existing = LockedRewards::<TestRuntime>::get(&owner);
+        let existing = LockedRewards::<TestRuntime>::get(owner);
         assert!(existing > 0, "existing locked must be non-zero");
 
         // Advance 26 weeks (26% penalty), then accrue a NEW reward into the SAME
@@ -411,7 +410,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         roll_forward(20);
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
-        let combined = LockedRewards::<TestRuntime>::get(&owner);
+        let combined = LockedRewards::<TestRuntime>::get(owner);
         let new_portion = combined.saturating_sub(existing);
         assert!(new_portion > 0, "a new reward must have accrued on top of the existing locked");
 
@@ -422,7 +421,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         let expected_forfeit = penalty.mul_floor(combined);
         let expected_net = combined.saturating_sub(expected_forfeit);
 
-        assert_eq!(Balances::free_balance(&owner), expected_net);
+        assert_eq!(Balances::free_balance(owner), expected_net);
         System::assert_has_event(
             Event::RewardWithdrawn {
                 owner,
@@ -444,7 +443,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
             penalty.mul_floor(new_portion),
             "penalty must not apply to the new portion only",
         );
-        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 0);
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
     });
 }

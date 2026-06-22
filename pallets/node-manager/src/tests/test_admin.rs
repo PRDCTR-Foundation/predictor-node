@@ -1,7 +1,5 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
@@ -29,7 +27,7 @@ fn origin_is_checked_signed() {
 
         let config = AdminConfig::NodeRegistrar(new_registrar);
         assert_noop!(
-            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar.clone()), config,),
+            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar), config,),
             DispatchError::BadOrigin
         );
     });

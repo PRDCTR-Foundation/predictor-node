@@ -1,7 +1,5 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{mock::*, *};
 use frame_support::{assert_ok, weights::Weight};
 use frame_system::RawOrigin;
@@ -133,16 +131,16 @@ fn drain_pays_all_nodes_within_one_block() {
         );
 
         // NodeUptime cleaned up for that period.
-        assert!(!NodeUptime::<TestRuntime>::contains_key(period, &n1));
-        assert!(!NodeUptime::<TestRuntime>::contains_key(period, &n2));
-        assert!(!NodeUptime::<TestRuntime>::contains_key(period, &n3));
+        assert!(!NodeUptime::<TestRuntime>::contains_key(period, n1));
+        assert!(!NodeUptime::<TestRuntime>::contains_key(period, n2));
+        assert!(!NodeUptime::<TestRuntime>::contains_key(period, n3));
 
         // Direct payout: each owner received their reward straight into free
         // balance (no lock), and the pot was drawn down by what was paid.
         let mut paid_total: u128 = 0;
         for owner in &owners {
             let bal = Balances::free_balance(owner);
-            assert!(bal > 0, "owner expected a positive direct payout, got {}", bal);
+            assert!(bal > 0, "owner expected a positive direct payout, got {bal}");
             paid_total = paid_total.saturating_add(bal);
         }
         let pot_after = NodeManager::reward_pot_balance();
@@ -259,7 +257,7 @@ fn drain_reclaims_undistributed_reward_for_empty_period() {
         let reclaimable = p0.saturating_add(p1);
         assert!(reclaimable > 0, "periods should have been funded at rollover");
 
-        let treasury_before = Balances::free_balance(&treasury_account());
+        let treasury_before = Balances::free_balance(treasury_account());
         let pot_before = NodeManager::reward_pot_balance();
         let outstanding_before = OutstandingRewardToPay::<TestRuntime>::get();
 
@@ -268,7 +266,7 @@ fn drain_reclaims_undistributed_reward_for_empty_period() {
         // Funds returned to the treasury, pot drawn down, outstanding cleared -
         // nothing stranded.
         assert_eq!(
-            Balances::free_balance(&treasury_account()).saturating_sub(treasury_before),
+            Balances::free_balance(treasury_account()).saturating_sub(treasury_before),
             reclaimable,
             "treasury should recover the undistributed reward",
         );
@@ -328,8 +326,8 @@ fn drain_pays_correct_amount_to_owners() {
         let owner_a = TestAccount::new([121u8; 32]).account_id();
         let owner_b = TestAccount::new([122u8; 32]).account_id();
         // Fresh owners: zero free balance before payout.
-        assert_eq!(Balances::free_balance(&owner_a), 0);
-        assert_eq!(Balances::free_balance(&owner_b), 0);
+        assert_eq!(Balances::free_balance(owner_a), 0);
+        assert_eq!(Balances::free_balance(owner_b), 0);
 
         // Equal uptime. Use count=1: with default MinUptimeThreshold=33%
         // and max_heartbeats=4 (period 20 / heartbeat 5), uptime_threshold
@@ -338,27 +336,23 @@ fn drain_pays_correct_amount_to_owners() {
         let period = setup_unpaid_period_with_nodes(&[(n1, 1), (n2, 1)]);
         let pot_info = RewardPot::<TestRuntime>::get(period).expect("pot must be funded");
         let total_reward = pot_info.total_reward;
-        assert!(total_reward > 0, "period {} reward pot expected to be funded", period);
+        assert!(total_reward > 0, "period {period} reward pot expected to be funded");
 
         let budget = per_iter().saturating_mul(20);
         let _ = NodeManager::drain_outstanding_payouts(budget);
 
         // Direct payout into free balance (no lock). Equal weight -> half each
         // (with rounding floor), so each owner's balance is the amount paid.
-        let a_bal = Balances::free_balance(&owner_a);
-        let b_bal = Balances::free_balance(&owner_b);
+        let a_bal = Balances::free_balance(owner_a);
+        let b_bal = Balances::free_balance(owner_b);
         let expected = total_reward / 2;
         assert!(
             a_bal == expected || a_bal + 1 == expected,
-            "owner A paid {} expected ~{}",
-            a_bal,
-            expected,
+            "owner A paid {a_bal} expected ~{expected}",
         );
         assert!(
             b_bal == expected || b_bal + 1 == expected,
-            "owner B paid {} expected ~{}",
-            b_bal,
-            expected,
+            "owner B paid {b_bal} expected ~{expected}",
         );
     });
 }
@@ -416,7 +410,7 @@ fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 2);
 
         let owner = TestAccount::new([101u8; 32]).account_id();
-        assert_eq!(Balances::free_balance(&owner), 0, "owner starts unfunded");
+        assert_eq!(Balances::free_balance(owner), 0, "owner starts unfunded");
 
         let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
         assert!(used.any_gt(Weight::zero()), "drain should make progress");
@@ -428,7 +422,7 @@ fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
         );
         // Liveness: the later funded period's operator actually gets paid.
         assert!(
-            Balances::free_balance(&owner) > 0,
+            Balances::free_balance(owner) > 0,
             "later period operator must be paid once the stuck period is abandoned",
         );
         assert!(
@@ -464,7 +458,10 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         let node = register_node(registrar, 101, 1, 11);
         let pot = NodeManager::compute_reward_account_id();
         let _ = Balances::deposit_creating(&pot, reward);
-        RewardPot::<TestRuntime>::insert(window + 1, RewardPotInfo::new(reward, 20u32, 0u64, false));
+        RewardPot::<TestRuntime>::insert(
+            window + 1,
+            RewardPotInfo::new(reward, 20u32, 0u64, false),
+        );
         OutstandingRewardToPay::<TestRuntime>::put(reward);
         record_uptime(window + 1, &node, 5);
 
@@ -516,7 +513,7 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         // (c) liveness: the later funded period's operator gets paid.
         let owner = TestAccount::new([101u8; 32]).account_id();
         assert!(
-            Balances::free_balance(&owner) > 0,
+            Balances::free_balance(owner) > 0,
             "later period operator must be paid once the stuck period is abandoned",
         );
     });

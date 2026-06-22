@@ -7,8 +7,8 @@
 // TokenManager treasury) into the pot account, and the `on_idle` drain pays
 // each eligible node's share directly to its owner.
 
-use frame_support::parameter_types;
 use common_primitives::constants::{BLOCKS_PER_YEAR, NODE_MANAGER_PALLET_ID};
+use frame_support::parameter_types;
 use sp_runtime::traits::Get;
 
 use crate::{

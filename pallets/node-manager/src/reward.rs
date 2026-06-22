@@ -17,8 +17,7 @@ impl<T: Config> Pallet<T> {
         let weight = uptime_info.weight;
 
         if actual_uptime > uptime_threshold.into() {
-            log::warn!("⚠️ Node ({:?}) has been up for more than the expected uptime. Actual: {:?}, Expected: {:?}",
-                node_id, actual_uptime, uptime_threshold);
+            log::warn!("⚠️ Node ({node_id:?}) has been up for more than the expected uptime. Actual: {actual_uptime:?}, Expected: {uptime_threshold:?}");
 
             // Cap at threshold. With staking removed, each heartbeat carries
             // HEARTBEAT_BASE_WEIGHT, so the capped contribution is exactly
@@ -464,6 +463,7 @@ impl<T: Config> Pallet<T> {
             .saturating_sub(<T as pallet::Config>::Currency::minimum_balance())
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_iterator_from_last_paid(
         oldest_period: RewardPeriodIndex,
         last_paid_pointer: PaymentPointer<T::AccountId>,

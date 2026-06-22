@@ -1,7 +1,5 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{self as pallet_node_manager, *};
 use frame_support::{derive_impl, parameter_types, weights::Weight, PalletId};
 use frame_system as system;
@@ -11,9 +9,7 @@ use parity_scale_codec::Decode;
 pub use parking_lot::RwLock;
 pub use sp_core::{
     offchain::{
-        testing::{
-            OffchainState, PendingRequest, PoolState, TestOffchainExt, TestTransactionPoolExt,
-        },
+        testing::{OffchainState, PoolState, TestOffchainExt, TestTransactionPoolExt},
         OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
     },
     sr25519, Pair,
@@ -151,7 +147,7 @@ where
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024 as u64, 0);
+    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024_u64, 0);
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
     pub const ChallengePeriod: u64 = 2;
@@ -175,7 +171,7 @@ impl pallet_avn::Config for TestRuntime {
 }
 
 thread_local! {
-    static EXISTENTIAL_DEPOSIT: RefCell<u128> = RefCell::new(0);
+    static EXISTENTIAL_DEPOSIT: RefCell<u128> = const { RefCell::new(0) };
 }
 
 /// Existential deposit is thread-local so individual tests can exercise the
@@ -236,17 +232,13 @@ impl ExtBuilder {
         set_existential_deposit(0);
 
         let mut storage: sp_runtime::Storage =
-            frame_system::GenesisConfig::<TestRuntime>::default()
-                .build_storage()
-                .unwrap()
-                .into();
+            frame_system::GenesisConfig::<TestRuntime>::default().build_storage().unwrap();
 
         // Pre-fund the treasury source so reward-period rollover transfers
         // succeed by default. Tests can drain or override this balance to
         // exercise the funding-failure path.
         let _ = pallet_balances::GenesisConfig::<TestRuntime> {
             balances: vec![(treasury_account(), TREASURY_GENESIS_BALANCE)],
-            ..Default::default()
         }
         .assimilate_storage(&mut storage);
 
@@ -276,7 +268,7 @@ impl ExtBuilder {
         let authors: Vec<AccountId> = AUTHORS.with(|l| l.borrow_mut().take().unwrap());
 
         BasicExternalities::execute_with_storage(&mut self.storage, || {
-            for ref k in &authors {
+            for k in &authors {
                 frame_system::Pallet::<TestRuntime>::inc_providers(k);
             }
         });
@@ -305,6 +297,7 @@ impl ExtBuilder {
         self
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn as_externality(self) -> sp_io::TestExternalities {
         let keystore = MemoryKeystore::new();
 
@@ -319,6 +312,7 @@ impl ExtBuilder {
         ext
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn as_externality_with_state(
         self,
     ) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) {
@@ -384,7 +378,7 @@ thread_local! {
     /// Defaults to zero so existing tests that drive the drain explicitly are
     /// unaffected; tests exercising the production `on_initialize` -> `on_idle`
     /// sequencing set a real budget via `set_idle_drain_weight`.
-    static IDLE_DRAIN_WEIGHT: RefCell<Weight> = RefCell::new(Weight::zero());
+    static IDLE_DRAIN_WEIGHT: RefCell<Weight> = const { RefCell::new(Weight::zero()) };
 }
 
 /// Set the idle weight budget that `roll_one_block` feeds to `on_idle`, so a
@@ -406,16 +400,4 @@ pub(crate) fn roll_one_block() -> u64 {
     let idle_weight = IDLE_DRAIN_WEIGHT.with(|w| *w.borrow());
     NodeManager::on_idle(System::block_number(), idle_weight);
     System::block_number()
-}
-
-pub fn mock_get_finalised_block(state: &mut OffchainState, response: &Option<Vec<u8>>) {
-    let url = "http://127.0.0.1:2020/latest_finalised_block".to_string();
-
-    state.expect_request(PendingRequest {
-        method: "GET".into(),
-        uri: url.into(),
-        response: response.clone(),
-        sent: true,
-        ..Default::default()
-    });
 }

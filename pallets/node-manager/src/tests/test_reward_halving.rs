@@ -1,7 +1,5 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
@@ -142,10 +140,7 @@ fn set_halving_enabled_rejects_non_root() {
     ext.execute_with(|| {
         let caller = TestAccount::new([7u8; 32]).account_id();
         assert_noop!(
-            NodeManager::set_halving_enabled(
-                RuntimeOrigin::signed(caller.clone()),
-                true,
-            ),
+            NodeManager::set_halving_enabled(RuntimeOrigin::signed(caller), true,),
             DispatchError::BadOrigin
         );
     });

@@ -19,9 +19,8 @@ use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
 /// Pre-funded in dev/local genesis so pallet-node-manager's reward-period
 /// rollover (which transfers from this account into the reward pot) can
 /// succeed without an out-of-band top-up.
-const TREASURY_ACCOUNT_BYTES: [u8; 32] = hex!(
-    "6d6f646c54726561737572790000000000000000000000000000000000000000"
-);
+const TREASURY_ACCOUNT_BYTES: [u8; 32] =
+    hex!("6d6f646c54726561737572790000000000000000000000000000000000000000");
 
 fn testnet_genesis(
     initial_authorities: Vec<(
@@ -37,11 +36,8 @@ fn testnet_genesis(
 ) -> Value {
     let eth_public_keys = local_ethereum_public_keys();
     let treasury_account = AccountId::from(TREASURY_ACCOUNT_BYTES);
-    let mut balances: Vec<(AccountId, u128)> = endowed_accounts
-        .iter()
-        .cloned()
-        .map(|k| (k, 1u128 << 60))
-        .collect();
+    let mut balances: Vec<(AccountId, u128)> =
+        endowed_accounts.iter().cloned().map(|k| (k, 1u128 << 60)).collect();
     balances.push((treasury_account, 1u128 << 60));
     let config = RuntimeGenesisConfig {
         balances: BalancesConfig { balances },
