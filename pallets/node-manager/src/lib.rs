@@ -941,7 +941,8 @@ pub mod pallet {
 
         /// Root: top up the reward pot for a period whose rollover funding
         /// failed. The period's `RewardPotInfo` must exist with
-        /// `total_reward == 0` (i.e. produced by a failed rollover transfer).
+        /// `funding_failed == true` (i.e. produced by a failed rollover
+        /// transfer); a legitimately-zero funded period is rejected.
         /// Pulls `amount` from `TreasurySource` into the reward pot account
         /// and bumps `OutstandingRewardToPay`.
         #[pallet::call_index(8)]

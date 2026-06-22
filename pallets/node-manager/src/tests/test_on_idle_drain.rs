@@ -437,3 +437,87 @@ fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
         );
     });
 }
+
+#[test]
+fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        expire_lock_schedule();
+        let window = <TestRuntime as Config>::MaxFailedFundingRecoveryPeriods::get();
+        let reward = 1_000 * AVT;
+
+        // Period 0: funding failed at rollover, but three nodes had already
+        // recorded heartbeats into NodeUptime[0] during the period.
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        let n1 = TestAccount::new([21u8; 32]).account_id();
+        let n2 = TestAccount::new([22u8; 32]).account_id();
+        let n3 = TestAccount::new([23u8; 32]).account_id();
+        record_uptime(0, &n1, 5);
+        record_uptime(0, &n2, 5);
+        record_uptime(0, &n3, 5);
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(0).count(), 3);
+
+        // A later period funded successfully with real uptime, to prove
+        // liveness once the stuck period is abandoned.
+        let node = register_node(registrar, 101, 1, 11);
+        let pot = NodeManager::compute_reward_account_id();
+        let _ = Balances::deposit_creating(&pot, reward);
+        RewardPot::<TestRuntime>::insert(window + 1, RewardPotInfo::new(reward, 20u32, 0u64, false));
+        OutstandingRewardToPay::<TestRuntime>::put(reward);
+        record_uptime(window + 1, &node, 5);
+
+        // Push the current period past period 0 + the recovery window so the
+        // unrecovered failed-funding period must be abandoned.
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 2);
+
+        // First pass: bound the batch to two entries so the abandonment cleanup
+        // is forced to span more than one drain call. The period must NOT be
+        // completed while NodeUptime[0] still holds entries.
+        set_batch_size(2);
+        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(2));
+        assert!(used.any_gt(Weight::zero()), "drain should make progress");
+        assert_eq!(
+            NodeUptime::<TestRuntime>::iter_prefix(0).count(),
+            1,
+            "two of three uptime entries cleared in the first bounded pass",
+        );
+        assert!(
+            RewardPot::<TestRuntime>::get(0).is_some(),
+            "period must not be completed while NodeUptime[0] still has entries",
+        );
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            0,
+            "cursor must not advance before the abandoned period is fully drained",
+        );
+
+        // Second pass: drains the remaining entry, completes period 0, and pays
+        // the later funded period's operator.
+        set_batch_size(64);
+        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(50));
+
+        // (a) NodeUptime[0] fully cleared - no orphaned entries.
+        assert_eq!(
+            NodeUptime::<TestRuntime>::iter_prefix(0).count(),
+            0,
+            "all uptime entries for the abandoned period must be cleared",
+        );
+        assert!(
+            RewardPot::<TestRuntime>::get(0).is_none(),
+            "abandoned failed-funding snapshot must be removed",
+        );
+        // (b) cursor advanced past the abandoned period.
+        assert!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() > 0,
+            "cursor must advance past the abandoned period",
+        );
+        // (c) liveness: the later funded period's operator gets paid.
+        let owner = TestAccount::new([101u8; 32]).account_id();
+        assert!(
+            Balances::free_balance(&owner) > 0,
+            "later period operator must be paid once the stuck period is abandoned",
+        );
+    });
+}
