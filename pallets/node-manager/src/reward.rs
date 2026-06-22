@@ -319,7 +319,12 @@ impl<T: Config> Pallet<T> {
         }
         let pot = Self::compute_reward_account_id();
         let treasury = T::TreasurySource::get();
-        match T::Currency::transfer(&pot, &treasury, amount, ExistenceRequirement::KeepAlive) {
+        // `AllowDeath`: in the earliest periods the reclaimed amount can be the
+        // pot's only balance, so a `KeepAlive` transfer would fail the `>= ED`
+        // check and strand the funds. The pot's genesis provider reference keeps
+        // the account from being reaped, and it is re-funded at the next
+        // rollover, so allowing the balance to reach zero here is safe.
+        match T::Currency::transfer(&pot, &treasury, amount, ExistenceRequirement::AllowDeath) {
             Ok(()) => {
                 Self::deposit_event(Event::UndistributedRewardReclaimed {
                     reward_period: period_index,

@@ -198,6 +198,43 @@ fn locked_rewards_accumulate_across_periods() {
     });
 }
 
+/// Early-chain single-period case: ED > 0 and the pot's only balance is one
+/// non-distributable period's funding. `AllowDeath` lets the reclaim drain the
+/// pot to zero (the genesis provider ref keeps the account alive) instead of
+/// failing the `KeepAlive` `>= ED` check and stranding the funds.
+#[test]
+fn reclaim_returns_funds_when_pot_holds_only_the_reclaimable_amount() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        set_existential_deposit(AVT);
+
+        let pot = NodeManager::compute_reward_account_id();
+        let amount = 20 * AVT;
+        Balances::make_free_balance_be(&pot, amount);
+        assert_eq!(Balances::free_balance(&pot), amount, "pot holds only the reclaimable amount");
+
+        let treasury_before = Balances::free_balance(&treasury_account());
+        NodeManager::reclaim_undistributed_reward(7, amount);
+
+        assert_eq!(
+            Balances::free_balance(&treasury_account()),
+            treasury_before + amount,
+            "funds returned to treasury",
+        );
+        assert_eq!(Balances::free_balance(&pot), 0, "pot drained to zero");
+        System::assert_has_event(
+            Event::UndistributedRewardReclaimed { reward_period: 7, amount }.into(),
+        );
+        assert!(
+            !System::events().iter().any(|r| matches!(
+                r.event,
+                RuntimeEvent::NodeManager(Event::UndistributedRewardReclaimFailed { .. })
+            )),
+            "reclaim must succeed, not fall into the failure path",
+        );
+    });
+}
+
 // ---- withdraw_rewards ---------------------------------------------------
 
 #[test]
@@ -305,6 +342,73 @@ fn withdraw_routes_forfeit_to_configured_destination() {
 
         assert_eq!(Balances::free_balance(&destination), 52 * AVT);
         assert_eq!(Balances::free_balance(&treasury_account()), treasury_before);
+    });
+}
+
+/// The decaying forfeiture penalty applies to the FULL locked balance -
+/// already-locked (existing) plus newly-accrued (new) rewards - not just one
+/// portion. Lock a first reward, advance into the decay window, accrue a second
+/// reward into the same locked balance, then withdraw and assert the penalty is
+/// charged over the combined total.
+#[test]
+fn forfeiture_applies_to_combined_existing_and_new_locked() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        set_lock_schedule(0, 52);
+        let node = register_node(registrar, 113, 13, 23);
+        let owner = TestAccount::new([113u8; 32]).account_id();
+
+        // Existing: first period accrues into the locked balance.
+        setup_unpaid_period_with_nodes(&[(node, 1)]);
+        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let existing = LockedRewards::<TestRuntime>::get(&owner);
+        assert!(existing > 0, "existing locked must be non-zero");
+
+        // Advance 26 weeks (26% penalty), then accrue a NEW reward into the SAME
+        // locked balance.
+        advance_time_weeks(26);
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        record_uptime(period, &node, 1);
+        roll_forward(20);
+        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+
+        let combined = LockedRewards::<TestRuntime>::get(&owner);
+        let new_portion = combined.saturating_sub(existing);
+        assert!(new_portion > 0, "a new reward must have accrued on top of the existing locked");
+
+        // Withdraw the full locked balance: penalty must be over existing + new.
+        assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
+
+        let penalty = Perbill::from_percent(26);
+        let expected_forfeit = penalty.mul_floor(combined);
+        let expected_net = combined.saturating_sub(expected_forfeit);
+
+        assert_eq!(Balances::free_balance(&owner), expected_net);
+        System::assert_has_event(
+            Event::RewardWithdrawn {
+                owner,
+                gross: combined,
+                net: expected_net,
+                forfeited: expected_forfeit,
+                penalty,
+            }
+            .into(),
+        );
+        // The forfeit must not match penalising only one portion.
+        assert_ne!(
+            expected_forfeit,
+            penalty.mul_floor(existing),
+            "penalty must not apply to the existing portion only",
+        );
+        assert_ne!(
+            expected_forfeit,
+            penalty.mul_floor(new_portion),
+            "penalty must not apply to the new portion only",
+        );
+        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
+        assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
     });
 }
 

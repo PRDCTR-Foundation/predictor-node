@@ -169,8 +169,22 @@ impl pallet_avn::Config for TestRuntime {
     type WeightInfo = ();
 }
 
-parameter_types! {
-    pub const ExistentialDeposit: u64 = 0u64;
+thread_local! {
+    static EXISTENTIAL_DEPOSIT: RefCell<u128> = RefCell::new(0);
+}
+
+/// Existential deposit is thread-local so individual tests can exercise the
+/// `ED > 0` reaping behaviour (e.g. reward-pot reclaim) while the suite default
+/// stays zero.
+pub struct ExistentialDeposit;
+impl frame_support::traits::Get<u128> for ExistentialDeposit {
+    fn get() -> u128 {
+        EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
+pub(crate) fn set_existential_deposit(ed: u128) {
+    EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = ed);
 }
 
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig as pallet_balances::DefaultConfig)]
@@ -212,6 +226,10 @@ pub struct ExtBuilder {
 
 impl ExtBuilder {
     pub fn build_default() -> Self {
+        // Reset the thread-local existential deposit so a prior test on this
+        // thread that raised it cannot leak into the next one.
+        set_existential_deposit(0);
+
         let mut storage: sp_runtime::Storage =
             frame_system::GenesisConfig::<TestRuntime>::default()
                 .build_storage()

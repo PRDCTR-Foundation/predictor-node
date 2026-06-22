@@ -1025,11 +1025,15 @@ pub mod pallet {
             let now = frame_system::Pallet::<T>::block_number();
 
             // Pre-flight validation: every node must be registered to the
-            // asserted owner, and is rate-limited exactly like the OCW path
-            // (`validate_heartbeats`). Dedup is via BTreeSet so the loop below
-            // stays O(N log N) and silently drops duplicate entries within the
-            // call; the spacing check additionally rejects a second heartbeat
-            // for the same node in the same block across distinct outer nonces.
+            // asserted owner - a false ownership claim is fatal and rejects the
+            // whole batch. Rate-limiting mirrors the OCW path
+            // (`validate_heartbeats`) but is per-node isolated: a node already at
+            // the uptime threshold or still inside the spacing window is skipped,
+            // not fatal, so a single maxed/recent node cannot block heartbeat
+            // progress for the rest of the batch. Dedup is via BTreeSet so the
+            // loop below stays O(N log N) and silently drops duplicate entries
+            // within the call (which also bars a second heartbeat for the same
+            // node in the same block across distinct outer nonces).
             use sp_std::collections::btree_set::BTreeSet;
             let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
             for node in nodes.iter() {
@@ -1037,13 +1041,14 @@ pub mod pallet {
                 ensure!(info.owner == asserted_owner, Error::<T>::NodeNotOwnedByProver);
 
                 if let Some(uptime_info) = NodeUptime::<T>::get(current_period, node) {
-                    ensure!(
-                        uptime_info.count < reward_period.uptime_threshold as u64,
-                        Error::<T>::HeartbeatThresholdReached
-                    );
+                    if uptime_info.count >= reward_period.uptime_threshold as u64 {
+                        continue
+                    }
                     let expected_submission = uptime_info.last_reported +
                         BlockNumberFor::<T>::from(reward_period.heartbeat_period);
-                    ensure!(now >= expected_submission, Error::<T>::DuplicateHeartbeat);
+                    if now < expected_submission {
+                        continue
+                    }
                 }
 
                 unique.insert(node.clone());

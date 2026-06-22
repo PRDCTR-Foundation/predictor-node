@@ -364,12 +364,13 @@ fn rejects_unsigned_origin() {
     });
 }
 
-/// A second heartbeat for the same node within the spacing window is rejected,
+/// A second heartbeat for the same node within the spacing window is skipped,
 /// even when submitted via a distinct call in the same block (the
-/// replay-across-nonces grief vector). Mirrors the OCW `DuplicateHeartbeat`
-/// guard.
+/// replay-across-nonces grief vector). Per-node isolation: the call succeeds but
+/// `count` is not advanced, mirroring the OCW `DuplicateHeartbeat` guard without
+/// failing the whole batch.
 #[test]
-fn rejects_second_heartbeat_within_spacing_window() {
+fn skips_second_heartbeat_within_spacing_window() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         let registrar = setup_registrar();
@@ -391,21 +392,21 @@ fn rejects_second_heartbeat_within_spacing_window() {
             bn,
         ));
 
-        // A second call in the same block (same period, no spacing elapsed) is
-        // rejected, so `count` cannot be inflated past one per window.
-        assert_noop!(
-            NodeManager::heartbeat_for_owned_nodes(
-                RawOrigin::Signed(prover).into(),
-                proof,
-                nodes,
-                bn,
-            ),
-            Error::<TestRuntime>::DuplicateHeartbeat
-        );
+        // A second call in the same block (same period, no spacing elapsed)
+        // succeeds but skips the node, so `count` cannot be inflated past one
+        // per window.
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
 
         let period = RewardPeriod::<TestRuntime>::get().current;
         let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime recorded");
         assert_eq!(info.count, 1, "count must not advance past the spacing window");
+        let total = TotalUptime::<TestRuntime>::get(period);
+        assert_eq!(total.total_heartbeats, 1, "skipped heartbeat must not inflate the denominator");
     });
 }
 
@@ -451,11 +452,12 @@ fn allows_heartbeat_after_spacing_window() {
     });
 }
 
-/// A node already at the uptime threshold cannot be heartbeated further, so the
-/// delegated path cannot inflate `TotalUptime.total_weight` past the cap the
-/// reward maths assumes. Mirrors the OCW `HeartbeatThresholdReached` guard.
+/// A node already at the uptime threshold is skipped, so the delegated path
+/// cannot inflate `TotalUptime.total_weight` past the cap the reward maths
+/// assumes. Per-node isolation: the call succeeds but the maxed node is not
+/// advanced, mirroring the OCW `HeartbeatThresholdReached` guard.
 #[test]
-fn rejects_heartbeat_at_uptime_threshold() {
+fn skips_heartbeat_at_uptime_threshold() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         let registrar = setup_registrar();
@@ -472,6 +474,10 @@ fn rejects_heartbeat_at_uptime_threshold() {
         let period = reward_period.current;
         let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(threshold as u128);
         NodeUptime::<TestRuntime>::insert(period, prover, UptimeInfo::new(threshold, weight, 0u64));
+        TotalUptime::<TestRuntime>::mutate(period, |t| {
+            t.total_heartbeats = t.total_heartbeats.saturating_add(threshold);
+            t.total_weight = t.total_weight.saturating_add(weight);
+        });
 
         let relayer = TestAccount::new([99u8; 32]).account_id();
         let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
@@ -479,18 +485,96 @@ fn rejects_heartbeat_at_uptime_threshold() {
         let bn = System::block_number();
         let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
 
-        assert_noop!(
-            NodeManager::heartbeat_for_owned_nodes(
-                RawOrigin::Signed(prover).into(),
-                proof,
-                nodes,
-                bn,
-            ),
-            Error::<TestRuntime>::HeartbeatThresholdReached
-        );
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
 
         let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime present");
         assert_eq!(info.count, threshold, "count must not exceed the threshold");
+        let total = TotalUptime::<TestRuntime>::get(period);
+        assert_eq!(total.total_heartbeats, threshold, "maxed node must not inflate the denominator");
+    });
+}
+
+/// Heterogeneous batch: one node at the uptime threshold, one heartbeated within
+/// the spacing window, and several eligible nodes in a single call. The maxed
+/// and recent nodes are skipped while every eligible node still records, proving
+/// the delegated path is per-node isolated rather than all-or-nothing.
+#[test]
+fn heterogeneous_batch_records_eligible_skips_offending() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([210u8; 32]).account_id();
+        let prover_seed = 211u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 220);
+
+        let reward_period = RewardPeriod::<TestRuntime>::get();
+        let threshold = reward_period.uptime_threshold as u64;
+        assert!(threshold > 0, "threshold expected to be non-zero in this config");
+        let period = reward_period.current;
+        let now = System::block_number();
+
+        // A node already at the uptime threshold: must be skipped.
+        let maxed = register_node_for(registrar, owner, 212, 221);
+        let maxed_weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(threshold as u128);
+        NodeUptime::<TestRuntime>::insert(
+            period,
+            maxed,
+            UptimeInfo::new(threshold, maxed_weight, now),
+        );
+
+        // A node heartbeated this block (spacing window not elapsed): must be
+        // skipped. count = 1 with last_reported = now.
+        let recent = register_node_for(registrar, owner, 213, 222);
+        NodeUptime::<TestRuntime>::insert(
+            period,
+            recent,
+            UptimeInfo::new(1, HEARTBEAT_BASE_WEIGHT, now),
+        );
+
+        TotalUptime::<TestRuntime>::mutate(period, |t| {
+            t.total_heartbeats = t.total_heartbeats.saturating_add(threshold + 1);
+            t.total_weight =
+                t.total_weight.saturating_add(maxed_weight + HEARTBEAT_BASE_WEIGHT);
+        });
+
+        // Two fresh, eligible nodes (plus the prover, also eligible).
+        let eligible_a = register_node_for(registrar, owner, 214, 223);
+        let eligible_b = register_node_for(registrar, owner, 215, 224);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover, maxed, recent, eligible_a, eligible_b]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
+
+        // The three eligible nodes recorded a heartbeat...
+        for node in [prover, eligible_a, eligible_b] {
+            let info = NodeUptime::<TestRuntime>::get(period, node).expect("eligible recorded");
+            assert_eq!(info.count, 1, "eligible node must record despite offending siblings");
+        }
+        // ...while the maxed and recent nodes were left untouched.
+        assert_eq!(
+            NodeUptime::<TestRuntime>::get(period, maxed).unwrap().count,
+            threshold,
+            "maxed node must not advance",
+        );
+        assert_eq!(
+            NodeUptime::<TestRuntime>::get(period, recent).unwrap().count,
+            1,
+            "recent node must not advance",
+        );
     });
 }
 
