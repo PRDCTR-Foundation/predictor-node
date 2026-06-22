@@ -7,7 +7,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 
-use parity_scale_codec::{Decode, Encode, FullCodec};
 use core::convert::TryFrom;
 use frame_support::{
     dispatch::DispatchResult,
@@ -25,6 +24,7 @@ use frame_system::{
 use pallet_avn::{
     self as avn, BridgeInterface, BridgeInterfaceNotification, ProcessedEventsChecker,
 };
+use parity_scale_codec::{Decode, Encode, FullCodec};
 use sp_application_crypto::RuntimeAppPublic;
 use sp_avn_common::{
     eth::EthereumId,
@@ -593,9 +593,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config:
-        frame_system::Config
-        + avn::Config
-        + SendTransactionTypes<Call<Self>>
+        frame_system::Config + avn::Config + SendTransactionTypes<Call<Self>>
     {
         /// Runtime event type
         type RuntimeEvent: From<Event<Self>>

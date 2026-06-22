@@ -3,11 +3,11 @@
 #![cfg(test)]
 
 use crate::{self as pallet_node_manager, *};
-use parity_scale_codec::Decode;
-pub use parity_scale_codec::alloc::sync::Arc;
 use frame_support::{derive_impl, parameter_types, weights::Weight, PalletId};
 use frame_system as system;
 use pallet_session as session;
+pub use parity_scale_codec::alloc::sync::Arc;
+use parity_scale_codec::Decode;
 pub use parking_lot::RwLock;
 pub use sp_avn_common::event_types::EthEventId;
 pub use sp_core::{

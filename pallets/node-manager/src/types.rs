@@ -125,16 +125,7 @@ impl<Balance: Copy> RewardPotInfo<Balance> {
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct UptimeInfo<BlockNumber> {
     /// Number of uptime reported
@@ -151,17 +142,7 @@ impl<BlockNumber: Copy> UptimeInfo<BlockNumber> {
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct PaymentPointer<AccountId> {
     pub period_index: RewardPeriodIndex,
     pub node: AccountId,
@@ -179,16 +160,7 @@ impl<AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo> PaymentPointer<Acc
 }
 
 #[derive(
-    Encode,
-    Decode,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
-    Default,
+    Encode, Decode, Copy, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
 )]
 pub enum UnstakeRestriction<Balance> {
     /// Default state. Unstaking is not permitted.
@@ -216,17 +188,7 @@ impl<Balance: Copy> UnstakeRestriction<Balance> {
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct NodeInfo<SignerId, AccountId, Balance> {
     /// The node owner
     pub owner: AccountId,
@@ -349,16 +311,7 @@ impl<
 }
 
 #[derive(
-    Encode,
-    Decode,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
-    Default,
+    Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
 )]
 pub struct StakeInfo<Balance> {
     /// The amount staked
@@ -402,16 +355,7 @@ pub enum AdminConfig<AccountId, Balance> {
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct TotalUptimeInfo {
     /// Total number of uptime reported for reward period
@@ -453,17 +397,7 @@ pub struct PendingMintRequest<Balance> {
     pub credit_received: bool,
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct BonusRange {
     pub start: u32,
     pub end: u32,
