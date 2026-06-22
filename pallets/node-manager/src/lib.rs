@@ -804,6 +804,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Register a new node via a relayer-proxied (avn-proxy) signed transaction.
         #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::signed_register_node())]
         pub fn signed_register_node(
@@ -844,6 +845,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Deregister one or more of `owner`'s nodes. Registrar-only.
         #[pallet::call_index(5)]
         #[pallet::weight(<T as Config>::WeightInfo::deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn deregister_nodes(
@@ -861,6 +863,8 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Deregister one or more of `owner`'s nodes via a relayer-proxied
+        /// (avn-proxy) signed transaction.
         #[pallet::call_index(6)]
         #[pallet::weight(<T as Config>::WeightInfo::signed_deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn signed_deregister_nodes(
