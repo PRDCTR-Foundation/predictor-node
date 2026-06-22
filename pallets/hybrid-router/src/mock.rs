@@ -39,7 +39,7 @@ use orml_traits::{asset_registry::AssetProcessor, MultiCurrency};
 use pallet_pm_combinatorial_tokens::types::{CryptographicIdManager, Fuel};
 #[cfg(feature = "runtime-benchmarks")]
 use pallet_treasury::ArgumentsFactory;
-use parity_scale_codec::{alloc::sync::Arc, Encode};
+use parity_scale_codec::Encode;
 use prediction_market_primitives::{
     constants::mock::{
         AddOutcomePeriod, AggregationPeriod, AppealBond, AppealPeriod, AuthorizedPalletId,
@@ -59,10 +59,12 @@ use prediction_market_primitives::{
     },
     traits::{DistributeFees, NoopLiquidityProvider},
     types::{
-        AccountIdTest, Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata,
-        MarketId, OrmlAmount, SignatureTest, TestAccountIdPK,
+        Asset, BasicCurrencyAdapter, CombinatorialId, CurrencyId, CustomMetadata, MarketId,
+        OrmlAmount,
     },
 };
+#[cfg(feature = "runtime-benchmarks")]
+use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, ConstU32, Get, IdentityLookup, Zero},
     BuildStorage, DispatchError, Perbill, Percent, SaturatedConversion,
@@ -72,62 +74,66 @@ use sp_runtime::{
 use prediction_market_primitives::types::NoopCombinatorialTokensBenchmarkHelper;
 
 use sp_core::H160;
-use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 
-pub use prediction_market_primitives::test_helper::{get_account, get_account_from_seed};
+use prediction_market_primitives::types::AccountIdTest;
 pub const INITIAL_BALANCE: Balance = 100 * BASE;
 
-// pub const ALICE: AccountIdTest = 0;
-// #[allow(unused)]
-// pub const BOB: AccountIdTest = 1;
-// pub const CHARLIE: AccountIdTest = 2;
-// pub const DAVE: AccountIdTest = 3;
-// pub const EVE: AccountIdTest = 4;
-// pub const FEE_ACCOUNT: AccountIdTest = 5;
-// pub const SUDO: AccountIdTest = 123456;
+pub const ALICE: AccountIdTest = 0;
+#[allow(unused)]
+pub const BOB: AccountIdTest = 1;
+pub const CHARLIE: AccountIdTest = 2;
+pub const DAVE: AccountIdTest = 3;
+pub const EVE: AccountIdTest = 4;
+pub const FEE_ACCOUNT: AccountIdTest = 5;
+pub const SUDO: AccountIdTest = 123456;
 // pub const EXTERNAL_FEES: Balance = CENT;
 // pub const INITIAL_BALANCE: Balance = 100 * BASE;
-// #[allow(unused)]
-// pub const MARKET_CREATOR: AccountIdTest = ALICE;
+#[allow(unused)]
+pub const MARKET_CREATOR: AccountIdTest = ALICE;
 
-pub fn alice() -> TestAccountIdPK {
-    get_account(0u8)
+pub fn alice() -> AccountIdTest {
+    ALICE
 }
 #[allow(unused)]
-pub fn bob() -> TestAccountIdPK {
-    get_account(1u8)
+pub fn bob() -> AccountIdTest {
+    BOB
 }
-pub fn charlie() -> TestAccountIdPK {
-    get_account(2u8)
+pub fn charlie() -> AccountIdTest {
+    CHARLIE
 }
-pub fn dave() -> TestAccountIdPK {
-    get_account(3u8)
+pub fn dave() -> AccountIdTest {
+    DAVE
 }
-pub fn eve() -> TestAccountIdPK {
-    get_account(4u8)
+pub fn eve() -> AccountIdTest {
+    EVE
 }
-pub fn sudo() -> TestAccountIdPK {
-    get_account(123u8)
+pub fn sudo() -> AccountIdTest {
+    SUDO
 }
-pub fn fee_account() -> TestAccountIdPK {
-    get_account(5u8)
+pub fn fee_account() -> AccountIdTest {
+    FEE_ACCOUNT
 }
-pub fn market_creator() -> TestAccountIdPK {
-    alice()
+pub fn market_creator() -> AccountIdTest {
+    MARKET_CREATOR
 }
-pub fn winning_fee_account() -> TestAccountIdPK {
-    get_account(95u8)
+pub fn winning_fee_account() -> AccountIdTest {
+    95
+}
+
+#[cfg(test)]
+pub fn get_account(index: u8) -> AccountIdTest {
+    index.into()
 }
 
 pub const FOREIGN_ASSET: Asset<MarketId> = Asset::ForeignAsset(1);
 
 parameter_types! {
-    pub FeeAccount: TestAccountIdPK = fee_account();
+    pub FeeAccount: AccountIdTest = fee_account();
 }
 
 ord_parameter_types! {
-    pub const Sudo: TestAccountIdPK = sudo();
-    pub const AuthorizedDisputeResolutionUser: TestAccountIdPK = alice();
+    pub const Sudo: AccountIdTest = sudo();
+    pub const AuthorizedDisputeResolutionUser: AccountIdTest = alice();
 }
 
 parameter_types! {
@@ -141,9 +147,9 @@ parameter_types! {
     pub const ValidityBond: Balance = 0;
     pub const DisputeBond: Balance = 0;
     pub const MaxCategories: u16 = MAX_ASSETS + 1;
-    pub TreasuryAccount: TestAccountIdPK = Treasury::account_id();
+    pub TreasuryAccount: AccountIdTest = Treasury::account_id();
     pub const WinnerFeePercentage: Perbill = Perbill::from_percent(5);
-    pub WinningFeeAccount: TestAccountIdPK = winning_fee_account();
+    pub WinningFeeAccount: AccountIdTest = winning_fee_account();
 }
 
 pub fn calculate_fee<T: crate::Config>(_amount: BalanceOf<T>) -> BalanceOf<T> {
@@ -208,8 +214,8 @@ where
 
 pub struct DustRemovalWhitelist;
 
-impl Contains<TestAccountIdPK> for DustRemovalWhitelist {
-    fn contains(account_id: &TestAccountIdPK) -> bool {
+impl Contains<AccountIdTest> for DustRemovalWhitelist {
+    fn contains(account_id: &AccountIdTest) -> bool {
         *account_id == fee_account()
     }
 }
@@ -233,7 +239,6 @@ construct_runtime!(
         Timestamp: pallet_timestamp,
         Tokens: orml_tokens,
         Treasury: pallet_treasury,
-        AVN: pallet_avn,
     }
 );
 
@@ -249,19 +254,7 @@ impl crate::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type MaxOrders = MaxOrders;
     type PalletId = HybridRouterPalletId;
-    type RuntimeCall = RuntimeCall;
-    type Public = TestAccountIdPK;
-    type Signature = SignatureTest;
     type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
-}
-
-impl pallet_avn::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type AuthorityId = pallet_avn::sr25519::AuthorityId;
-    type EthereumPublicKeyChecker = ();
-    type NewSessionHandler = ();
-    type DisabledValidatorChecker = ();
-    type WeightInfo = ();
 }
 
 impl pallet_pm_order_book::Config for Runtime {
@@ -288,12 +281,8 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type MaxSwapFee = NeoMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
-    type SignedTxLifetime = ConstU32<16>;
-    type Public = TestAccountIdPK;
-    type Signature = SignatureTest;
-    type RuntimeCall = RuntimeCall;
     type PalletAdminGetter = PredictionMarkets;
-    type OnLiquidityProvided = NoopLiquidityProvider<TestAccountIdPK, MarketId>;
+    type OnLiquidityProvided = NoopLiquidityProvider<AccountIdTest, MarketId>;
 }
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
@@ -301,7 +290,7 @@ impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 impl pallet_prediction_markets::Config for Runtime {
     type AdvisoryBond = AdvisoryBond;
     type AdvisoryBondSlashPercentage = AdvisoryBondSlashPercentage;
-    type ApproveOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type ApproveOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
     type AssetRegistry = AssetRegistry;
     type Authorized = Authorized;
     type CloseEarlyBlockPeriod = CloseEarlyBlockPeriod;
@@ -310,8 +299,8 @@ impl pallet_prediction_markets::Config for Runtime {
     type CloseEarlyProtectionBlockPeriod = CloseEarlyProtectionBlockPeriod;
     type CloseEarlyProtectionTimeFramePeriod = CloseEarlyProtectionTimeFramePeriod;
     type CloseEarlyRequestBond = CloseEarlyRequestBond;
-    type CloseMarketEarlyOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
-    type CloseOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type CloseMarketEarlyOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type CloseOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
     type Court = Court;
     type Currency = Balances;
     type DeployPool = NeoSwaps;
@@ -333,15 +322,12 @@ impl pallet_prediction_markets::Config for Runtime {
     type OracleBond = OracleBond;
     type OutsiderBond = OutsiderBond;
     type PalletId = PmPalletId;
-    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
-    type RequestEditOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
-    type ResolveOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type RequestEditOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
+    type ResolveOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
     type AssetManager = AssetManager;
     type Slash = Treasury;
     type ValidityBond = ValidityBond;
-    type RuntimeCall = RuntimeCall;
-    type Public = TestAccountIdPK;
-    type Signature = SignatureTest;
     type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
     type TokenInterface = ();
     type WinnerFeePercentage = WinnerFeePercentage;
@@ -350,7 +336,7 @@ impl pallet_prediction_markets::Config for Runtime {
 
 impl pallet_pm_authorized::Config for Runtime {
     type AuthorizedDisputeResolutionOrigin =
-        EnsureSignedBy<AuthorizedDisputeResolutionUser, TestAccountIdPK>;
+        EnsureSignedBy<AuthorizedDisputeResolutionUser, AccountIdTest>;
     type CorrectionPeriod = CorrectionPeriod;
     type Currency = Balances;
     type RuntimeEvent = RuntimeEvent;
@@ -391,7 +377,7 @@ impl pallet_pm_court::Config for Runtime {
     type MaxCourtParticipants = MaxCourtParticipants;
     type MaxYearlyInflation = MaxYearlyInflation;
     type MinJurorStake = MinJurorStake;
-    type MonetaryGovernanceOrigin = EnsureRoot<TestAccountIdPK>;
+    type MonetaryGovernanceOrigin = EnsureRoot<AccountIdTest>;
     type PalletId = CourtPalletId;
     type Random = RandomnessCollectiveFlip;
     type RequestInterval = RequestInterval;
@@ -402,7 +388,7 @@ impl pallet_pm_court::Config for Runtime {
 
 impl frame_system::Config for Runtime {
     type AccountData = pallet_balances::AccountData<Balance>;
-    type AccountId = TestAccountIdPK;
+    type AccountId = AccountIdTest;
     type BaseCallFilter = Everything;
     type Block = MockBlockU32<Runtime>;
     type BlockHashCount = BlockHashCount;
@@ -449,7 +435,7 @@ impl pallet_pm_eth_asset_registry::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type CustomMetadata = CustomMetadata;
     type AssetId = CurrencyId;
-    type AuthorityOrigin = EnsureRoot<TestAccountIdPK>;
+    type AuthorityOrigin = EnsureRoot<AccountIdTest>;
     type Balance = Balance;
     type StringLimit = ConstU32<1024>;
     type AssetProcessor = NoopAssetProcessor;
@@ -526,21 +512,23 @@ impl pallet_pm_global_disputes::Config for Runtime {
 #[cfg(feature = "runtime-benchmarks")]
 pub struct BenchmarkHelper;
 #[cfg(feature = "runtime-benchmarks")]
-impl ArgumentsFactory<(), TestAccountIdPK> for BenchmarkHelper {
+impl ArgumentsFactory<(), AccountIdTest> for BenchmarkHelper {
     fn create_asset_kind(_seed: u32) {
         // No-op
     }
 
-    fn create_beneficiary(seed: [u8; 32]) -> TestAccountIdPK {
-        get_account_from_seed(seed)
+    fn create_beneficiary(seed: [u8; 32]) -> AccountIdTest {
+        let h160 = H160::from(H256::from(seed));
+        let lower_128: u128 = u128::from_le_bytes(h160.as_bytes()[..16].try_into().unwrap());
+        AccountIdTest::from(lower_128)
     }
 }
 
 impl pallet_treasury::Config for Runtime {
     type AssetKind = ();
     type BalanceConverter = UnityAssetBalanceConversion;
-    type Beneficiary = TestAccountIdPK;
-    type BeneficiaryLookup = IdentityLookup<TestAccountIdPK>;
+    type Beneficiary = AccountIdTest;
+    type BeneficiaryLookup = IdentityLookup<AccountIdTest>;
     type Burn = ();
     type BurnDestination = ();
     type Currency = Balances;
@@ -549,7 +537,7 @@ impl pallet_treasury::Config for Runtime {
     type PalletId = TreasuryPalletId;
     type Paymaster = PayFromAccount<Balances, TreasuryAccount>;
     type PayoutPeriod = ();
-    type RejectOrigin = EnsureSignedBy<Sudo, TestAccountIdPK>;
+    type RejectOrigin = EnsureSignedBy<Sudo, AccountIdTest>;
     type SpendFunds = ();
     type SpendOrigin = NeverEnsureOrigin<Balance>;
     type SpendPeriod = ();
@@ -560,7 +548,7 @@ impl pallet_treasury::Config for Runtime {
 
 #[allow(unused)]
 pub struct ExtBuilder {
-    balances: Vec<(TestAccountIdPK, Balance)>,
+    balances: Vec<(AccountIdTest, Balance)>,
 }
 
 // TODO(#1222): Remove this in favor of adding whatever the account need in the individual tests.
@@ -582,7 +570,6 @@ impl Default for ExtBuilder {
 #[allow(unused)]
 impl ExtBuilder {
     pub fn build(self) -> sp_io::TestExternalities {
-        let keystore = MemoryKeystore::new();
         let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
         let _ = env_logger::builder().is_test(true).try_init();
@@ -630,7 +617,6 @@ impl ExtBuilder {
         .unwrap();
 
         let mut test_ext: sp_io::TestExternalities = t.into();
-        test_ext.register_extension(KeystoreExt(Arc::new(keystore)));
         test_ext.execute_with(|| System::set_block_number(1));
         test_ext
     }

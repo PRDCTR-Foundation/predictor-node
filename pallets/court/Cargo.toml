@@ -50,4 +50,4 @@ authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-court"
 
-version = "0.2.0"
+version.workspace = true
