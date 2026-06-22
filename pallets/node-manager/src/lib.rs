@@ -452,6 +452,12 @@ pub mod pallet {
             forfeited: BalanceOf<T>,
             penalty: Perbill,
         },
+        /// A non-distributable period's funded reward was returned from the
+        /// pot to the treasury (the period had no reportable uptime).
+        UndistributedRewardReclaimed { reward_period: RewardPeriodIndex, amount: BalanceOf<T> },
+        /// Reclaim of a non-distributable period's reward failed; the funds
+        /// remain in the pot to be recovered by a later admin action.
+        UndistributedRewardReclaimFailed { reward_period: RewardPeriodIndex, amount: BalanceOf<T> },
         /// The global lock window set by root
         LockScheduleSet { start: Duration, initial_penalty_percent: u32 },
         /// Forfeiture destination set by root
@@ -1014,21 +1020,37 @@ pub mod pallet {
                 NodeRegistry::<T>::get(&proof.signer).ok_or(Error::<T>::ProverNotRegistered)?;
             let asserted_owner = prover_info.owner.clone();
 
+            let reward_period = RewardPeriod::<T>::get();
+            let current_period = reward_period.current;
+            let now = frame_system::Pallet::<T>::block_number();
+
             // Pre-flight validation: every node must be registered to the
-            // asserted owner. Dedup is via BTreeSet so the loop below stays
-            // O(N log N) and silently drops duplicate entries.
+            // asserted owner, and is rate-limited exactly like the OCW path
+            // (`validate_heartbeats`). Dedup is via BTreeSet so the loop below
+            // stays O(N log N) and silently drops duplicate entries within the
+            // call; the spacing check additionally rejects a second heartbeat
+            // for the same node in the same block across distinct outer nonces.
             use sp_std::collections::btree_set::BTreeSet;
             let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
             for node in nodes.iter() {
                 let info = NodeRegistry::<T>::get(node).ok_or(Error::<T>::NodeNotOwnedByProver)?;
                 ensure!(info.owner == asserted_owner, Error::<T>::NodeNotOwnedByProver);
+
+                if let Some(uptime_info) = NodeUptime::<T>::get(current_period, node) {
+                    ensure!(
+                        uptime_info.count < reward_period.uptime_threshold as u64,
+                        Error::<T>::HeartbeatThresholdReached
+                    );
+                    let expected_submission = uptime_info.last_reported +
+                        BlockNumberFor::<T>::from(reward_period.heartbeat_period);
+                    ensure!(now >= expected_submission, Error::<T>::DuplicateHeartbeat);
+                }
+
                 unique.insert(node.clone());
             }
 
             // All validations passed; record heartbeats. From this point on
             // we mutate state and cannot fail (modulo storage I/O).
-            let current_period = RewardPeriod::<T>::get().current;
-            let now = frame_system::Pallet::<T>::block_number();
             let mut total_new_weight: u128 = 0;
             let mut new_heartbeat_count: u64 = 0;
 
@@ -1173,7 +1195,10 @@ pub mod pallet {
             // Fund the previous period's reward pot synchronously from the
             // treasury source. The pot account is recorded either way so the
             // period is recoverable via `top_up_reward_pot` if the transfer
-            // fails (treasury underfunded, ED violation, etc.).
+            // fails (treasury underfunded, ED violation, etc.). If the period
+            // turns out to have no distributable uptime, the funds are
+            // reclaimed back to the treasury when the drain skips it (see
+            // `drain_outstanding_payouts`), so they are never stranded.
             let treasury = T::TreasurySource::get();
             let pot = Self::compute_reward_account_id();
             let funded_amount = match T::Currency::transfer(

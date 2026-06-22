@@ -108,19 +108,19 @@ impl<T: Config> Pallet<T> {
     }
 
     /// Worst-case weight charged per `on_idle` per-node iteration. Set
-    /// conservatively above the sum of a NodeRegistry read, a NodeUptime read,
-    /// one `Currency::transfer` (reward pot -> owner) or the equivalent pair
-    /// of locked-accrual writes, and the event deposit.
-    /// `worst_case_iteration_weight`.
+    /// conservatively above the sum of a NodeRegistry read, a
+    /// `Currency::transfer` (reward pot -> owner, touching two accounts), the
+    /// NodeUptime removal write, and the event deposit - or the equivalent
+    /// locked-accrual writes when the lock window is active.
     pub fn worst_case_iteration_weight() -> Weight {
-        // Equivalent to ~200 ms of weight per iteration - a generous safety
-        // margin over the measured cost on similar runtimes. The block-weight
-        // cap and `MaxBatchSize` are the real upper bounds; this is the
-        // granularity at which `on_idle` decides whether to attempt another
-        // iteration.
-        Weight::from_parts(200_000_000, 4096)
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().writes(2))
+        // ref_time is denominated in picoseconds, so 200_000_000_000 is ~200 ms
+        // per iteration - a generous safety margin over the measured cost on
+        // similar runtimes. The block-weight cap and `MaxBatchSize` are the
+        // real upper bounds; this is the granularity at which `on_idle` decides
+        // whether to attempt another iteration.
+        Weight::from_parts(200_000_000_000, 4096)
+            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(4))
+            .saturating_add(<T as frame_system::Config>::DbWeight::get().writes(4))
     }
 
     /// Pay one node out of the given period. Returns the amount paid (or
@@ -216,7 +216,11 @@ impl<T: Config> Pallet<T> {
             }
             let total_uptime = TotalUptime::<T>::get(period);
             if total_uptime.total_weight == 0u128 {
-                // No reportable uptime this period - nothing to distribute.
+                // No reportable uptime this period - nothing to distribute. The
+                // pot was funded for this period at rollover, so reclaim those
+                // funds back to the treasury instead of stranding them in the
+                // pot, then advance.
+                Self::reclaim_undistributed_reward(period, pot_info.total_reward);
                 Self::complete_reward_payout(period);
                 used = used.saturating_add(per_iter);
                 continue
@@ -299,6 +303,35 @@ impl<T: Config> Pallet<T> {
         // it
         for node in paid_nodes_to_remove {
             NodeUptime::<T>::remove(period_index, node);
+        }
+    }
+
+    /// Return a non-distributable period's funded reward from the pot to the
+    /// treasury source. Called when the drain skips a period that was funded at
+    /// rollover but has no reportable uptime, so the funds are recycled instead
+    /// of being orphaned in the pot. Best-effort: if the transfer fails the
+    /// funds remain in the pot and `OutstandingRewardToPay` is still cleared by
+    /// `complete_reward_payout`, leaving the pot's surplus reclaimable by a
+    /// later top-up/admin action rather than blocking the drain.
+    pub fn reclaim_undistributed_reward(period_index: RewardPeriodIndex, amount: BalanceOf<T>) {
+        if amount.is_zero() {
+            return
+        }
+        let pot = Self::compute_reward_account_id();
+        let treasury = T::TreasurySource::get();
+        match T::Currency::transfer(&pot, &treasury, amount, ExistenceRequirement::KeepAlive) {
+            Ok(()) => {
+                Self::deposit_event(Event::UndistributedRewardReclaimed {
+                    reward_period: period_index,
+                    amount,
+                });
+            },
+            Err(_) => {
+                Self::deposit_event(Event::UndistributedRewardReclaimFailed {
+                    reward_period: period_index,
+                    amount,
+                });
+            },
         }
     }
 

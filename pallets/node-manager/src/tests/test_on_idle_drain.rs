@@ -116,6 +116,10 @@ fn drain_pays_all_nodes_within_one_block() {
         let pot_before = NodeManager::reward_pot_balance();
         assert!(pot_before > 0, "reward pot expected to be funded before drain");
 
+        // Period 0 was funded at rollover but carries zero uptime, so the drain
+        // reclaims its reward back to the treasury rather than stranding it.
+        let reclaimed = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
+
         // Generous weight budget: pay all 3 nodes (and skip the empty period 0).
         let budget = per_iter().saturating_mul(20);
         let used = NodeManager::drain_outstanding_payouts(budget);
@@ -144,10 +148,11 @@ fn drain_pays_all_nodes_within_one_block() {
         let pot_after = NodeManager::reward_pot_balance();
         assert_eq!(
             pot_before.saturating_sub(pot_after),
-            paid_total,
-            "pot drawdown ({}) should equal the sum paid to owners ({})",
+            paid_total.saturating_add(reclaimed),
+            "pot drawdown ({}) should equal the sum paid to owners ({}) plus the reclaimed empty-period reward ({})",
             pot_before.saturating_sub(pot_after),
             paid_total,
+            reclaimed,
         );
     });
 }
@@ -234,6 +239,52 @@ fn drain_advances_past_empty_period() {
         assert!(
             OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() > oldest_before,
             "empty period should be skipped past",
+        );
+    });
+}
+
+#[test]
+fn drain_reclaims_undistributed_reward_for_empty_period() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        setup_registrar();
+        fast_periods();
+        // No nodes => every funded period has zero uptime, so its reward is
+        // undistributable and must be returned to the treasury, not stranded.
+        roll_forward(200); // fund period 0 (genesis amount), enter period 1
+        roll_forward(20); // fund period 1 (fast_periods amount), enter period 2
+
+        let p0 = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
+        let p1 = RewardPot::<TestRuntime>::get(1).map(|p| p.total_reward).unwrap_or_default();
+        let reclaimable = p0.saturating_add(p1);
+        assert!(reclaimable > 0, "periods should have been funded at rollover");
+
+        let treasury_before = Balances::free_balance(&treasury_account());
+        let pot_before = NodeManager::reward_pot_balance();
+        let outstanding_before = OutstandingRewardToPay::<TestRuntime>::get();
+
+        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(10));
+
+        // Funds returned to the treasury, pot drawn down, outstanding cleared -
+        // nothing stranded.
+        assert_eq!(
+            Balances::free_balance(&treasury_account()).saturating_sub(treasury_before),
+            reclaimable,
+            "treasury should recover the undistributed reward",
+        );
+        assert_eq!(pot_before.saturating_sub(NodeManager::reward_pot_balance()), reclaimable);
+        assert_eq!(
+            outstanding_before.saturating_sub(OutstandingRewardToPay::<TestRuntime>::get()),
+            reclaimable,
+        );
+
+        let events = System::events();
+        assert!(
+            events.iter().any(|er| matches!(
+                &er.event,
+                RuntimeEvent::NodeManager(Event::UndistributedRewardReclaimed { .. })
+            )),
+            "UndistributedRewardReclaimed event missing",
         );
     });
 }

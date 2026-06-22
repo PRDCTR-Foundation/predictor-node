@@ -6,7 +6,6 @@ use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 use frame_system::RawOrigin;
 use sp_avn_common::Proof;
-use sp_runtime::traits::IdentifyAccount;
 
 const SIGNED_TX_LIFETIME: u32 = 64;
 
@@ -362,6 +361,136 @@ fn rejects_unsigned_origin() {
             ),
             sp_runtime::DispatchError::BadOrigin,
         );
+    });
+}
+
+/// A second heartbeat for the same node within the spacing window is rejected,
+/// even when submitted via a distinct call in the same block (the
+/// replay-across-nonces grief vector). Mirrors the OCW `DuplicateHeartbeat`
+/// guard.
+#[test]
+fn rejects_second_heartbeat_within_spacing_window() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([60u8; 32]).account_id();
+        let prover_seed = 61u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 71);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        // First heartbeat records the node.
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof.clone(),
+            nodes.clone(),
+            bn,
+        ));
+
+        // A second call in the same block (same period, no spacing elapsed) is
+        // rejected, so `count` cannot be inflated past one per window.
+        assert_noop!(
+            NodeManager::heartbeat_for_owned_nodes(
+                RawOrigin::Signed(prover).into(),
+                proof,
+                nodes,
+                bn,
+            ),
+            Error::<TestRuntime>::DuplicateHeartbeat
+        );
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime recorded");
+        assert_eq!(info.count, 1, "count must not advance past the spacing window");
+    });
+}
+
+/// Once the spacing window has elapsed, a follow-up heartbeat is accepted and
+/// advances the count.
+#[test]
+fn allows_heartbeat_after_spacing_window() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([62u8; 32]).account_id();
+        let prover_seed = 63u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 73);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes.clone(),
+            bn,
+        ));
+
+        // Advance past `heartbeat_period` blocks, then submit again.
+        let heartbeat_period = RewardPeriod::<TestRuntime>::get().heartbeat_period as u64;
+        roll_forward(heartbeat_period);
+        let bn2 = System::block_number();
+        let proof2 = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn2));
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof2,
+            nodes,
+            bn2,
+        ));
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime recorded");
+        assert_eq!(info.count, 2, "count should advance once spacing has elapsed");
+    });
+}
+
+/// A node already at the uptime threshold cannot be heartbeated further, so the
+/// delegated path cannot inflate `TotalUptime.total_weight` past the cap the
+/// reward maths assumes. Mirrors the OCW `HeartbeatThresholdReached` guard.
+#[test]
+fn rejects_heartbeat_at_uptime_threshold() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([64u8; 32]).account_id();
+        let prover_seed = 65u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 75);
+
+        let reward_period = RewardPeriod::<TestRuntime>::get();
+        let threshold = reward_period.uptime_threshold as u64;
+        assert!(threshold > 0, "threshold expected to be non-zero in this config");
+
+        // Seed the node at exactly the threshold, with the spacing window
+        // already satisfied so the threshold guard is what fires.
+        let period = reward_period.current;
+        let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(threshold as u128);
+        NodeUptime::<TestRuntime>::insert(period, prover, UptimeInfo::new(threshold, weight, 0u64));
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        assert_noop!(
+            NodeManager::heartbeat_for_owned_nodes(
+                RawOrigin::Signed(prover).into(),
+                proof,
+                nodes,
+                bn,
+            ),
+            Error::<TestRuntime>::HeartbeatThresholdReached
+        );
+
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime present");
+        assert_eq!(info.count, threshold, "count must not exceed the threshold");
     });
 }
 

@@ -96,6 +96,9 @@ fn payout_locks_when_schedule_unset() {
         assert!(LockSchedule::<TestRuntime>::get().is_none(), "no schedule at genesis");
         let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
         let pot_before = NodeManager::reward_pot_balance();
+        // Period 0 was funded at rollover but has zero uptime, so the drain
+        // reclaims it to the treasury; only that amount leaves the pot.
+        let reclaimed = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
 
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
@@ -104,8 +107,9 @@ fn payout_locks_when_schedule_unset() {
         assert!(locked > 0, "reward should have accrued into LockedRewards");
         assert_eq!(Balances::free_balance(&owner), 0, "free balance must stay untouched");
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), locked);
-        // The funds never left the pot.
-        assert_eq!(NodeManager::reward_pot_balance(), pot_before);
+        // The locked claim's funds never left the pot (only the reclaimed
+        // empty-period reward did).
+        assert_eq!(NodeManager::reward_pot_balance(), pot_before.saturating_sub(reclaimed));
         System::assert_has_event(
             Event::RewardLocked { reward_period: period, owner, node, amount: locked }.into(),
         );
