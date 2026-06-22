@@ -7,7 +7,10 @@ frame-system = { workspace = true }
 hydra-dx-math = { workspace = true }
 log = { workspace = true }
 orml-traits = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
 typenum = { workspace = true }
@@ -26,7 +29,7 @@ pallet-insecure-randomness-collective-flip = { workspace = true, optional = true
 pallet-timestamp = { workspace = true, optional = true }
 pallet-treasury = { workspace = true, optional = true }
 pallet-xcm = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }   
+serde = { workspace = true, optional = true }
 sp-api = { workspace = true, optional = true }
 sp-io = { workspace = true, optional = true }
 xcm = { workspace = true, optional = true }
@@ -46,80 +49,77 @@ sp-keystore = { workspace = true, optional = true }
 more-asserts = { workspace = true }
 test-case = { workspace = true }
 pallet-pm-neo-swaps = { workspace = true, features = ["mock"] }
-sp-keystore = { workspace = true, features = ["default"]}
-sp-avn-common = { workspace = true, features=["test-utils"] }
+sp-keystore = { workspace = true, features = ["default"] }
+sp-avn-common = { workspace = true, features = ["test-utils"] }
 
 [features]
 default = ["std"]
 mock = [
-    "orml-currencies/default",
-    "orml-tokens/default",
-    "pallet-balances",
-    "pallet-insecure-randomness-collective-flip/default",
-    "pallet-timestamp/default",
-    "pallet-treasury/default",
-    "sp-api/default",
-    "sp-io/default",
-    "sp-keystore/default",
-    "prediction-market-primitives/mock",
-    "pallet-prediction-markets-runtime-api/default",
-    "xcm/default",
-    "pallet-pm-eth-asset-registry/default",
-    "orml-currencies/default",
-    "orml-tokens/default",
-    "pallet-balances/default",
-    "pallet-timestamp/default",
-    "sp-api/default",
-    "sp-core/default",
-    "sp-io/default",
-    "pallet-pm-combinatorial-tokens/std",
-    "pallet-pm-combinatorial-tokens/mock",
-    "pallet-pm-combinatorial-tokens/default",
-    "pallet-pm-court/std",
-    "pallet-pm-authorized/std",
-    "pallet-pm-global-disputes/std",
-    "pallet-prediction-markets/std",
-    "pallet-prediction-markets/mock",
-    "pallet-prediction-markets/default",
-    "pallet-avn/default",
-    "serde/default",
-    "env_logger/default",
+  "orml-currencies/default",
+  "orml-tokens/default",
+  "pallet-balances",
+  "pallet-insecure-randomness-collective-flip/default",
+  "pallet-timestamp/default",
+  "pallet-treasury/default",
+  "sp-api/default",
+  "sp-io/default",
+  "sp-keystore/default",
+  "prediction-market-primitives/mock",
+  "pallet-prediction-markets-runtime-api/default",
+  "xcm/default",
+  "pallet-pm-eth-asset-registry/default",
+  "orml-currencies/default",
+  "orml-tokens/default",
+  "pallet-balances/default",
+  "pallet-timestamp/default",
+  "sp-api/default",
+  "sp-core/default",
+  "sp-io/default",
+  "pallet-pm-combinatorial-tokens/std",
+  "pallet-pm-combinatorial-tokens/mock",
+  "pallet-pm-combinatorial-tokens/default",
+  "pallet-pm-court/std",
+  "pallet-pm-authorized/std",
+  "pallet-pm-global-disputes/std",
+  "pallet-prediction-markets/std",
+  "pallet-prediction-markets/mock",
+  "pallet-prediction-markets/default",
+  "pallet-avn/default",
+  "serde/default",
+  "env_logger/default",
 ]
 parachain = ["pallet-prediction-markets/parachain"]
 runtime-benchmarks = [
-    "frame-benchmarking/runtime-benchmarks",
-    "frame-support/runtime-benchmarks",
-    "frame-system/runtime-benchmarks",
-    "xcm-builder/runtime-benchmarks",
-    "pallet-xcm/runtime-benchmarks",
-    "pallet-pm-combinatorial-tokens/runtime-benchmarks",
-    "pallet-pm-eth-asset-registry?/runtime-benchmarks",
-    "pallet-treasury?/runtime-benchmarks",
-    "pallet-prediction-markets?/runtime-benchmarks",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
+  "xcm-builder/runtime-benchmarks",
+  "pallet-xcm/runtime-benchmarks",
+  "pallet-pm-combinatorial-tokens/runtime-benchmarks",
+  "pallet-pm-eth-asset-registry?/runtime-benchmarks",
+  "pallet-treasury?/runtime-benchmarks",
+  "pallet-prediction-markets?/runtime-benchmarks",
 ]
 std = [
-    "frame-benchmarking?/std",
-    "frame-support/std",
-    "frame-system/std",
-    "orml-traits/std",
-    "parity-scale-codec/std",
-    "sp-core/std",
-    "sp-runtime/std",
-    "xcm-builder/std",
-    "pallet-xcm/std",
-    "sp-avn-common/std",
-    "prediction-market-primitives/std",
-    "pallet-pm-market-commons/std",
-    "common-primitives/std",
-    "pallet-avn/std",
+  "frame-benchmarking?/std",
+  "frame-support/std",
+  "frame-system/std",
+  "orml-traits/std",
+  "parity-scale-codec/std",
+  "sp-core/std",
+  "sp-runtime/std",
+  "xcm-builder/std",
+  "pallet-xcm/std",
+  "sp-avn-common/std",
+  "prediction-market-primitives/std",
+  "pallet-pm-market-commons/std",
+  "common-primitives/std",
+  "pallet-avn/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-neo-swaps"
 version.workspace = true
-

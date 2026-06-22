@@ -8,7 +8,10 @@ pallet-avn = { workspace = true, optional = true }
 pallet-prediction-markets = { workspace = true }
 pallet-pm-market-commons = { workspace = true }
 pallet-timestamp = { workspace = true, optional = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 prediction-market-primitives = { workspace = true }
 scale-info = { workspace = true, features = ["derive"] }
 sp-avn-common = { workspace = true }
@@ -28,35 +31,33 @@ sp-io = { workspace = true }
 [features]
 default = ["std"]
 runtime-benchmarks = [
-    "common-primitives",
-    "frame-benchmarking/runtime-benchmarks",
-    "frame-support/runtime-benchmarks",
-    "frame-system/runtime-benchmarks",
-    "orml-traits",
-    "pallet-avn",
-    "pallet-prediction-markets/runtime-benchmarks",
-    "pallet-timestamp/runtime-benchmarks",
+  "common-primitives",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
+  "orml-traits",
+  "pallet-avn",
+  "pallet-prediction-markets/runtime-benchmarks",
+  "pallet-timestamp/runtime-benchmarks",
 ]
 std = [
-    "common-primitives?/std",
-    "frame-benchmarking?/std",
-    "frame-support/std",
-    "frame-system/std",
-    "orml-traits?/std",
-    "pallet-avn?/std",
-    "pallet-prediction-markets/std",
-    "pallet-pm-market-commons/std",
-    "pallet-timestamp?/std",
-    "parity-scale-codec/std",
-    "prediction-market-primitives/std",
-    "scale-info/std",
-    "sp-avn-common/std",
-    "sp-core/std",
-    "sp-runtime/std",
+  "common-primitives?/std",
+  "frame-benchmarking?/std",
+  "frame-support/std",
+  "frame-system/std",
+  "orml-traits?/std",
+  "pallet-avn?/std",
+  "pallet-prediction-markets/std",
+  "pallet-pm-market-commons/std",
+  "pallet-timestamp?/std",
+  "parity-scale-codec/std",
+  "prediction-market-primitives/std",
+  "scale-info/std",
+  "sp-avn-common/std",
+  "sp-core/std",
+  "sp-runtime/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true
