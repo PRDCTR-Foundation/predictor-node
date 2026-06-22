@@ -345,6 +345,43 @@ fn withdraw_routes_forfeit_to_configured_destination() {
     });
 }
 
+/// Single-node early-period exact-division case: ED > 0 and the pot's only
+/// balance is exactly the locked rewards being withdrawn. `AllowDeath` lets the
+/// net + forfeited transfers drain the pot to zero (the genesis provider ref
+/// keeps the account alive) instead of failing the `KeepAlive` `>= ED` check
+/// and blocking the owner from realising their reward.
+#[test]
+fn withdraw_full_succeeds_when_pot_holds_exactly_the_locked_amount() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        set_existential_deposit(AVT);
+
+        let owner = TestAccount::new([114u8; 32]).account_id();
+        let destination = TestAccount::new([115u8; 32]).account_id();
+        let gross = 100 * AVT;
+
+        LockedRewards::<TestRuntime>::insert(&owner, gross);
+        TotalLockedRewards::<TestRuntime>::put(gross);
+        let pot = NodeManager::compute_reward_account_id();
+        Balances::make_free_balance_be(&pot, gross);
+        assert_eq!(Balances::free_balance(&pot), gross, "pot holds only the locked amount");
+
+        set_lock_schedule(0, 52); // week-one: 52% forfeit, 48% net.
+        assert_ok!(NodeManager::set_admin_config(
+            RawOrigin::Root.into(),
+            AdminConfig::ForfeitureDestination(destination),
+        ));
+
+        assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
+
+        assert_eq!(Balances::free_balance(&owner), 48 * AVT, "net reaches the owner");
+        assert_eq!(Balances::free_balance(&destination), 52 * AVT, "forfeit reaches destination");
+        assert_eq!(Balances::free_balance(&pot), 0, "pot drained to zero");
+        assert_eq!(LockedRewards::<TestRuntime>::get(&owner), 0);
+        assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
+    });
+}
+
 /// The decaying forfeiture penalty applies to the FULL locked balance -
 /// already-locked (existing) plus newly-accrued (new) rewards - not just one
 /// portion. Lock a first reward, advance into the decay window, accrue a second

@@ -93,7 +93,7 @@ impl<T: Config> Pallet<T> {
                 &reward_pot,
                 &node_owner,
                 amount,
-                ExistenceRequirement::KeepAlive,
+                ExistenceRequirement::AllowDeath,
             )?;
         }
 

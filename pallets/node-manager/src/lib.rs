@@ -1121,7 +1121,7 @@ pub mod pallet {
             // first transfer if the second fails.
             let reward_pot = Self::compute_reward_account_id();
             if !net.is_zero() {
-                T::Currency::transfer(&reward_pot, &who, net, ExistenceRequirement::KeepAlive)?;
+                T::Currency::transfer(&reward_pot, &who, net, ExistenceRequirement::AllowDeath)?;
             }
             if !forfeited.is_zero() {
                 let destination =
@@ -1130,7 +1130,7 @@ pub mod pallet {
                     &reward_pot,
                     &destination,
                     forfeited,
-                    ExistenceRequirement::KeepAlive,
+                    ExistenceRequirement::AllowDeath,
                 )?;
             }
 
