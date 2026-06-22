@@ -2192,7 +2192,7 @@ checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 
 [[package]]
 name = "common-primitives"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -6674,7 +6674,7 @@ checksum = "b93853da6d84c2e3c7d730d6473e8817692dd89be387eb01b94d7f108ecb5b8c"
 
 [[package]]
 name = "node-macros"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "node-primitives"
@@ -7355,7 +7355,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7647,7 +7647,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-authorized"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7666,7 +7666,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-combinatorial-tokens"
-version = "0.6.1"
+version = "0.2.0"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.5.0",
@@ -7681,7 +7681,6 @@ dependencies = [
  "orml-tokens",
  "orml-traits",
  "pallet-balances",
- "pallet-pm-combinatorial-tokens",
  "pallet-pm-market-commons",
  "pallet-timestamp",
  "parity-scale-codec",
@@ -7695,7 +7694,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-combinatorial-tokens-fuzz"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -7710,7 +7709,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-court"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arrayvec",
  "common-primitives",
@@ -7738,7 +7737,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-eth-asset-registry"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -7757,7 +7756,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-global-disputes"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7780,7 +7779,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-hybrid-router"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -7799,7 +7798,6 @@ dependencies = [
  "pallet-pm-court",
  "pallet-pm-eth-asset-registry",
  "pallet-pm-global-disputes",
- "pallet-pm-hybrid-router",
  "pallet-pm-market-commons",
  "pallet-pm-neo-swaps",
  "pallet-pm-order-book",
@@ -7823,7 +7821,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-market-commons"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7843,7 +7841,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-neo-swaps"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -7859,7 +7857,6 @@ dependencies = [
  "orml-tokens",
  "orml-traits",
  "pallet-avn",
- "pallet-avn-proxy",
  "pallet-balances",
  "pallet-insecure-randomness-collective-flip",
  "pallet-pm-authorized",
@@ -7868,7 +7865,6 @@ dependencies = [
  "pallet-pm-eth-asset-registry",
  "pallet-pm-global-disputes",
  "pallet-pm-market-commons",
- "pallet-pm-neo-swaps",
  "pallet-prediction-markets",
  "pallet-prediction-markets-runtime-api",
  "pallet-timestamp",
@@ -7892,7 +7888,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-neo-swaps-fuzz"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -7907,7 +7903,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-order-book"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7920,7 +7916,6 @@ dependencies = [
  "orml-traits",
  "pallet-balances",
  "pallet-pm-market-commons",
- "pallet-pm-order-book",
  "pallet-timestamp",
  "parity-scale-codec",
  "prediction-market-primitives",
@@ -7932,7 +7927,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-order-book-fuzz"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arbitrary",
  "frame-system",
@@ -7943,7 +7938,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prediction-markets"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -7964,7 +7959,6 @@ dependencies = [
  "pallet-pm-eth-asset-registry",
  "pallet-pm-global-disputes",
  "pallet-pm-market-commons",
- "pallet-prediction-markets",
  "pallet-prediction-markets-runtime-api",
  "pallet-timestamp",
  "pallet-treasury",
@@ -7985,7 +7979,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prediction-markets-fuzz"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -8980,7 +8974,7 @@ dependencies = [
 
 [[package]]
 name = "prediction-market-primitives"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arbitrary",
  "common-primitives",
@@ -9006,7 +9000,7 @@ dependencies = [
 
 [[package]]
 name = "predictor-node"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "cli-commands",
@@ -9059,7 +9053,7 @@ dependencies = [
 
 [[package]]
 name = "predictor-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "common-primitives",
  "frame-benchmarking",

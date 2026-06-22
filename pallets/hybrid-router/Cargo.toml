@@ -38,7 +38,8 @@ pallet-avn = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
-pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
+# Remove when pallet-pm-neo-swaps is added to the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
+# pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
 sp-keystore = { workspace = true, features = ["default"]}
 sp-avn-common = { workspace = true, features=["test-utils"] }
 
@@ -119,5 +120,5 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-hybrid-router"
-version = { workspace = true }
+version = "0.2.0"
 

@@ -43,7 +43,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         .with_protocol_id("prd-local-testnet")
         .with_properties(properties)
         .with_chain_type(ChainType::Local)
-        .with_genesis_config_preset_name(sp_genesis_builder::DEV_RUNTIME_PRESET)
+        .with_genesis_config_preset_name(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET)
         .build())
 }
 

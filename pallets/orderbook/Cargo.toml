@@ -22,7 +22,8 @@ common-primitives = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
-pallet-pm-order-book = { workspace = true, features = ["mock", "default"] }
+# Remove the mock feature to avoid a circular dependency
+# pallet-pm-order-book = { workspace = true, features = ["mock", "default"] }
 
 [features]
 default = ["std"]
@@ -59,4 +60,4 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-order-book"
-version = { workspace = true }
+version = "0.2.0"

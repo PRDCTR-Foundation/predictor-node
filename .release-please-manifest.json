@@ -1,0 +1,22 @@
+{
+  "node": "0.2.0",
+  "runtime": "0.2.0",
+  "macros": "0.2.0",
+  "primitives/common": "0.2.0",
+  "primitives/prediction-market": "0.2.0",
+  "pallets/authorized": "0.2.0",
+  "pallets/combinatorial-tokens": "0.2.0",
+  "pallets/config": "0.2.0",
+  "pallets/court": "0.2.0",
+  "pallets/eth-asset-registry": "0.2.0",
+  "pallets/market-commons": "0.2.0",
+  "pallets/hybrid-router": "0.2.0",
+  "pallets/orderbook": "0.2.0",
+  "pallets/neo-swaps": "0.2.0",
+  "pallets/prediction-markets": "0.2.0",
+  "pallets/global-disputes": "0.2.0",
+  "pallets/combinatorial-tokens/fuzz": "0.6.2",
+  "pallets/neo-swaps/fuzz": "0.6.2",
+  "pallets/orderbook/fuzz": "0.6.2",
+  "pallets/prediction-markets/fuzz": "0.6.2"
+}

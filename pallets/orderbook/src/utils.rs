@@ -39,7 +39,7 @@ where
 {
     Market {
         market_id: Default::default(),
-        base_asset: Asset::Tru,
+        base_asset: Asset::Prd,
         creation: MarketCreation::Permissionless,
         creator_fee: sp_runtime::Perbill::zero(),
         creator: T::PalletId::get().into_account_truncating(),

@@ -92,7 +92,7 @@ fuzz_target!(|params: RedeemPositionFuzzParams| {
         // We create a market and equip the user with the tokens they require to make the
         // `redeem_position` call meaningful. We also provide the pallet account with collateral in
         // case it's required.
-        let collateral = Asset::Tru;
+        let collateral = Asset::Prd;
         let asset_count = params.index_set.len() as u16;
         let market = common::market::<Runtime>(
             params.market_id,
@@ -108,7 +108,7 @@ fuzz_target!(|params: RedeemPositionFuzzParams| {
 
             Asset::CombinatorialToken(position_id)
         } else {
-            Asset::Tru
+            Asset::Prd
         };
         <<Runtime as Config>::MultiCurrency>::deposit(position, &params.account_id, params.amount)
             .unwrap();

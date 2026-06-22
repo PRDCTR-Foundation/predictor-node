@@ -29,11 +29,7 @@ use frame_support::{dispatch::PostDispatchInfo, weights::Weight};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 use sp_core::sr25519;
-use sp_runtime::{
-    generic,
-    traits::{BlakeTwo256, IdentifyAccount, Verify},
-    DispatchResult, MultiSignature, OpaqueExtrinsic,
-};
+use sp_runtime::{traits::Verify, DispatchResult, MultiSignature};
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::{Arbitrary, Result, Unstructured};
