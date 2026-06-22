@@ -365,6 +365,15 @@ impl<T: Config> Pallet<T> {
 
         Self::remove_paid_nodes(period, &drained_nodes);
         if iterator_exhausted {
+            // Completing a period with no drained entries (e.g. an empty
+            // failed-funding abandonment) still does real storage work but
+            // charged no `per_iter` in the loop above; charge one so the outer
+            // loop's weight/batch guards bound how many empty periods complete
+            // per block. The outer loop only enters here with at least one
+            // `per_iter` of budget left, so progress is still guaranteed.
+            if drained_nodes.is_empty() {
+                *used = used.saturating_add(per_iter);
+            }
             Self::complete_reward_payout(period);
         } else {
             Self::update_last_paid_pointer(period, last_node);

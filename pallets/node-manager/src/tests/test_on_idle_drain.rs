@@ -521,3 +521,58 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         );
     });
 }
+
+#[test]
+fn drain_charges_weight_and_bounds_empty_abandoned_period_completions() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let window = <TestRuntime as Config>::MaxFailedFundingRecoveryPeriods::get();
+
+        // Five consecutive failed-funding periods (0..=4) with NO NodeUptime
+        // entries, all pushed past the recovery window so they must be abandoned.
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        for p in 0..5u64 {
+            RewardPot::<TestRuntime>::insert(p, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        }
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 10);
+
+        // Budget for exactly three completions. Even though empty periods drain
+        // no nodes, completing each still charges one `per_iter`, so the outer
+        // loop's weight guard must stop after three.
+        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(3));
+
+        assert_eq!(
+            used,
+            per_iter().saturating_mul(3),
+            "each empty-period completion must charge one per_iter",
+        );
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            3,
+            "weight budget must bound completions to three periods per call",
+        );
+        for p in 0..3u64 {
+            assert!(RewardPot::<TestRuntime>::get(p).is_none(), "period {p} must be completed");
+        }
+        for p in 3..5u64 {
+            assert!(
+                RewardPot::<TestRuntime>::get(p).is_some(),
+                "period {p} must remain for a later call",
+            );
+        }
+
+        // A fresh call with ample budget finishes the remaining periods.
+        let used2 = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(50));
+        assert!(used2.any_gt(Weight::zero()), "drain should make progress");
+        for p in 3..5u64 {
+            assert!(
+                RewardPot::<TestRuntime>::get(p).is_none(),
+                "period {p} must be abandoned on the second call",
+            );
+        }
+        assert!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() >= 5,
+            "cursor must advance past all abandoned periods",
+        );
+    });
+}
