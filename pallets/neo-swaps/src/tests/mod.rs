@@ -50,7 +50,7 @@ use prediction_market_primitives::{
     },
 };
 
-const BASE_ASSET: Asset<MarketId> = Asset::Tru;
+const BASE_ASSET: Asset<MarketId> = Asset::Prd;
 // const BASE_ASSET: Asset<MarketId> = FOREIGN_ASSET;
 pub use sp_runtime::traits::Hash;
 use sp_runtime::Perbill;

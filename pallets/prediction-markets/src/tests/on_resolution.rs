@@ -27,7 +27,7 @@ fn it_correctly_resolves_a_market_that_was_reported_on() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
         simple_create_categorical_market(
-            Asset::Tru,
+            Asset::Prd,
             MarketCreation::Permissionless,
             0..end,
             ScoringRule::AmmCdaHybrid,
@@ -127,7 +127,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
         assert_eq!(Balances::free_balance(alice()), alice_balance_before + OracleBond::get());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -177,7 +177,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
         assert_eq!(Balances::free_balance(alice()), alice_balance_before);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -229,7 +229,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
         assert_eq!(Balances::free_balance(alice()), alice_balance_before + ValidityBond::get());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -285,7 +285,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
         assert_eq!(Balances::free_balance(alice()), alice_balance_before);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -340,7 +340,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -396,7 +396,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_advised_approved_ma
         assert_eq!(Balances::free_balance(alice()), alice_balance_before + OracleBond::get());
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -463,7 +463,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -533,7 +533,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_advised_approved_ma
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -548,7 +548,7 @@ fn trusted_market_complete_lifecycle() {
         WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             bob(),
             MarketPeriod::Block(0..end),
@@ -630,7 +630,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -702,7 +702,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
         assert!(market.bonds.outsider.unwrap().is_settled);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {

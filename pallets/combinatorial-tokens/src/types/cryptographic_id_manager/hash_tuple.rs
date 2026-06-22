@@ -115,7 +115,7 @@ mod tests {
 
     // Beware! If you have to modify these tests, that means that you broke encoding of assets in a
     // way that's not backwards compatible.
-    #[test_case(Asset::Tru, vec![4])]
+    #[test_case(Asset::Prd, vec![4])]
     #[test_case(Asset::ForeignAsset(0), vec![5, 0, 0, 0, 0])]
     #[test_case(Asset::ForeignAsset(1), vec![5, 1, 0, 0, 0])]
     #[test_case(Asset::ForeignAsset(2), vec![5, 2, 0, 0, 0])]

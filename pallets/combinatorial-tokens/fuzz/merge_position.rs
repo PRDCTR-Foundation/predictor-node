@@ -79,7 +79,7 @@ fuzz_target!(|params: MergePositionFuzzParams| {
     ext.execute_with(|| {
         // We create a market and equip the user with the tokens they require to make the
         // `merge_position` call meaningful, and deposit collateral in the pallet account.
-        let collateral = Asset::Tru;
+        let collateral = Asset::Prd;
         let asset_count = if let Some(member) = params.partition.first() {
             member.len().max(2) as u16
         } else {

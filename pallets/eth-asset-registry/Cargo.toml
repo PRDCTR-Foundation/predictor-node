@@ -6,7 +6,7 @@ license = "Apache-2.0"
 authors = ["Interlay Ltd, Aventus"]
 edition = { workspace = true }
 
-version = { workspace = true }
+version = "0.2.0"
 
 [dependencies]
 log = { workspace = true }
