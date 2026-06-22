@@ -199,8 +199,8 @@ impl<T: Config> Pallet<T> {
                 break
             }
 
-            // Resolve the snapshot for this period. If missing or unfunded,
-            // skip the period cleanly via `complete_reward_payout`.
+            // Resolve the snapshot for this period. If missing, skip the period
+            // cleanly via `complete_reward_payout`.
             let pot_info = match RewardPot::<T>::get(period) {
                 Some(p) => p,
                 None => {
@@ -209,7 +209,19 @@ impl<T: Config> Pallet<T> {
                     continue
                 },
             };
+            if pot_info.funding_failed {
+                // The rollover treasury transfer for this period failed, so it
+                // is recorded with `total_reward == 0` and awaits recovery via
+                // `top_up_reward_pot`. Leave the snapshot in place and do NOT
+                // advance the cursor past it as if paid - otherwise the
+                // documented recovery would be impossible. Stop the drain here
+                // (rather than spinning on an unadvanceable period); it resumes
+                // automatically once a top-up funds the period.
+                break
+            }
             if pot_info.total_reward.is_zero() {
+                // Legitimately zero-reward period (funded successfully with a
+                // zero amount): nothing to distribute and nothing to reclaim.
                 Self::complete_reward_payout(period);
                 used = used.saturating_add(per_iter);
                 continue

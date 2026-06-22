@@ -97,11 +97,21 @@ pub struct RewardPotInfo<Balance> {
     pub uptime_threshold: u32,
     /// The last timestamp of the previous reward period, used to calculate genesis bonus
     pub reward_end_time: Duration,
+    /// `true` when the rollover treasury transfer for this period failed, so the
+    /// snapshot exists with `total_reward == 0` and is awaiting recovery via
+    /// `top_up_reward_pot`. Distinguishes a recoverable failed-funding period
+    /// from a legitimately zero-reward period (which the drain may skip).
+    pub funding_failed: bool,
 }
 
 impl<Balance: Copy> RewardPotInfo<Balance> {
-    pub fn new(total_reward: Balance, uptime_threshold: u32, reward_end_time: Duration) -> Self {
-        RewardPotInfo { total_reward, uptime_threshold, reward_end_time }
+    pub fn new(
+        total_reward: Balance,
+        uptime_threshold: u32,
+        reward_end_time: Duration,
+        funding_failed: bool,
+    ) -> Self {
+        RewardPotInfo { total_reward, uptime_threshold, reward_end_time, funding_failed }
     }
 }
 

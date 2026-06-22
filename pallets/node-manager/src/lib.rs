@@ -951,6 +951,7 @@ pub mod pallet {
                 .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
 
             pot_info.total_reward = amount;
+            pot_info.funding_failed = false;
             RewardPot::<T>::insert(period, pot_info);
             OutstandingRewardToPay::<T>::mutate(|outstanding| {
                 *outstanding = outstanding.saturating_add(amount);
@@ -1032,8 +1033,10 @@ pub mod pallet {
             // not fatal, so a single maxed/recent node cannot block heartbeat
             // progress for the rest of the batch. Dedup is via BTreeSet so the
             // loop below stays O(N log N) and silently drops duplicate entries
-            // within the call (which also bars a second heartbeat for the same
-            // node in the same block across distinct outer nonces).
+            // within a single call. A second heartbeat for the same node in the
+            // same block across distinct outer nonces is barred instead by the
+            // spacing check below (`now < last_reported + heartbeat_period`),
+            // not by this in-call set.
             use sp_std::collections::btree_set::BTreeSet;
             let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
             for node in nodes.iter() {
@@ -1206,7 +1209,7 @@ pub mod pallet {
             // `drain_outstanding_payouts`), so they are never stranded.
             let treasury = T::TreasurySource::get();
             let pot = Self::compute_reward_account_id();
-            let funded_amount = match T::Currency::transfer(
+            let (funded_amount, funding_failed) = match T::Currency::transfer(
                 &treasury,
                 &pot,
                 reward_amount,
@@ -1220,7 +1223,7 @@ pub mod pallet {
                         period: previous_index,
                         amount: reward_amount,
                     });
-                    reward_amount
+                    (reward_amount, false)
                 },
                 Err(reason) => {
                     Self::deposit_event(Event::RewardPotFundingFailed {
@@ -1228,19 +1231,26 @@ pub mod pallet {
                         requested_amount: reward_amount,
                         reason,
                     });
-                    BalanceOf::<T>::zero()
+                    // A genuine funding failure only happens when a non-zero
+                    // reward could not be transferred. A zero `reward_amount`
+                    // transfers trivially via the `Ok` arm, so reaching here
+                    // with a non-zero requested amount marks the period as
+                    // awaiting recovery.
+                    (BalanceOf::<T>::zero(), !reward_amount.is_zero())
                 },
             };
 
-            // Always record the period snapshot. On funding failure the
-            // entry carries `total_reward = 0` and `top_up_reward_pot` can
-            // later replace it with the actual funded amount.
+            // Always record the period snapshot. On funding failure the entry
+            // carries `total_reward = 0` and `funding_failed = true`, so the
+            // drain leaves it recoverable and `top_up_reward_pot` can later
+            // replace it with the actual funded amount.
             <RewardPot<T>>::insert(
                 previous_index,
                 RewardPotInfo::<BalanceOf<T>>::new(
                     funded_amount,
                     previous_uptime_threshold,
                     Self::time_now_sec(),
+                    funding_failed,
                 ),
             );
 

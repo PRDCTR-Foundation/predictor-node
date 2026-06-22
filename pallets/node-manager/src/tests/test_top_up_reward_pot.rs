@@ -6,9 +6,17 @@ use crate::{mock::*, *};
 use frame_support::{
     assert_noop, assert_ok,
     traits::{Currency, ExistenceRequirement},
+    weights::Weight,
 };
 use frame_system::RawOrigin;
 use sp_runtime::DispatchError;
+
+/// Generous idle weight so `on_idle` (run by `roll_one_block`) attempts to
+/// drain, reproducing the production sequencing where `on_idle` runs in the
+/// same block as the rollover `on_initialize`.
+fn generous_idle_weight() -> Weight {
+    NodeManager::worst_case_iteration_weight().saturating_mul(20)
+}
 
 /// Drain the treasury source so the next rollover transfer fails.
 fn drain_treasury() {
@@ -117,11 +125,28 @@ fn top_up_recovers_after_funding_failure() {
         let before_outstanding = OutstandingRewardToPay::<TestRuntime>::get();
         let pot = NodeManager::compute_reward_account_id();
 
+        // Run `on_idle` at the end of every block, exactly as production does -
+        // including the rollover block, so the drain sees the freshly recorded
+        // failed-funding snapshot and must leave it recoverable rather than
+        // completing+removing it.
+        set_idle_drain_weight(generous_idle_weight());
+
         drain_treasury();
         roll_past_next_period();
 
+        // The drain (via on_idle) has run on the failed-funding period but must
+        // NOT have removed it or advanced past it - it is still recoverable.
+        let info = RewardPot::<TestRuntime>::get(0).expect("RewardPotInfo for period 0");
+        assert!(info.funding_failed, "failed-funding snapshot should be flagged");
+        assert!(info.total_reward.is_zero());
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            0,
+            "cursor must not advance past an unrecovered failed-funding period",
+        );
+
         // Refund treasury (simulating an off-chain top-up) and call the
-        // extrinsic to recover the period.
+        // extrinsic to recover the period - it still exists despite on_idle.
         let _ = Balances::deposit_creating(&treasury_account(), reward_amount * 10);
 
         assert_ok!(NodeManager::top_up_reward_pot(
@@ -132,6 +157,7 @@ fn top_up_recovers_after_funding_failure() {
 
         let info = RewardPot::<TestRuntime>::get(0).expect("RewardPotInfo for period 0");
         assert_eq!(info.total_reward, reward_amount);
+        assert!(!info.funding_failed, "funding_failed cleared after recovery");
         assert_eq!(
             OutstandingRewardToPay::<TestRuntime>::get(),
             before_outstanding.saturating_add(reward_amount)
@@ -141,6 +167,41 @@ fn top_up_recovers_after_funding_failure() {
         System::assert_last_event(
             Event::RewardPotFunded { period: 0, amount: reward_amount }.into(),
         );
+    });
+}
+
+#[test]
+fn drain_blocks_on_failed_funding_then_resumes_after_top_up() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let reward_amount = NextRewardAmountPerPeriod::<TestRuntime>::get();
+        set_idle_drain_weight(generous_idle_weight());
+
+        drain_treasury();
+        roll_past_next_period();
+
+        // The failed-funding period (0) holds the cursor; the drain does not
+        // advance past it even after several idle blocks.
+        roll_forward(3);
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            0,
+            "drain must keep waiting on the unrecovered period",
+        );
+        assert!(RewardPot::<TestRuntime>::get(0).is_some());
+
+        // Recover the period, then let the drain run again: with no uptime the
+        // now-funded period is reclaimed and completed, so the cursor advances -
+        // proving the drain resumes rather than permanently stalling.
+        let _ = Balances::deposit_creating(&treasury_account(), reward_amount * 10);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 0, reward_amount,));
+
+        roll_forward(1);
+        assert!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() > 0,
+            "drain should advance past the recovered period",
+        );
+        assert!(RewardPot::<TestRuntime>::get(0).is_none(), "recovered period drained and removed");
     });
 }
 

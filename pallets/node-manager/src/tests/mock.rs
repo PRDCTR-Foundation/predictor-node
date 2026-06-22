@@ -373,6 +373,22 @@ pub(crate) fn roll_forward(num_blocks_to_roll: u64) {
     }
 }
 
+thread_local! {
+    /// Idle weight budget handed to `NodeManager::on_idle` from `roll_one_block`,
+    /// mirroring the executive handing leftover block weight to the hook.
+    /// Defaults to zero so existing tests that drive the drain explicitly are
+    /// unaffected; tests exercising the production `on_initialize` -> `on_idle`
+    /// sequencing set a real budget via `set_idle_drain_weight`.
+    static IDLE_DRAIN_WEIGHT: RefCell<Weight> = RefCell::new(Weight::zero());
+}
+
+/// Set the idle weight budget that `roll_one_block` feeds to `on_idle`, so a
+/// test can have the drain run as it would in production at the end of each
+/// block. Pass `Weight::zero()` to restore the default no-op behaviour.
+pub(crate) fn set_idle_drain_weight(weight: Weight) {
+    IDLE_DRAIN_WEIGHT.with(|w| *w.borrow_mut() = weight);
+}
+
 pub(crate) fn roll_one_block() -> u64 {
     Balances::on_finalize(System::block_number());
     System::on_finalize(System::block_number());
@@ -380,6 +396,10 @@ pub(crate) fn roll_one_block() -> u64 {
     System::on_initialize(System::block_number());
     Balances::on_initialize(System::block_number());
     NodeManager::on_initialize(System::block_number());
+    // Mirror production: the executive runs `on_idle` with the block's leftover
+    // weight after `on_initialize` and the extrinsics.
+    let idle_weight = IDLE_DRAIN_WEIGHT.with(|w| *w.borrow());
+    NodeManager::on_idle(System::block_number(), idle_weight);
     System::block_number()
 }
 
