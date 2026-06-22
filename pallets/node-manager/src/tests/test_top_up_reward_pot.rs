@@ -220,6 +220,23 @@ fn top_up_rejects_already_funded_period() {
 }
 
 #[test]
+fn top_up_rejects_legitimately_zero_funded_period() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        // A period funded successfully with a zero `reward_amount` has
+        // `total_reward == 0` but `funding_failed == false`. It is NOT a failed
+        // funding, so top_up must reject it rather than injecting funds for a
+        // period that never had a funding failure.
+        RewardPot::<TestRuntime>::insert(3, RewardPotInfo::new(0u128, 20u32, 0u64, false));
+
+        assert_noop!(
+            NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 3, 1 * AVT),
+            Error::<TestRuntime>::RewardPotAlreadyFunded
+        );
+    });
+}
+
+#[test]
 fn top_up_rejects_unknown_period() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {

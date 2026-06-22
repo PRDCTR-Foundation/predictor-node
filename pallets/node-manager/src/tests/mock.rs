@@ -78,6 +78,10 @@ parameter_types! {
     /// Production value (30k per the hard-fork proposal). Cap tests set
     /// `TotalRegisteredNodes` storage directly instead of mass-registering.
     pub const MaxRegisteredNodes: u32 = 30_000;
+    /// Small recovery window so tests can drive both the "still recoverable"
+    /// and the "abandoned after the window" branches of the failed-funding
+    /// drain handling without rolling thousands of periods.
+    pub const MaxFailedFundingRecoveryPeriods: u64 = 5;
 }
 
 /// A pseudo-treasury account used as the funding source for the reward pot in
@@ -105,6 +109,7 @@ impl Config for TestRuntime {
     type HalvingEnabledAtGenesis = HalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = MaxRegisteredNodes;
+    type MaxFailedFundingRecoveryPeriods = MaxFailedFundingRecoveryPeriods;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
     type WeightInfo = ();

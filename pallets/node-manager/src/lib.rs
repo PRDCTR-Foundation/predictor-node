@@ -606,6 +606,18 @@ pub mod pallet {
         /// frees capacity.
         #[pallet::constant]
         type MaxRegisteredNodes: Get<u32>;
+        /// Recovery window, in reward periods, for a period whose rollover
+        /// funding failed (`funding_failed == true`). While such a period's age
+        /// (`current period index - the period`) stays within this window the
+        /// `on_idle` drain leaves it in place so `top_up_reward_pot` can still
+        /// fund it retroactively, head-of-line-blocking the payout stream. Once
+        /// the age exceeds this window the drain abandons the unrecovered period
+        /// (completing it without payout, as nothing was ever funded) so the
+        /// cursor advances and later periods' operators get paid. This bounds
+        /// the maximum payout stall to this many periods rather than an
+        /// indefinite freeze behind one never-recovered period.
+        #[pallet::constant]
+        type MaxFailedFundingRecoveryPeriods: Get<RewardPeriodIndex>;
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
@@ -943,7 +955,7 @@ pub mod pallet {
             ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
 
             let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
-            ensure!(pot_info.total_reward.is_zero(), Error::<T>::RewardPotAlreadyFunded);
+            ensure!(pot_info.funding_failed, Error::<T>::RewardPotAlreadyFunded);
 
             let treasury = T::TreasurySource::get();
             let pot = Self::compute_reward_account_id();

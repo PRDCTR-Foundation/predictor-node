@@ -362,3 +362,78 @@ fn drain_pays_correct_amount_to_owners() {
         );
     });
 }
+
+#[test]
+fn drain_keeps_failed_funding_within_recovery_window() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let window = <TestRuntime as Config>::MaxFailedFundingRecoveryPeriods::get();
+
+        // Period 0 failed funding; the current period index is still within the
+        // recovery window, so the drain must leave it recoverable and not
+        // advance the cursor past it.
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = window);
+
+        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        assert_eq!(used, Weight::zero(), "drain should not charge weight while blocked");
+        assert!(
+            RewardPot::<TestRuntime>::get(0).is_some(),
+            "in-window failed-funding snapshot must stay recoverable",
+        );
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            0,
+            "cursor must not advance while period is within the recovery window",
+        );
+    });
+}
+
+#[test]
+fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        expire_lock_schedule();
+        let window = <TestRuntime as Config>::MaxFailedFundingRecoveryPeriods::get();
+        let reward = 1_000 * AVT;
+
+        // Period 0: failed funding, never recovered.
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+
+        // Period 2: funded successfully with real uptime for one node.
+        let node = register_node(registrar, 101, 1, 11);
+        let pot = NodeManager::compute_reward_account_id();
+        let _ = Balances::deposit_creating(&pot, reward);
+        RewardPot::<TestRuntime>::insert(2, RewardPotInfo::new(reward, 20u32, 0u64, false));
+        OutstandingRewardToPay::<TestRuntime>::put(reward);
+        record_uptime(2, &node, 5);
+
+        // Push the current period index past period 0 + the recovery window so
+        // the unrecovered failed-funding period must be abandoned.
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 2);
+
+        let owner = TestAccount::new([101u8; 32]).account_id();
+        assert_eq!(Balances::free_balance(&owner), 0, "owner starts unfunded");
+
+        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        assert!(used.any_gt(Weight::zero()), "drain should make progress");
+
+        // Period 0 abandoned: snapshot removed and cursor advanced past it.
+        assert!(
+            RewardPot::<TestRuntime>::get(0).is_none(),
+            "out-of-window failed-funding snapshot must be abandoned",
+        );
+        // Liveness: the later funded period's operator actually gets paid.
+        assert!(
+            Balances::free_balance(&owner) > 0,
+            "later period operator must be paid once the stuck period is abandoned",
+        );
+        assert!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() > 2,
+            "cursor must advance past the paid period",
+        );
+    });
+}

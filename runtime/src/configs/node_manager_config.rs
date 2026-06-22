@@ -30,6 +30,13 @@ parameter_types! {
     /// Network-wide registered-node cap, fixed at 30,000 by the PRDCTR
     /// hard-fork proposal. Deregistration frees capacity under the cap.
     pub const NodeManagerMaxRegisteredNodes: u32 = 30_000;
+    /// Recovery window (in reward periods) for a period whose rollover funding
+    /// failed. The `on_idle` drain keeps such a period recoverable via
+    /// `top_up_reward_pot` while its age stays within this window, then
+    /// abandons it so the payout stream cannot freeze indefinitely behind one
+    /// unfundable period. Sized to give governance ample time to source and
+    /// inject top-up funds before the period is written off.
+    pub const NodeManagerMaxFailedFundingRecoveryPeriods: u64 = 100;
 }
 
 /// Funding source for reward-period rollover: the TokenManager treasury
@@ -57,6 +64,7 @@ impl pallet_node_manager::Config for Runtime {
     type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = NodeManagerMaxRegisteredNodes;
+    type MaxFailedFundingRecoveryPeriods = NodeManagerMaxFailedFundingRecoveryPeriods;
     type SignedTxLifetime = NodeManagerSignedTxLifetime;
     type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
 }

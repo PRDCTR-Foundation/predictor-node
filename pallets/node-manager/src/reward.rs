@@ -212,12 +212,26 @@ impl<T: Config> Pallet<T> {
             if pot_info.funding_failed {
                 // The rollover treasury transfer for this period failed, so it
                 // is recorded with `total_reward == 0` and awaits recovery via
-                // `top_up_reward_pot`. Leave the snapshot in place and do NOT
-                // advance the cursor past it as if paid - otherwise the
+                // `top_up_reward_pot`. While the period is still within the
+                // bounded recovery window, leave the snapshot in place and do
+                // NOT advance the cursor past it as if paid - otherwise the
                 // documented recovery would be impossible. Stop the drain here
                 // (rather than spinning on an unadvanceable period); it resumes
                 // automatically once a top-up funds the period.
-                break
+                //
+                // Once the period's age exceeds the window, abandon it: a
+                // recovery may never arrive, and an indefinite head-of-line
+                // block would freeze the entire payout stream behind one
+                // unfunded period. Nothing was ever funded for it
+                // (`total_reward == 0`), so there is nothing to reclaim - just
+                // complete it so the cursor advances and later periods pay out.
+                let age = current.saturating_sub(period);
+                if age <= T::MaxFailedFundingRecoveryPeriods::get() {
+                    break
+                }
+                Self::complete_reward_payout(period);
+                used = used.saturating_add(per_iter);
+                continue
             }
             if pot_info.total_reward.is_zero() {
                 // Legitimately zero-reward period (funded successfully with a
