@@ -12,17 +12,16 @@ mod benchmarks;
 pub mod configs;
 pub mod fees;
 mod genesis_config_presets;
+mod runtime_version;
 pub mod third_party_weights;
 pub mod weights;
 
 extern crate alloc;
 use alloc::vec::Vec;
-use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys, traits::BlakeTwo256, MultiAddress,
-};
+pub use runtime_version::VERSION;
+use sp_runtime::{generic, impl_opaque_keys, traits::BlakeTwo256, MultiAddress};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
-use sp_version::RuntimeVersion;
 
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
@@ -75,25 +74,6 @@ pub mod opaque {
         }
     }
 }
-
-// To learn more about runtime versioning, see:
-// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
-#[sp_version::runtime_version]
-pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("predictor-runtime"),
-    impl_name: create_runtime_str!("predictor-runtime"),
-    authoring_version: 1,
-    // The version of the runtime specification. A full node will not attempt to use its native
-    //   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
-    //   `spec_version`, and `authoring_version` are the same between Wasm and native.
-    // This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
-    //   the compatible custom types.
-    spec_version: 100,
-    impl_version: 1,
-    apis: apis::RUNTIME_API_VERSIONS,
-    transaction_version: 1,
-    state_version: 1,
-};
 
 mod block_times {
     /// This determines the average expected block time that we are targeting. Blocks will be
@@ -315,4 +295,13 @@ mod runtime {
 
     #[runtime::pallet_index(83)]
     pub type CombinatorialTokens = pallet_pm_combinatorial_tokens;
+
+    #[runtime::pallet_index(90)]
+    pub type SignedHybridRouter = pallet_pm_signed_hybrid_router;
+
+    #[runtime::pallet_index(91)]
+    pub type SignedPredictionMarkets = pallet_pm_signed_prediction_markets;
+
+    #[runtime::pallet_index(92)]
+    pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
 }

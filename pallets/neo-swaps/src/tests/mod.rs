@@ -28,9 +28,6 @@ mod join;
 mod liquidity_tree_interactions;
 mod pallet_admin_tests;
 mod sell;
-mod signed_exit;
-mod signed_join;
-mod signed_withdraw_fees;
 mod withdraw_fees;
 
 use crate::{consts::*, mock::*, traits::*, *};
@@ -40,13 +37,12 @@ use orml_traits::MultiCurrency;
 use pallet_pm_combinatorial_tokens::types::Fuel;
 use pallet_pm_market_commons::{MarketCommonsPalletApi, Markets};
 use pallet_prediction_markets::WhitelistedMarketCreators;
-pub use prediction_market_primitives::test_helper::get_account_from_seed;
 use prediction_market_primitives::{
     constants::base_multiples::*,
     math::fixed::{FixedDiv, FixedMul},
     types::{
-        Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus, MarketType,
-        MultiHash, ScalarPosition, ScoringRule, TestAccountIdPK,
+        AccountIdTest, Asset, Deadlines, MarketCreation, MarketId, MarketPeriod, MarketStatus,
+        MarketType, MultiHash, ScalarPosition, ScoringRule,
     },
 };
 
@@ -56,7 +52,7 @@ pub use sp_runtime::traits::Hash;
 use sp_runtime::Perbill;
 
 fn create_market(
-    creator: TestAccountIdPK,
+    creator: AccountIdTest,
     base_asset: Asset<MarketId>,
     market_type: MarketType,
     scoring_rule: ScoringRule,

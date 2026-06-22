@@ -691,7 +691,6 @@ impl pallet_prediction_markets::Config for Runtime {
     type DeployPool = NeoSwaps;
     type DisputeBond = DisputeBond;
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
     type GlobalDisputes = GlobalDisputes;
     type MaxCategories = MaxCategories;
     type MaxCreatorFee = MaxCreatorFee;
@@ -718,11 +717,16 @@ impl pallet_prediction_markets::Config for Runtime {
     type ValidityBond = ValidityBond;
     type WeightInfo = pallet_prediction_markets::weights::WeightInfo<Runtime>;
     type AssetRegistry = AssetRegistry;
-    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
-    type Signature = Signature;
     type TokenInterface = TokenManager;
     type WinnerFeePercentage = WinnerFeePercentage;
     type WinnerFeeHandler = WinnerFee;
+}
+
+impl pallet_pm_signed_prediction_markets::Config for Runtime {
+    type RuntimeCall = RuntimeCall;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type Signature = Signature;
+    type WeightInfo = pallet_pm_signed_prediction_markets::weights::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -857,16 +861,20 @@ impl pallet_pm_neo_swaps::Config for Runtime {
     type PoolId = MarketId;
     type MaxSplits = MaxSplits;
     type RuntimeEvent = RuntimeEvent;
-    type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_pm_neo_swaps::weights::WeightInfo<Runtime>;
     type MaxLiquidityTreeDepth = MaxLiquidityTreeDepth;
     type MaxSwapFee = NeoSwapsMaxSwapFee;
     type PalletId = NeoSwapsPalletId;
+    type PalletAdminGetter = PredictionMarkets;
+    type OnLiquidityProvided = PredictionMarkets;
+}
+
+impl pallet_pm_signed_neo_swaps::Config for Runtime {
+    type RuntimeCall = RuntimeCall;
     type SignedTxLifetime = ConstU32<16>;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
-    type PalletAdminGetter = PredictionMarkets;
-    type OnLiquidityProvided = PredictionMarkets;
+    type WeightInfo = pallet_pm_signed_neo_swaps::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_pm_order_book::Config for Runtime {
@@ -890,10 +898,14 @@ impl pallet_pm_hybrid_router::Config for Runtime {
     type MaxOrders = MaxOrders;
     type RuntimeEvent = RuntimeEvent;
     type PalletId = HybridRouterPalletId;
+    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+}
+
+impl pallet_pm_signed_hybrid_router::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type Public = <Signature as sp_runtime::traits::Verify>::Signer;
     type Signature = Signature;
-    type WeightInfo = pallet_pm_hybrid_router::weights::WeightInfo<Runtime>;
+    type WeightInfo = pallet_pm_signed_hybrid_router::weights::WeightInfo<Runtime>;
 }
 
 impl pallet_config::Config for Runtime {
