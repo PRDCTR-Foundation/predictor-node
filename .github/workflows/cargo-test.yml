@@ -37,11 +37,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Reclaim runner disk before the heavy runtime-benchmarks build, which
+      # otherwise tips ubuntu-latest over on link. Toggles are explicit (rather
+      # than relying on the action's defaults) and modelled on Parity's template:
+      # https://github.com/paritytech/polkadot-sdk-solochain-template/blob/master/.github/actions/free-disk-space/action.yml
+      # Action pinned to a release SHA instead of @main for reproducibility.
       - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # 1.3.1
         with:
+          # Big, reliable wins: preinstalled SDKs/runtimes and toolchains we
+          # never touch (android ~12 GB, dotnet, haskell, docker images).
+          android: true
+          dotnet: true
+          haskell: true
+          docker-images: true
           tool-cache: true
+          # Left off: Parity reports these as slow and occasionally flaky, and
+          # the build is green without them.
           large-packages: false
+          swap-storage: false
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
