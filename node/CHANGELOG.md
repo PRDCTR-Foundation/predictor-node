@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.2.0...v0.3.0) (2026-06-15)
+
+
+### Features
+
+* Introduce public testnet chainspec ([#61](https://github.com/Predictor-Foundation/predictor-node/issues/61)) ([e274606](https://github.com/Predictor-Foundation/predictor-node/commit/e27460682c497209bd06213abd3ff8ef7e613e9d))
+
 ## [0.2.0](https://github.com/Predictor-Foundation/predictor-node/compare/v0.1.0...v0.2.0) (2026-05-28)
 
 

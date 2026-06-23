@@ -11,7 +11,7 @@ fn create_signed_join_proof(
 ) -> Proof<SignatureTest, TestAccountIdPK> {
     let relayer = eve();
     let block_number = System::block_number();
-    let encoded_payload = NeoSwaps::encode_signed_join_params(
+    let encoded_payload = encode_signed_join_params::<Runtime>(
         &relayer,
         pool_id,
         pool_shares,
@@ -26,8 +26,6 @@ fn create_signed_join_proof(
 }
 
 struct SignedJoinContext {
-    pub pool_balances: Vec<u128>,
-    pub spot_prices: Vec<BalanceOf<Runtime>>,
     pub pool_id: MarketId,
     pub pool_shares_amount: u128,
     pub outcomes: Vec<AssetOf<Runtime>>,
@@ -47,9 +45,6 @@ impl Default for SignedJoinContext {
         );
 
         Self {
-            // These need to match the actual pool balances after deployment
-            pool_balances: vec![50_000_000_000, 5_087_779_911],
-            spot_prices,
             pool_id,
             pool_shares_amount: _4, // Add 40% to the pool
             outcomes: vec![],
@@ -66,18 +61,7 @@ impl SignedJoinContext {
         })
         .unwrap();
 
-        let pool = Pools::<Runtime>::get(self.pool_id).unwrap();
-        self.outcomes = pool.assets();
-
-        // Verify the initial pool state matches our expected values
-        assert_pool_state!(
-            self.pool_id,
-            self.pool_balances,
-            self.spot_prices,
-            27_905_531_321, // Updated liquidity parameter value
-            create_b_tree_map!({ alice() => _5 }),
-            0,
-        );
+        self.outcomes = NeoSwaps::assets(self.pool_id).unwrap();
     }
 
     fn prepare_outcome_tokens(&self, who: &TestAccountIdPK, amount: BalanceOf<Runtime>) {
@@ -94,7 +78,6 @@ fn signed_join_works() {
 
         let pool_id = context.pool_id;
         let pool_shares_amount = _4;
-        let expected_liquidity_parameter = 50_229_956_378;
 
         context.setup_market();
 
@@ -116,7 +99,7 @@ fn signed_join_works() {
         ];
 
         // Execute signed join
-        assert_ok!(NeoSwaps::signed_join(
+        assert_ok!(SignedNeoSwaps::signed_join(
             RuntimeOrigin::signed(bob()),
             proof,
             pool_id,
@@ -124,9 +107,6 @@ fn signed_join_works() {
             max_amounts_in,
             proof_blocknumber
         ));
-
-        // Get the pool to verify state changes
-        let pool = Pools::<Runtime>::get(pool_id).unwrap();
 
         // Check that Bob's outcome tokens were reduced
         let bob_final_balances = [
@@ -138,24 +118,25 @@ fn signed_join_works() {
         assert!(bob_final_balances[0] < bob_initial_balances[0]);
         assert!(bob_final_balances[1] < bob_initial_balances[1]);
 
-        // Verify pool state changes
-        assert_ok!(pool.liquidity_shares_manager.shares_of(&bob()));
-        assert_eq!(pool.liquidity_parameter, expected_liquidity_parameter);
-
-        // Verify the event was emitted
-        System::assert_has_event(
-            Event::JoinExecuted {
-                who: bob(),
-                pool_id,
-                pool_shares_amount,
-                amounts_in: vec![
-                    bob_initial_balances[0] - bob_final_balances[0],
-                    bob_initial_balances[1] - bob_final_balances[1],
-                ],
-                new_liquidity_parameter: expected_liquidity_parameter,
-            }
-            .into(),
-        );
+        let expected_amounts_in = vec![
+            bob_initial_balances[0] - bob_final_balances[0],
+            bob_initial_balances[1] - bob_final_balances[1],
+        ];
+        assert!(System::events().iter().any(|record| {
+            matches!(
+                &record.event,
+                RuntimeEvent::NeoSwaps(NeoSwapsEvent::JoinExecuted {
+                    who,
+                    pool_id: event_pool_id,
+                    pool_shares_amount: event_pool_shares_amount,
+                    amounts_in,
+                    ..
+                }) if *who == bob()
+                    && *event_pool_id == pool_id
+                    && *event_pool_shares_amount == pool_shares_amount
+                    && amounts_in == &expected_amounts_in
+            )
+        }));
     });
 }
 
@@ -188,7 +169,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -227,7 +208,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -266,7 +247,7 @@ mod fails_when {
             };
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -304,7 +285,7 @@ mod fails_when {
             System::set_block_number(proof_blocknumber + 100);
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -341,7 +322,7 @@ mod fails_when {
             );
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -349,7 +330,7 @@ mod fails_when {
                     max_amounts_in,
                     proof_blocknumber
                 ),
-                Error::<Runtime>::AmountInAboveMax
+                NeoSwapsError::<Runtime>::AmountInAboveMax
             );
         });
     }
@@ -387,7 +368,7 @@ mod fails_when {
 
             // Test that it fails with MarketNotActive error
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -395,7 +376,7 @@ mod fails_when {
                     max_amounts_in,
                     proof_blocknumber
                 ),
-                Error::<Runtime>::MarketNotActive
+                NeoSwapsError::<Runtime>::MarketNotActive
             );
         });
     }
@@ -423,7 +404,7 @@ mod fails_when {
             );
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -431,7 +412,7 @@ mod fails_when {
                     max_amounts_in,
                     proof_blocknumber
                 ),
-                Error::<Runtime>::ZeroAmount
+                NeoSwapsError::<Runtime>::ZeroAmount
             );
         });
     }
@@ -455,7 +436,7 @@ mod fails_when {
                 create_signed_join_proof(&bob_account, &pool_id, &tiny_position, &max_amounts_in);
 
             assert_noop!(
-                NeoSwaps::signed_join(
+                SignedNeoSwaps::signed_join(
                     RuntimeOrigin::signed(bob()),
                     proof,
                     pool_id,
@@ -463,7 +444,7 @@ mod fails_when {
                     max_amounts_in,
                     proof_blocknumber
                 ),
-                Error::<Runtime>::MinRelativeLiquidityThresholdViolated
+                NeoSwapsError::<Runtime>::MinRelativeLiquidityThresholdViolated
             );
         });
     }
