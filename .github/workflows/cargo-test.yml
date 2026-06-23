@@ -14,6 +14,10 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   SKIP_WASM_BUILD: 1
+  # Tests don't need debug symbols; dropping them slashes object/rlib disk
+  # usage and link time, which is what tips the runner over on the heavy
+  # runtime-benchmarks build.
+  RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
   cargo-test:
@@ -32,6 +36,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          large-packages: false
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
