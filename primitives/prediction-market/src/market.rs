@@ -468,7 +468,7 @@ mod tests {
     ) {
         let market = Market {
             market_id: 9,
-            base_asset: Asset::Tru,
+            base_asset: Asset::Prd,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),
@@ -520,7 +520,7 @@ mod tests {
     ) {
         let market = Market {
             market_id: 0,
-            base_asset: Asset::Tru,
+            base_asset: Asset::Prd,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),
@@ -579,7 +579,7 @@ mod tests {
 
         let market = Market {
             market_id: 0,
-            base_asset: Asset::Tru,
+            base_asset: Asset::Prd,
             creator: 1,
             creation: MarketCreation::Permissionless,
             creator_fee: Default::default(),

@@ -55,7 +55,7 @@ where
 {
     Market {
         market_id: 0u8.into(),
-        base_asset: Asset::Tru,
+        base_asset: Asset::Prd,
         creation: MarketCreation::Permissionless,
         creator_fee: sp_runtime::Perbill::zero(),
         creator: account("creator", 0, 0),

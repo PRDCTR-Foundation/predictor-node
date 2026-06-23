@@ -1,0 +1,115 @@
+name: sense-check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: sense-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  SKIP_WASM_BUILD: 1
+
+jobs:
+  rustfmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install nightly-2023-05-22 --profile minimal --component rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: sense-check-${{ runner.os }}-rustfmt-nightly-2023-05-22-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            sense-check-${{ runner.os }}-rustfmt-nightly-2023-05-22-
+            sense-check-${{ runner.os }}-rustfmt-
+            sense-check-${{ runner.os }}-
+
+      - name: Cargo fmt
+        run: cargo +nightly-2023-05-22 fmt --all -- --check
+
+  cargo-toml:
+    name: cargo manifest checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Taplo format check
+        uses: uncenter/setup-taplo@v1
+
+      - name: Check Cargo.toml formatting
+        run: taplo fmt --check '**/Cargo.toml'
+
+      - name: Lint Cargo.toml files
+        run: taplo check '**/Cargo.toml'
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: sense-check-${{ runner.os }}-cargo-metadata-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            sense-check-${{ runner.os }}-cargo-metadata-
+            sense-check-${{ runner.os }}-
+
+      - name: Validate cargo metadata
+        run: cargo metadata --locked --all-features --format-version 1
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+            target
+          key: sense-check-${{ runner.os }}-clippy-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            sense-check-${{ runner.os }}-clippy-
+            sense-check-${{ runner.os }}-
+
+      - name: Cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings

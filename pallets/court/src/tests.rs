@@ -69,7 +69,7 @@ const ORACLE_REPORT: OutcomeReport = OutcomeReport::Scalar(u128::MAX);
 
 const DEFAULT_MARKET: MarketOf<Runtime> = Market {
     market_id: 0,
-    base_asset: Asset::Tru,
+    base_asset: Asset::Prd,
     creation: MarketCreation::Permissionless,
     creator_fee: sp_runtime::Perbill::zero(),
     creator: 0,

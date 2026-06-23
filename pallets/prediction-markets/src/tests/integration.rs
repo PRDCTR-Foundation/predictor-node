@@ -41,7 +41,7 @@ fn it_appeals_a_court_market_to_global_dispute() {
             let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + j;
             let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&j);
             let juror = get_account_from_seed(seed.into());
-            assert_ok!(AssetManager::deposit(Asset::Tru, &juror, amount + SENTINEL_AMOUNT));
+            assert_ok!(AssetManager::deposit(Asset::Prd, &juror, amount + SENTINEL_AMOUNT));
             assert_ok!(Court::join_court(RuntimeOrigin::signed(juror), amount));
             free_before.insert(j, Balances::free_balance(juror));
         }
@@ -135,7 +135,7 @@ fn it_appeals_a_court_market_to_global_dispute() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -150,7 +150,7 @@ fn the_entire_market_lifecycle_works_with_timestamps() {
         // Creates a permissionless market.
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
-            Asset::Tru,
+            Asset::Prd,
             Perbill::zero(),
             bob(),
             MarketPeriod::Timestamp(0..100_000_000),
@@ -312,7 +312,7 @@ fn full_scalar_market_lifecycle() {
         );
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -362,14 +362,14 @@ fn authorized_correctly_resolves_disputed_market() {
         run_to_block(dispute_at);
         assert_ok!(PredictionMarkets::dispute(RuntimeOrigin::signed(charlie()), 0,));
 
-        if base_asset == Asset::Tru {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+        if base_asset == Asset::Prd {
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(
                 charlie_balance,
                 1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
             let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
@@ -399,14 +399,14 @@ fn authorized_correctly_resolves_disputed_market() {
         );
         assert_eq!(market_ids_1.len(), 1);
 
-        if base_asset == Asset::Tru {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+        if base_asset == Asset::Prd {
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(
                 charlie_balance,
                 1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
             let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
@@ -417,14 +417,14 @@ fn authorized_correctly_resolves_disputed_market() {
         let market_after = MarketCommons::market(&0).unwrap();
         assert_eq!(market_after.status, MarketStatus::Disputed);
 
-        if base_asset == Asset::Tru {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+        if base_asset == Asset::Prd {
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(
                 charlie_balance,
                 1_000 * BASE - CENT_BASE - <Runtime as Config>::DisputeBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - <Runtime as Config>::DisputeBond::get());
             let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
@@ -432,14 +432,14 @@ fn authorized_correctly_resolves_disputed_market() {
 
         run_blocks(1);
 
-        if base_asset == Asset::Tru {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+        if base_asset == Asset::Prd {
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(
                 charlie_balance,
                 1_000 * BASE - CENT_BASE + <Runtime as Config>::OracleBond::get()
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE + <Runtime as Config>::OracleBond::get());
             let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE - CENT_BASE);
@@ -450,34 +450,34 @@ fn authorized_correctly_resolves_disputed_market() {
 
         assert_ok!(PredictionMarkets::redeem_shares(RuntimeOrigin::signed(charlie()), 0));
 
-        if base_asset == Asset::Tru {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+        if base_asset == Asset::Prd {
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(
                 charlie_balance,
                 1_000 * BASE + <Runtime as Config>::OracleBond::get() - winning_fee
             );
         } else {
-            let charlie_balance = AssetManager::free_balance(Asset::Tru, &charlie());
+            let charlie_balance = AssetManager::free_balance(Asset::Prd, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE + <Runtime as Config>::OracleBond::get());
             let charlie_balance = AssetManager::free_balance(base_asset, &charlie());
             assert_eq!(charlie_balance, 1_000 * BASE);
         }
-        let charlie_reserved_2 = AssetManager::reserved_balance(Asset::Tru, &charlie());
+        let charlie_reserved_2 = AssetManager::reserved_balance(Asset::Prd, &charlie());
         assert_eq!(charlie_reserved_2, 0);
 
-        let alice_balance = AssetManager::free_balance(Asset::Tru, &alice());
+        let alice_balance = AssetManager::free_balance(Asset::Prd, &alice());
         assert_eq!(alice_balance, 1_000 * BASE - <Runtime as Config>::OracleBond::get());
 
         // bob kinda gets away scot-free since Alice is held responsible
         // for her designated reporter
-        let bob_balance = AssetManager::free_balance(Asset::Tru, &bob());
+        let bob_balance = AssetManager::free_balance(Asset::Prd, &bob());
         assert_eq!(bob_balance, 1_000 * BASE);
 
         assert!(market_after.bonds.creation.unwrap().is_settled);
         assert!(market_after.bonds.oracle.unwrap().is_settled);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -498,7 +498,7 @@ fn it_resolves_a_disputed_court_market() {
         let mut counter = 1000;
         for j in &[juror_0, juror_1, juror_2, juror_3, juror_4, juror_5] {
             let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + counter;
-            assert_ok!(AssetManager::deposit(Asset::Tru, j, amount + SENTINEL_AMOUNT));
+            assert_ok!(AssetManager::deposit(Asset::Prd, j, amount + SENTINEL_AMOUNT));
             assert_ok!(Court::join_court(RuntimeOrigin::signed(*j), amount));
             counter += 1;
         }
@@ -508,7 +508,7 @@ fn it_resolves_a_disputed_court_market() {
             let seed = <Runtime as frame_system::Config>::Hashing::hash_of(&j);
             let juror = get_account_from_seed(seed.into());
             let amount = <Runtime as pallet_pm_court::Config>::MinJurorStake::get() + j as u128;
-            assert_ok!(AssetManager::deposit(Asset::Tru, &juror, amount + SENTINEL_AMOUNT));
+            assert_ok!(AssetManager::deposit(Asset::Prd, &juror, amount + SENTINEL_AMOUNT));
             assert_ok!(Court::join_court(RuntimeOrigin::signed(juror), amount));
         }
 
@@ -735,7 +735,7 @@ fn it_resolves_a_disputed_court_market() {
         assert_eq!(free_juror_2_after, free_juror_2_before + juror_2_share * total_slashed);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {
@@ -818,7 +818,7 @@ fn outsider_reports_wrong_outcome() {
         assert_eq!(Balances::free_balance(dave()), dave_balance_before);
     };
     ExtBuilder::default().build().execute_with(|| {
-        test(Asset::Tru);
+        test(Asset::Prd);
     });
     #[cfg(feature = "parachain")]
     ExtBuilder::default().build().execute_with(|| {

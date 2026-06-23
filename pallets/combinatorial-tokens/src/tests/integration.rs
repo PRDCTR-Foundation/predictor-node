@@ -20,10 +20,10 @@ use super::*;
 #[test]
 fn split_followed_by_merge_vertical_no_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
         let pallet = Account::new(Pallet::<Runtime>::account_id());
 
-        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Prd, MarketType::Categorical(3));
         let partition = vec![vec![B0, B0, B1], vec![B1, B1, B0]];
         let amount = _1;
 
@@ -44,10 +44,10 @@ fn split_followed_by_merge_vertical_no_parent() {
             amount,
             Fuel::new(16, false),
         ));
-        assert_eq!(alice.free_balance(Asset::Tru), _99);
+        assert_eq!(alice.free_balance(Asset::Prd), _99);
         assert_eq!(alice.free_balance(ct_001), _1);
         assert_eq!(alice.free_balance(ct_110), _1);
-        assert_eq!(pallet.free_balance(Asset::Tru), _1);
+        assert_eq!(pallet.free_balance(Asset::Prd), _1);
 
         assert_ok!(CombinatorialTokens::merge_position(
             alice.signed(),
@@ -57,17 +57,17 @@ fn split_followed_by_merge_vertical_no_parent() {
             amount,
             Fuel::new(16, false),
         ));
-        assert_eq!(alice.free_balance(Asset::Tru), _100);
+        assert_eq!(alice.free_balance(Asset::Prd), _100);
         assert_eq!(alice.free_balance(ct_001), 0);
         assert_eq!(alice.free_balance(ct_110), 0);
-        assert_eq!(pallet.free_balance(Asset::Tru), 0);
+        assert_eq!(pallet.free_balance(Asset::Prd), 0);
     });
 }
 
 #[test]
 fn split_followed_by_merge_vertical_with_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
         let pallet = Account::new(Pallet::<Runtime>::account_id());
 
         let ct_001 = CombinatorialToken([
@@ -87,7 +87,7 @@ fn split_followed_by_merge_vertical_with_parent() {
             184, 75, 79, 107, 73, 89, 19, 22, 124, 15, 58, 110, 100,
         ]);
 
-        let parent_market_id = create_market(Asset::Tru, MarketType::Categorical(3));
+        let parent_market_id = create_market(Asset::Prd, MarketType::Categorical(3));
         let parent_amount = _3;
         let parent_partition = vec![vec![B0, B0, B1], vec![B1, B1, B0]];
         assert_ok!(CombinatorialTokens::split_position(
@@ -99,7 +99,7 @@ fn split_followed_by_merge_vertical_with_parent() {
             Fuel::new(16, false),
         ));
 
-        let child_market_id = create_market(Asset::Tru, MarketType::Categorical(4));
+        let child_market_id = create_market(Asset::Prd, MarketType::Categorical(4));
         let child_amount = _1;
         // Collection ID of [0, 0, 1].
         let parent_collection_id = [
@@ -117,10 +117,10 @@ fn split_followed_by_merge_vertical_with_parent() {
         ));
         assert_eq!(alice.free_balance(ct_001), parent_amount - child_amount);
         assert_eq!(alice.free_balance(ct_110), parent_amount);
-        assert_eq!(alice.free_balance(Asset::Tru), _100 - parent_amount);
+        assert_eq!(alice.free_balance(Asset::Prd), _100 - parent_amount);
         assert_eq!(alice.free_balance(ct_001_0101), child_amount);
         assert_eq!(alice.free_balance(ct_001_1010), child_amount);
-        assert_eq!(pallet.free_balance(Asset::Tru), parent_amount);
+        assert_eq!(pallet.free_balance(Asset::Prd), parent_amount);
 
         assert_ok!(CombinatorialTokens::merge_position(
             alice.signed(),
@@ -132,10 +132,10 @@ fn split_followed_by_merge_vertical_with_parent() {
         ));
         assert_eq!(alice.free_balance(ct_001), parent_amount);
         assert_eq!(alice.free_balance(ct_110), parent_amount);
-        assert_eq!(alice.free_balance(Asset::Tru), _100 - parent_amount);
+        assert_eq!(alice.free_balance(Asset::Prd), _100 - parent_amount);
         assert_eq!(alice.free_balance(ct_001_0101), 0);
         assert_eq!(alice.free_balance(ct_001_1010), 0);
-        assert_eq!(pallet.free_balance(Asset::Tru), parent_amount);
+        assert_eq!(pallet.free_balance(Asset::Prd), parent_amount);
 
         assert_ok!(CombinatorialTokens::merge_position(
             alice.signed(),
@@ -147,20 +147,20 @@ fn split_followed_by_merge_vertical_with_parent() {
         ));
         assert_eq!(alice.free_balance(ct_001), 0);
         assert_eq!(alice.free_balance(ct_110), 0);
-        assert_eq!(alice.free_balance(Asset::Tru), _100);
+        assert_eq!(alice.free_balance(Asset::Prd), _100);
         assert_eq!(alice.free_balance(ct_001_0101), 0);
         assert_eq!(alice.free_balance(ct_001_1010), 0);
-        assert_eq!(pallet.free_balance(Asset::Tru), 0);
+        assert_eq!(pallet.free_balance(Asset::Prd), 0);
     });
 }
 
 #[test]
 fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
 
-        let market_0 = create_market(Asset::Tru, MarketType::Categorical(3));
-        let market_1 = create_market(Asset::Tru, MarketType::Categorical(4));
+        let market_0 = create_market(Asset::Prd, MarketType::Categorical(3));
+        let market_1 = create_market(Asset::Prd, MarketType::Categorical(4));
 
         let partition_0 = vec![vec![B0, B0, B1], vec![B1, B1, B0]];
         let partition_1 = vec![vec![B0, B0, B1, B1], vec![B1, B1, B0, B0]];
@@ -256,7 +256,7 @@ fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
         assert_eq!(alice.free_balance(ct_110_1100), _1);
         assert_eq!(alice.free_balance(ct_0011), 0);
         assert_eq!(alice.free_balance(ct_1100), 0);
-        assert_eq!(alice.free_balance(Asset::Tru), _99);
+        assert_eq!(alice.free_balance(Asset::Prd), _99);
 
         // Merge C&(U|V) and (A|B)&(U|V) into U|V.
         assert_ok!(CombinatorialTokens::merge_position(
@@ -276,7 +276,7 @@ fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
         assert_eq!(alice.free_balance(ct_110_1100), 0);
         assert_eq!(alice.free_balance(ct_0011), 0);
         assert_eq!(alice.free_balance(ct_1100), _1);
-        assert_eq!(alice.free_balance(Asset::Tru), _99);
+        assert_eq!(alice.free_balance(Asset::Prd), _99);
 
         // Merge C&(W|X) and (A|B)&(W|X) into W|X.
         assert_ok!(CombinatorialTokens::merge_position(
@@ -296,7 +296,7 @@ fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
         assert_eq!(alice.free_balance(ct_110_1100), 0);
         assert_eq!(alice.free_balance(ct_0011), _1);
         assert_eq!(alice.free_balance(ct_1100), _1);
-        assert_eq!(alice.free_balance(Asset::Tru), _99);
+        assert_eq!(alice.free_balance(Asset::Prd), _99);
 
         // Merge U|V and W|X into ZTG.
         assert_ok!(CombinatorialTokens::merge_position(
@@ -316,7 +316,7 @@ fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
         assert_eq!(alice.free_balance(ct_110_1100), 0);
         assert_eq!(alice.free_balance(ct_0011), 0);
         assert_eq!(alice.free_balance(ct_1100), 0);
-        assert_eq!(alice.free_balance(Asset::Tru), _100);
+        assert_eq!(alice.free_balance(Asset::Prd), _100);
     });
 }
 
@@ -325,9 +325,9 @@ fn split_followed_by_merge_vertical_with_parent_in_opposite_order() {
 #[test]
 fn split_vertical_followed_by_horizontal_split_no_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
 
-        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Prd, MarketType::Categorical(3));
         let amount = _1;
 
         // Split vertically and then horizontally.
@@ -386,11 +386,11 @@ fn split_vertical_followed_by_horizontal_split_no_parent() {
 #[test]
 fn split_vertical_followed_by_horizontal_split_with_parent() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
         let pallet = Account::new(Pallet::<Runtime>::account_id());
 
         // Prepare level 1 token.
-        let parent_market_id = create_market(Asset::Tru, MarketType::Categorical(3));
+        let parent_market_id = create_market(Asset::Prd, MarketType::Categorical(3));
         let parent_amount = _6;
         assert_ok!(CombinatorialTokens::split_position(
             alice.signed(),
@@ -401,7 +401,7 @@ fn split_vertical_followed_by_horizontal_split_with_parent() {
             Fuel::new(16, false),
         ));
 
-        let child_market_id = create_market(Asset::Tru, MarketType::Categorical(4));
+        let child_market_id = create_market(Asset::Prd, MarketType::Categorical(4));
         let child_amount_first_pass = _3;
         // Collection ID of [0, 0, 1].
         let parent_collection_id = [
@@ -458,7 +458,7 @@ fn split_vertical_followed_by_horizontal_split_with_parent() {
         assert_eq!(alice.free_balance(ct_001_1100), 0);
         assert_eq!(alice.free_balance(ct_001_1000), child_amount_first_pass);
         assert_eq!(alice.free_balance(ct_001_0100), child_amount_first_pass);
-        assert_eq!(pallet.free_balance(Asset::Tru), parent_amount);
+        assert_eq!(pallet.free_balance(Asset::Prd), parent_amount);
         assert_eq!(pallet.free_balance(ct_001_1100), 0);
 
         // Split vertically. This should yield the same amount as the two splits above.
@@ -479,7 +479,7 @@ fn split_vertical_followed_by_horizontal_split_with_parent() {
         assert_eq!(alice.free_balance(ct_001_1100), 0);
         assert_eq!(alice.free_balance(ct_001_1000), total_child_amount);
         assert_eq!(alice.free_balance(ct_001_0100), total_child_amount);
-        assert_eq!(pallet.free_balance(Asset::Tru), parent_amount);
+        assert_eq!(pallet.free_balance(Asset::Prd), parent_amount);
         assert_eq!(pallet.free_balance(ct_001_1100), 0);
     });
 }
@@ -487,9 +487,9 @@ fn split_vertical_followed_by_horizontal_split_with_parent() {
 #[test]
 fn split_horizontal_followed_by_merge_horizontal() {
     ExtBuilder::build().execute_with(|| {
-        let alice = Account::new(0).deposit(Asset::Tru, _100).unwrap();
+        let alice = Account::new(0).deposit(Asset::Prd, _100).unwrap();
 
-        let market_id = create_market(Asset::Tru, MarketType::Categorical(3));
+        let market_id = create_market(Asset::Prd, MarketType::Categorical(3));
         let amount = _1;
 
         let ct_001 = CombinatorialToken([
