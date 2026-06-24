@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use super::mock;
 use crate as pallet_pm_eth_asset_registry;
 use crate::{
@@ -190,9 +188,8 @@ fn test_update_metadata_works() {
             Some(new_metadata.additional.clone())
         ));
 
-        let old_eth_address: EthAddress = old_metadata.additional.eth_address().try_into().unwrap();
-        let new_eth_address: EthAddress =
-            new_metadata.additional.eth_address().clone().try_into().unwrap();
+        let old_eth_address: EthAddress = old_metadata.additional.eth_address();
+        let new_eth_address: EthAddress = new_metadata.additional.eth_address();
 
         // check that the old location was removed and the new one added
         assert_eq!(AssetRegistry::eth_address_to_asset_id(old_eth_address), None);

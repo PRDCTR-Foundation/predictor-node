@@ -1,7 +1,5 @@
 //! Mocks for the EthAssetRegistry module.
 
-#![cfg(test)]
-
 use super::*;
 use frame_support::{
     construct_runtime, derive_impl, ord_parameter_types, parameter_types,
@@ -71,7 +69,7 @@ pub struct CustomMetadata {
 
 impl HasEthAddress for CustomMetadata {
     fn eth_address(&self) -> EthAddress {
-        self.eth_address.clone()
+        self.eth_address
     }
 
     fn set_eth_address(&mut self, eth_address: EthAddress) {

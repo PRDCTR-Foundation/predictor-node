@@ -29,7 +29,7 @@ fn on_initialize_skips_the_genesis_block() {
     let end = (blocks * MILLISECS_PER_BLOCK) as u64;
     ExtBuilder::default().build().execute_with(|| {
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

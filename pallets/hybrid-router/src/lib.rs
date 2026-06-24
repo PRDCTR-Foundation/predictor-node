@@ -17,6 +17,10 @@
 
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
+// The transactional macro expands to a self-conversion on the dispatch result
+// that clippy flags as useless_conversion against macro-generated code - a false
+// positive, not a real conversion.
+#![allow(clippy::useless_conversion)]
 
 extern crate alloc;
 

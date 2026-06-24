@@ -207,7 +207,7 @@ impl<T: Config> Pallet<T> {
         metadata: AssetMetadata<T::Balance, T::CustomMetadata, T::StringLimit>,
         maybe_asset_id: Option<T::AssetId>,
     ) -> DispatchResult {
-        ensure!(eth_address != H160::zero().into(), Error::<T>::EthAddressIsMandatory);
+        ensure!(eth_address != H160::zero(), Error::<T>::EthAddressIsMandatory);
 
         let (asset_id, metadata) = T::AssetProcessor::pre_register(maybe_asset_id, metadata)?;
 
@@ -272,10 +272,10 @@ impl<T: Config> Pallet<T> {
             if let Some(eth_address) = eth_address {
                 Self::do_update_eth_address(
                     asset_id.clone(),
-                    metadata.additional.eth_address().clone().into(),
-                    eth_address.clone(),
+                    metadata.additional.eth_address(),
+                    eth_address,
                 )?;
-                metadata.additional.set_eth_address(eth_address.into());
+                metadata.additional.set_eth_address(eth_address);
             }
 
             if let Some(existential_deposit) = existential_deposit {
@@ -305,8 +305,7 @@ impl<T: Config> Pallet<T> {
     }
 
     pub fn fetch_eth_address_by_asset_id(asset_id: &T::AssetId) -> Option<EthAddress> {
-        Metadata::<T>::get(asset_id)
-            .and_then(|metadata| Some(metadata.additional.eth_address().into()))
+        Metadata::<T>::get(asset_id).map(|metadata| metadata.additional.eth_address())
     }
 
     fn do_insert_eth_address_mapping(
@@ -356,7 +355,7 @@ impl<T: Config> InspectEthAsset for Pallet<T> {
     fn metadata_by_eth_address(
         eth_address: &EthAddress,
     ) -> Option<AssetMetadata<Self::Balance, Self::CustomMetadata, Self::StringLimit>> {
-        Pallet::<T>::fetch_metadata_by_eth_address(&eth_address)
+        Pallet::<T>::fetch_metadata_by_eth_address(eth_address)
     }
 
     fn eth_address_by_asset_id(asset_id: &Self::AssetId) -> Option<EthAddress> {

@@ -92,7 +92,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -142,7 +142,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -193,7 +193,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -245,7 +245,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_approved_advised_ma
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -301,7 +301,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -356,7 +356,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_advised_approved_ma
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -412,7 +412,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -479,7 +479,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_advised_approved_ma
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -545,7 +545,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_advised_approved_ma
 fn trusted_market_complete_lifecycle() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -598,7 +598,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -645,7 +645,7 @@ fn on_resolution_correctly_reserves_and_unreserves_bonds_for_permissionless_mark
     let test = |base_asset: AssetOf<Runtime>| {
         reserve_sentinel_amounts();
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,

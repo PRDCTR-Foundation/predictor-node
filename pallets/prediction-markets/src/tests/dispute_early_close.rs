@@ -55,7 +55,7 @@ fn dispute_early_close_emits_event() {
 fn dispute_early_close_from_market_creator_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -132,7 +132,7 @@ fn dispute_early_close_from_market_creator_works() {
 fn dispute_early_close_fails_if_scheduled_as_sudo() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -166,7 +166,7 @@ fn dispute_early_close_fails_if_scheduled_as_sudo() {
 fn dispute_early_close_fails_if_already_disputed() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -207,7 +207,7 @@ fn dispute_early_close_fails_if_already_disputed() {
 fn dispute_early_close_fails_if_already_rejected() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -253,7 +253,7 @@ fn dispute_early_close_fails_if_already_rejected() {
 fn settles_early_close_bonds_with_resolution_in_state_disputed() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -319,7 +319,7 @@ fn settles_early_close_bonds_with_resolution_in_state_disputed() {
 fn settles_early_close_bonds_with_resolution_in_state_scheduled_as_market_creator() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -368,7 +368,7 @@ fn schedule_early_close_disputed_sudo_schedule_and_settle_bonds() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
         let old_period = MarketPeriod::Block(0..end);
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

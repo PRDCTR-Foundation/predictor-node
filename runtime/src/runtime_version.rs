@@ -9,7 +9,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("predictor-runtime"),
     impl_name: create_runtime_str!("predictor-runtime"),
     authoring_version: 1,
-    spec_version: 01_00_02_00,
+    spec_version: 1_00_02_00,
     impl_version: 1,
     apis: apis::RUNTIME_API_VERSIONS,
     transaction_version: 1,

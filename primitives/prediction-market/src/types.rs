@@ -143,7 +143,7 @@ pub struct CustomMetadata {
 
 impl HasEthAddress for CustomMetadata {
     fn eth_address(&self) -> EthAddress {
-        self.eth_address.clone()
+        self.eth_address
     }
 
     fn set_eth_address(&mut self, eth_address: EthAddress) {

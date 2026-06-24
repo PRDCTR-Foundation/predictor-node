@@ -36,7 +36,7 @@ impl FromHexStr for Fq {
         let hex_str_sans_prefix = &hex_str[2..];
 
         // Pad with zeroes on the left.
-        let hex_str_padded = format!("{:0>64}", hex_str_sans_prefix);
+        let hex_str_padded = format!("{hex_str_sans_prefix:0>64}");
 
         let bytes: Vec<u8> = (0..hex_str_padded.len())
             .step_by(2)

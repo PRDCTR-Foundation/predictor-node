@@ -42,7 +42,7 @@ fn join_works(
             swap_fee,
         );
         // Alice should be a LP because she deployed a pool
-        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &alice()), true);
+        assert!(PredictionMarkets::is_liquidity_provider(&market_id, &alice()));
 
         let pool_shares_amount = _4; // Add 40% to the pool.
         deposit_complete_set(market_id, who, pool_shares_amount);
@@ -75,7 +75,7 @@ fn join_works(
             .into(),
         );
 
-        assert_eq!(PredictionMarkets::is_liquidity_provider(&market_id, &who), true);
+        assert!(PredictionMarkets::is_liquidity_provider(&market_id, &who));
     });
 }
 

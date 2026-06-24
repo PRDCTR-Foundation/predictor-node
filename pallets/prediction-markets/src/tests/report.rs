@@ -136,7 +136,7 @@ fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duratio
 #[test]
 fn it_allows_only_oracle_to_report_the_outcome_of_a_market_during_oracle_duration_moment() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -297,7 +297,7 @@ fn it_allows_anyone_to_report_an_unreported_market() {
 #[test]
 fn report_fails_on_market_state_proposed() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -325,7 +325,7 @@ fn report_fails_on_market_state_proposed() {
 #[test]
 fn report_fails_on_market_state_closed_for_advised_market() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -353,7 +353,7 @@ fn report_fails_on_market_state_closed_for_advised_market() {
 #[test]
 fn report_fails_on_market_state_active() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -381,7 +381,7 @@ fn report_fails_on_market_state_active() {
 #[test]
 fn report_fails_on_market_state_resolved() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -413,7 +413,7 @@ fn report_fails_on_market_state_resolved() {
 #[test]
 fn report_fails_if_reporter_is_not_the_oracle() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

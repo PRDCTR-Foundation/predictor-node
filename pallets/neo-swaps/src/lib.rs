@@ -17,6 +17,10 @@
 
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
+// The transactional macro expands to a self-conversion on the dispatch result
+// that clippy flags as useless_conversion against macro-generated code - a false
+// positive, not a real conversion.
+#![allow(clippy::useless_conversion)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::type_complexity)]
 
@@ -242,7 +246,7 @@ mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            AdditionalSwapFee::<T>::set(Some(self.additional_swap_fee.clone()));
+            AdditionalSwapFee::<T>::set(Some(self.additional_swap_fee));
         }
     }
 
@@ -1728,11 +1732,11 @@ mod pallet {
         }
 
         pub fn early_exit_account() -> Result<T::AccountId, Error<T>> {
-            Ok(<EarlyExitFeeAccount<T>>::get().ok_or(Error::<T>::EarlyExitFeeAccountNotSet)?)
+            <EarlyExitFeeAccount<T>>::get().ok_or(Error::<T>::EarlyExitFeeAccountNotSet)
         }
 
         pub fn additional_swap_fee() -> Result<BalanceOf<T>, Error<T>> {
-            Ok(<AdditionalSwapFee<T>>::get().ok_or(Error::<T>::AdditionalSwapFeeNotSet)?)
+            <AdditionalSwapFee<T>>::get().ok_or(Error::<T>::AdditionalSwapFeeNotSet)
         }
 
         /// Distribute swap fees and external fees and returns the remaining amount.

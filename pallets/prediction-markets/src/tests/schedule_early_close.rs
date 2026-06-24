@@ -67,7 +67,7 @@ fn schedule_early_close_emits_event() {
 fn sudo_schedule_early_close_at_block_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -140,7 +140,7 @@ fn sudo_schedule_early_close_at_timeframe_works() {
         let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
 
         let end = start + (42 * MILLISECS_PER_BLOCK) as u64;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -213,7 +213,7 @@ fn sudo_schedule_early_close_at_timeframe_works() {
 fn schedule_early_close_block_fails_if_early_close_request_too_late() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -246,7 +246,7 @@ fn schedule_early_close_timestamp_fails_if_early_close_request_too_late() {
         run_blocks(start_block);
         let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
         let end = start + (42 * MILLISECS_PER_BLOCK as u64);
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -276,7 +276,7 @@ fn schedule_early_close_timestamp_fails_if_early_close_request_too_late() {
 fn schedule_early_close_as_market_creator_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
