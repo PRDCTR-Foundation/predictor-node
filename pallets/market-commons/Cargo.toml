@@ -2,7 +2,10 @@
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 log = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-arithmetic = { workspace = true }
 sp-runtime = { workspace = true }
@@ -14,22 +17,23 @@ pallet-balances = { workspace = true, features = ["default"] }
 pallet-timestamp = { workspace = true, features = ["default"] }
 sp-io = { workspace = true, features = ["default"] }
 test-case = { workspace = true }
-prediction-market-primitives = { workspace = true, features = ["mock", "default"] }
+prediction-market-primitives = { workspace = true, features = [
+  "mock",
+  "default",
+] }
 common-primitives = { workspace = true }
 
 [features]
 default = ["std"]
 std = [
-    "frame-support/std",
-    "frame-system/std",
-    "parity-scale-codec/std",
-    "sp-arithmetic/std",
-    "sp-runtime/std",
-    "prediction-market-primitives/std",
+  "frame-support/std",
+  "frame-system/std",
+  "parity-scale-codec/std",
+  "sp-arithmetic/std",
+  "sp-runtime/std",
+  "prediction-market-primitives/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true

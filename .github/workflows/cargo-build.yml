@@ -10,6 +10,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Strip debug symbols to keep the heavy release build within the runner's
+  # disk budget (same exhaustion that broke the runtime-benchmarks tests).
+  RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
   production:
@@ -20,6 +23,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          large-packages: false
 
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
