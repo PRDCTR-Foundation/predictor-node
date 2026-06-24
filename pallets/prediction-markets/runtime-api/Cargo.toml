@@ -1,14 +1,17 @@
 [dependencies]
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 sp-api = { workspace = true }
 prediction-market-primitives = { workspace = true }
 
 [features]
 default = ["std"]
 std = [
-    "parity-scale-codec/std",
-    "sp-api/std",
-    "prediction-market-primitives/std",
+  "parity-scale-codec/std",
+  "sp-api/std",
+  "prediction-market-primitives/std",
 ]
 
 [package]
@@ -16,4 +19,3 @@ authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets-runtime-api"
 version.workspace = true
-
