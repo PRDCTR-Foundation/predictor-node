@@ -52,15 +52,19 @@ jobs:
         if: ${{ steps.release-pr.outputs.branch != '' }}
         run: cargo update --workspace --offline
 
-      - name: Commit Cargo.lock
+      - name: Update runtime spec version
+        if: ${{ steps.release-pr.outputs.branch != '' }}
+        run: .github/scripts/update-runtime-version.sh
+
+      - name: Commit generated release files
         if: ${{ steps.release-pr.outputs.branch != '' }}
         run: |
-          if git diff --quiet Cargo.lock; then
+          if git diff --quiet Cargo.lock runtime/src/runtime_version.rs runtime/src/runtime_version.rs.template; then
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          git commit -m "chore: update Cargo.lock for release"
+          git add Cargo.lock runtime/src/runtime_version.rs runtime/src/runtime_version.rs.template
+          git commit -m "chore: update generated release files"
           git push
