@@ -12,7 +12,7 @@ pub(crate) fn prd_chain_properties() -> sc_chain_spec::Properties {
     // Give your base currency a unit name and decimal places
     let mut properties = sc_chain_spec::Properties::new();
     properties.insert("tokenSymbol".into(), "PRD".into());
-    properties.insert("tokenDecimals".into(), 18.into());
+    properties.insert("tokenDecimals".into(), 10.into());
     // TODO: Determine which address prefix to use. Using default for now
     properties.insert("ss58Format".into(), 42.into());
     return properties
