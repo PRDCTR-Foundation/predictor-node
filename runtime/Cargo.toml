@@ -105,6 +105,7 @@ substrate-wasm-builder = { optional = true, workspace = true, default-features =
 
 [features]
 default = ["std"]
+enable-static-presents = []
 std = [
   "parity-scale-codec/std",
   "scale-info/std",
