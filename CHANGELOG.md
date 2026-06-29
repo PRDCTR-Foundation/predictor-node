@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.2...v1.1.0) (2026-06-29)
+
+
+### Features
+
+* make testnet a static config by default ([b4efe7c](https://github.com/Predictor-Foundation/predictor-node/commit/b4efe7ccae3677bf5ed0a565643cb80db6bdbf69))
+
+
+### Bug Fixes
+
+* Align token decimals to PRD ([f5aba62](https://github.com/Predictor-Foundation/predictor-node/commit/f5aba62496218f7955cf86c7e5c84a5648c2c4fb))
+* set existential deposit to 0 ([82e6592](https://github.com/Predictor-Foundation/predictor-node/commit/82e6592978440dee9bb3491257850c90bacfcb2e))
+
 ## [1.0.2](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.1...v1.0.2) (2026-06-18)
 
 
