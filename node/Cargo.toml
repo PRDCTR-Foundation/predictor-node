@@ -105,6 +105,7 @@ substrate-build-script-utils.default-features = true
 
 [features]
 default = ["std"]
+enable-static-presents = ["predictor-runtime/enable-static-presents"]
 std = ["predictor-runtime/std"]
 # Dependencies that are only required if runtime benchmarking should be build.
 runtime-benchmarks = [
