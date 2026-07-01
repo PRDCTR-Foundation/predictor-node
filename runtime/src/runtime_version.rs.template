@@ -1,11 +1,3 @@
-use crate::apis;
-use sp_runtime::create_runtime_str;
-use sp_version::{self, RuntimeVersion};
-
-// This file is managed by CI. Change `runtime/src/runtime_version.rs.template`
-// for persistent changes.
-// To learn more about runtime versioning, see:
-// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("predictor-runtime"),
