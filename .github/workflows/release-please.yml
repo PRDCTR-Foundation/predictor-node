@@ -29,7 +29,8 @@ jobs:
       - name: Find open release PR
         id: release-pr
         run: |
-          branch="$(gh pr list --state open --label "autorelease: pending" \
+          branch="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+            --label "autorelease: pending" \
             --json headRefName --jq '.[0].headRefName // empty')"
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
         env:
