@@ -26,21 +26,15 @@ jobs:
           manifest-file: .release-please-manifest.json
           target-branch: ${{ github.event.inputs.target_branch || github.ref_name }}
 
-      - id: release-pr
-        name: Resolve release PR branch
-        if: ${{ steps.release.outputs.pr != '' }}
-        uses: actions/github-script@v7
+      - name: Find open release PR
+        id: release-pr
+        run: |
+          branch="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+            --label "autorelease: pending" \
+            --json headRefName --jq '.[0].headRefName // empty')"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
         env:
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
-        with:
-          script: |
-            const pr = JSON.parse(process.env.RELEASE_PR);
-            const branch = pr.headBranchName || pr.headRefName || pr.head?.ref;
-            if (!branch) {
-              core.setFailed(`Could not find release PR branch in: ${process.env.RELEASE_PR}`);
-              return;
-            }
-            core.setOutput('branch', branch);
+          GH_TOKEN: ${{ github.token }}
 
       - name: Checkout release PR
         if: ${{ steps.release-pr.outputs.branch != '' }}
@@ -50,21 +44,17 @@ jobs:
 
       - name: Update Cargo.lock
         if: ${{ steps.release-pr.outputs.branch != '' }}
-        run: cargo update --workspace --offline
+        run: cargo update --workspace
 
-      - name: Update runtime spec version
-        if: ${{ steps.release-pr.outputs.branch != '' }}
-        run: .github/scripts/update-runtime-version.sh
-
-      - name: Commit generated release files
+      - name: Commit updated Cargo.lock
         if: ${{ steps.release-pr.outputs.branch != '' }}
         run: |
-          if git diff --quiet Cargo.lock runtime/src/runtime_version.rs runtime/src/runtime_version.rs.template; then
+          if git diff --quiet Cargo.lock; then
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock runtime/src/runtime_version.rs runtime/src/runtime_version.rs.template
-          git commit -m "chore: update generated release files"
+          git add Cargo.lock
+          git commit -m "chore: update Cargo.lock"
           git push
