@@ -1,28 +1,13 @@
 // Copyright 2026 Aventus DAO Ltd
 
 use crate::*;
-use frame_support::traits::Get;
-use sp_runtime::{FixedPointNumber, FixedU128, Saturating};
+use sp_runtime::Saturating;
 // This is used to scale a single heartbeat so we can preserve precision when applying the reward
 // weight.
 pub const HEARTBEAT_BASE_WEIGHT: u128 = 100_000_000;
 pub type Duration = u64;
 pub type RewardPeriodIndex = u64;
-
-/// Local mirror of sp_avn_common's TotalSupplyUpdatedData. Lives here while
-/// the published sp_avn_common on the consumed branch lacks it; the pallet
-/// only needs the struct shape, not the EventData wiring.
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
-pub struct TotalSupplyUpdatedData {
-    pub amount: u128,
-    pub t2_tx_id: u32,
-}
-
-impl TotalSupplyUpdatedData {
-    pub fn is_valid(&self) -> bool {
-        self.amount > 0u128
-    }
-}
+pub const SECONDS_PER_WEEK: Duration = 7 * 24 * 60 * 60;
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 /// The current era index and transition information
@@ -112,25 +97,26 @@ pub struct RewardPotInfo<Balance> {
     pub uptime_threshold: u32,
     /// The last timestamp of the previous reward period, used to calculate genesis bonus
     pub reward_end_time: Duration,
+    /// `true` when the rollover treasury transfer for this period failed, so the
+    /// snapshot exists with `total_reward == 0` and is awaiting recovery via
+    /// `top_up_reward_pot`. Distinguishes a recoverable failed-funding period
+    /// from a legitimately zero-reward period (which the drain may skip).
+    pub funding_failed: bool,
 }
 
 impl<Balance: Copy> RewardPotInfo<Balance> {
-    pub fn new(total_reward: Balance, uptime_threshold: u32, reward_end_time: Duration) -> Self {
-        RewardPotInfo { total_reward, uptime_threshold, reward_end_time }
+    pub fn new(
+        total_reward: Balance,
+        uptime_threshold: u32,
+        reward_end_time: Duration,
+        funding_failed: bool,
+    ) -> Self {
+        RewardPotInfo { total_reward, uptime_threshold, reward_end_time, funding_failed }
     }
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct UptimeInfo<BlockNumber> {
     /// Number of uptime reported
@@ -147,17 +133,7 @@ impl<BlockNumber: Copy> UptimeInfo<BlockNumber> {
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct PaymentPointer<AccountId> {
     pub period_index: RewardPeriodIndex,
     pub node: AccountId,
@@ -174,17 +150,7 @@ impl<AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo> PaymentPointer<Acc
     }
 }
 
-#[derive(
-    Encode,
-    Decode,
-    Default,
-    Clone,
-    PartialEq,
-    Debug,
-    Eq,
-    TypeInfo,
-    MaxEncodedLen,
-)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct NodeInfo<SignerId, AccountId> {
     /// The node owner
     pub owner: AccountId,
@@ -215,25 +181,50 @@ pub enum AdminConfig<AccountId, Balance> {
     BatchSize(u32),
     NextHeartbeatPeriod(u32),
     NextRewardAmountPerPeriod(Balance),
-    NumPeriodsToMint(u32),
     RewardEnabled(bool),
     MinUptimeThreshold(Perbill),
-    RewardFee(Perbill),
-    GenesisBonus50(BonusRange),
-    GenesisBonus25(BonusRange),
+    LockSchedule(LockScheduleInfo),
+    ForfeitureDestination(AccountId),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+/// The single global reward-lock window. Rewards paid out while the window is
+/// active accumulate in `LockedRewards` instead of the owner's free balance;
+/// withdrawing early forfeits a percentage that decays by 1% per elapsed week
+/// (52% in week one -> 0% from week 53 on, mirroring the T1 migration-claim
+/// schedule). Once the penalty reaches zero the lock is expired and payouts
+/// credit free balance directly again.
+pub struct LockScheduleInfo {
+    /// Window anchor as a unix timestamp in seconds (the migration
+    /// "Global Start Date"). A start in the future charges the week-one rate.
+    pub start: Duration,
+    /// Forfeiture percentage during the first week (52 per the proposal).
+    pub initial_penalty_percent: u32,
+}
+
+impl LockScheduleInfo {
+    pub fn new(start: Duration, initial_penalty_percent: u32) -> Self {
+        LockScheduleInfo { start, initial_penalty_percent }
+    }
+
+    /// Forfeiture rate for a withdrawal happening at `now` (unix seconds).
+    /// Decays by one percentage point per full week elapsed since `start`.
+    pub fn penalty_at(&self, now: Duration) -> Perbill {
+        let elapsed_weeks = now.saturating_sub(self.start) / SECONDS_PER_WEEK;
+        let percent = self
+            .initial_penalty_percent
+            .saturating_sub(elapsed_weeks.min(u32::MAX as u64) as u32);
+        Perbill::from_percent(percent)
+    }
+
+    /// The lock no longer withholds anything once the penalty hits zero.
+    pub fn is_expired(&self, now: Duration) -> bool {
+        self.penalty_at(now).is_zero()
+    }
 }
 
 #[derive(
-    Copy,
-    Clone,
-    PartialEq,
-    Default,
-    Eq,
-    Encode,
-    Decode,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
+    Copy, Clone, PartialEq, Default, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen,
 )]
 pub struct TotalUptimeInfo {
     /// Total number of uptime reported for reward period
@@ -245,67 +236,5 @@ pub struct TotalUptimeInfo {
 impl TotalUptimeInfo {
     pub fn new(total_heartbeats: u64, total_weight: u128) -> TotalUptimeInfo {
         TotalUptimeInfo { total_heartbeats, total_weight }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RewardWeight {
-    pub genesis_bonus: FixedU128,
-    pub stake_multiplier: FixedU128,
-}
-
-impl RewardWeight {
-    pub fn to_heartbeat_weight(&self) -> u128 {
-        let scaled_stake_weight = self.stake_multiplier.saturating_mul_int(HEARTBEAT_BASE_WEIGHT);
-        // apply the bonus last to preserve precision.
-        self.genesis_bonus.saturating_mul_int(scaled_stake_weight)
-    }
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct PendingMintRequest<Balance> {
-    pub tx_id: EthereumId,
-    pub amount: Balance,
-    pub bridge_confirmed: bool,
-    pub credit_received: bool,
-}
-
-#[derive(
-    Encode,
-    Decode,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    RuntimeDebug,
-    TypeInfo,
-    MaxEncodedLen,
-)]
-pub struct BonusRange {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl BonusRange {
-    pub fn new(start: u32, end: u32) -> Self {
-        BonusRange { start, end }
-    }
-
-    pub fn contains(&self, n: &u32) -> bool {
-        *n >= self.start && *n <= self.end
-    }
-}
-
-pub struct DefaultGenesisBonus50;
-impl Get<BonusRange> for DefaultGenesisBonus50 {
-    fn get() -> BonusRange {
-        BonusRange::new(3001, 6000)
-    }
-}
-
-pub struct DefaultGenesisBonus25;
-impl Get<BonusRange> for DefaultGenesisBonus25 {
-    fn get() -> BonusRange {
-        BonusRange::new(6001, 11000)
     }
 }

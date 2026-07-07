@@ -1,29 +1,24 @@
 // Copyright 2026 Aventus DAO.
 
-#![cfg(test)]
-
 use crate::{self as pallet_node_manager, *};
-use parity_scale_codec::Decode;
-pub use parity_scale_codec::alloc::sync::Arc;
 use frame_support::{derive_impl, parameter_types, weights::Weight, PalletId};
 use frame_system as system;
 use pallet_session as session;
+pub use parity_scale_codec::alloc::sync::Arc;
+use parity_scale_codec::Decode;
 pub use parking_lot::RwLock;
-pub use sp_avn_common::event_types::EthEventId;
 pub use sp_core::{
     offchain::{
-        testing::{
-            OffchainState, PendingRequest, PoolState, TestOffchainExt, TestTransactionPoolExt,
-        },
+        testing::{OffchainState, PoolState, TestOffchainExt, TestTransactionPoolExt},
         OffchainDbExt, OffchainWorkerExt, TransactionPoolExt,
     },
-    sr25519, Pair, H160,
+    sr25519, Pair,
 };
 use sp_keystore::{testing::MemoryKeystore, KeystoreExt};
 pub use sp_runtime::{
     testing::{TestXt, UintAuthorityId},
     traits::{ConvertInto, IdentityLookup, Verify},
-    BuildStorage, DispatchError, Perbill,
+    BuildStorage, Perbill,
 };
 use sp_state_machine::BasicExternalities;
 use std::cell::RefCell;
@@ -32,8 +27,8 @@ pub type Signature = sr25519::Signature;
 pub type AccountId = <Signature as Verify>::Signer;
 pub type Extrinsic = TestXt<RuntimeCall, ()>;
 
-/// Native token unit used for mock balances. Mirrors `runtime/common::constants::currency::AVT`.
-pub const AVT: u128 = 1_000_000_000_000_000_000;
+/// One whole PRD in base units. PRD has 10 decimals, so 1 PRD = 10^10.
+pub const PRD: u128 = 10_000_000_000;
 
 #[derive(Clone)]
 pub struct TestAccount {
@@ -70,51 +65,32 @@ frame_support::construct_runtime!(
 
 parameter_types! {
     pub const RewardPotId: PalletId = PalletId(*b"avtnodes");
-    pub const BonusNodeSerialStart: u32 = 20_000;
+    pub TreasurySource: AccountId = treasury_account();
+    /// Small interval so tests can observe halving on a tight budget.
+    pub const HalvingInterval: u64 = 1_000;
+    /// Defaults to OFF; tests flip via set_halving_enabled.
+    pub const HalvingEnabledAtGenesis: bool = false;
+    pub const MaxNodesPerAggregateHeartbeat: u32 = 1024;
+    /// Production value (30k per the hard-fork proposal). Cap tests set
+    /// `TotalRegisteredNodes` storage directly instead of mass-registering.
+    pub const MaxRegisteredNodes: u32 = 30_000;
+    /// Small recovery window so tests can drive both the "still recoverable"
+    /// and the "abandoned after the window" branches of the failed-funding
+    /// drain handling without rolling thousands of periods.
+    pub const MaxFailedFundingRecoveryPeriods: u64 = 5;
 }
 
-pub struct TestBridgeInterface;
-impl pallet_avn::BridgeInterface for TestBridgeInterface {
-    fn publish(
-        _function_name: &[u8],
-        _params: &[(Vec<u8>, Vec<u8>)],
-        _caller_id: Vec<u8>,
-    ) -> Result<u32, sp_runtime::DispatchError> {
-        Ok(1u32.into())
-    }
-
-    fn generate_lower_proof(
-        _lower_id: u32,
-        _params: &[u8; 116],
-        _caller_id: Vec<u8>,
-    ) -> Result<(), DispatchError> {
-        Ok(())
-    }
-
-    fn read_bridge_contract(
-        _contract: Vec<u8>,
-        _function_name: &[u8],
-        _params: &[(Vec<u8>, Vec<u8>)],
-        _at_block: Option<u32>,
-    ) -> Result<Vec<u8>, DispatchError> {
-        Ok(Vec::new())
-    }
-
-    fn latest_finalised_ethereum_block() -> Result<u32, DispatchError> {
-        Ok(1u32)
-    }
+/// A pseudo-treasury account used as the funding source for the reward pot in
+/// the mock. Funded in genesis with a large balance so every reward-period
+/// rollover can succeed by default; tests that need an "underfunded" treasury
+/// drain it via `Balances::make_free_balance_be`.
+pub fn treasury_account() -> AccountId {
+    TestAccount::new([23u8; 32]).account_id()
 }
 
-pub struct TestProcessedEventsChecker;
-
-impl pallet_avn::ProcessedEventsChecker for TestProcessedEventsChecker {
-    fn processed_event_exists(_event_id: &sp_avn_common::event_types::EthEventId) -> bool {
-        true
-    }
-    fn add_processed_event(_event_id: &EthEventId, _accepted: bool) -> Result<(), ()> {
-        Ok(())
-    }
-}
+/// Default treasury balance available in mock genesis (covers thousands of
+/// rollovers at the default reward_amount_per_period).
+pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * PRD;
 
 impl Config for TestRuntime {
     type RuntimeEvent = RuntimeEvent;
@@ -124,14 +100,15 @@ impl Config for TestRuntime {
     type Public = AccountId;
     type Signature = Signature;
     type RewardPotId = RewardPotId;
+    type TreasurySource = TreasurySource;
+    type HalvingInterval = HalvingInterval;
+    type HalvingEnabledAtGenesis = HalvingEnabledAtGenesis;
+    type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
+    type MaxRegisteredNodes = MaxRegisteredNodes;
+    type MaxFailedFundingRecoveryPeriods = MaxFailedFundingRecoveryPeriods;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
-    type Token = H160;
-    type RewardFeeHandler = Self;
     type WeightInfo = ();
-    type BridgeInterface = TestBridgeInterface;
-    type ProcessedEventsChecker = TestProcessedEventsChecker;
-    type BonusNodeSerialStart = BonusNodeSerialStart;
 }
 
 parameter_types! {
@@ -170,7 +147,7 @@ where
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024 as u64, 0);
+    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024_u64, 0);
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
     pub const ChallengePeriod: u64 = 2;
@@ -193,8 +170,22 @@ impl pallet_avn::Config for TestRuntime {
     type WeightInfo = ();
 }
 
-parameter_types! {
-    pub const ExistentialDeposit: u64 = 0u64;
+thread_local! {
+    static EXISTENTIAL_DEPOSIT: RefCell<u128> = const { RefCell::new(0) };
+}
+
+/// Existential deposit is thread-local so individual tests can exercise the
+/// `ED > 0` reaping behaviour (e.g. reward-pot reclaim) while the suite default
+/// stays zero.
+pub struct ExistentialDeposit;
+impl frame_support::traits::Get<u128> for ExistentialDeposit {
+    fn get() -> u128 {
+        EXISTENTIAL_DEPOSIT.with(|v| *v.borrow())
+    }
+}
+
+pub(crate) fn set_existential_deposit(ed: u128) {
+    EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = ed);
 }
 
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig as pallet_balances::DefaultConfig)]
@@ -236,10 +227,20 @@ pub struct ExtBuilder {
 
 impl ExtBuilder {
     pub fn build_default() -> Self {
-        let storage = frame_system::GenesisConfig::<TestRuntime>::default()
-            .build_storage()
-            .unwrap()
-            .into();
+        // Reset the thread-local existential deposit so a prior test on this
+        // thread that raised it cannot leak into the next one.
+        set_existential_deposit(0);
+
+        let mut storage: sp_runtime::Storage =
+            frame_system::GenesisConfig::<TestRuntime>::default().build_storage().unwrap();
+
+        // Pre-fund the treasury source so reward-period rollover transfers
+        // succeed by default. Tests can drain or override this balance to
+        // exercise the funding-failure path.
+        let _ = pallet_balances::GenesisConfig::<TestRuntime> {
+            balances: vec![(treasury_account(), TREASURY_GENESIS_BALANCE)],
+        }
+        .assimilate_storage(&mut storage);
 
         Self {
             storage,
@@ -253,13 +254,11 @@ impl ExtBuilder {
 
     pub fn with_genesis_config(mut self) -> Self {
         let _ = pallet_node_manager::GenesisConfig::<TestRuntime> {
-            _phantom: Default::default(),
             reward_period: 200u32,
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
-            reward_amount_per_period: 20 * AVT,
-            num_periods_to_mint: 3,
-            reward_fee_percentage: Perbill::from_percent(0),
+            reward_amount_per_period: 20 * PRD,
+            ..Default::default()
         }
         .assimilate_storage(&mut self.storage);
         self
@@ -269,7 +268,7 @@ impl ExtBuilder {
         let authors: Vec<AccountId> = AUTHORS.with(|l| l.borrow_mut().take().unwrap());
 
         BasicExternalities::execute_with_storage(&mut self.storage, || {
-            for ref k in &authors {
+            for k in &authors {
                 frame_system::Pallet::<TestRuntime>::inc_providers(k);
             }
         });
@@ -298,6 +297,7 @@ impl ExtBuilder {
         self
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn as_externality(self) -> sp_io::TestExternalities {
         let keystore = MemoryKeystore::new();
 
@@ -312,6 +312,7 @@ impl ExtBuilder {
         ext
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn as_externality_with_state(
         self,
     ) -> (sp_io::TestExternalities, Arc<RwLock<PoolState>>, Arc<RwLock<OffchainState>>) {
@@ -331,6 +332,37 @@ impl ExtBuilder {
     }
 }
 
+/// Advance the mock clock by whole weeks (the lock-penalty granularity).
+pub(crate) fn advance_time_weeks(weeks: u64) {
+    let now_ms = Timestamp::get();
+    Timestamp::set_timestamp(now_ms + weeks * crate::types::SECONDS_PER_WEEK * 1_000);
+}
+
+/// Set the global lock window anchored `weeks_ago` full weeks before the
+/// current mock time. With the default 52% week-one penalty, `weeks_ago = 0`
+/// is the week-one rate and `weeks_ago >= 52` is fully decayed (expired).
+/// The mock clock starts near zero, so the clock is first advanced far enough
+/// that the anchor doesn't saturate at zero.
+pub(crate) fn set_lock_schedule(weeks_ago: u64, initial_penalty_percent: u32) {
+    let needed_ms = weeks_ago * crate::types::SECONDS_PER_WEEK * 1_000;
+    if Timestamp::get() < needed_ms {
+        Timestamp::set_timestamp(needed_ms);
+    }
+    let now = NodeManager::time_now_sec();
+    let start = now.saturating_sub(weeks_ago * crate::types::SECONDS_PER_WEEK);
+    LockSchedule::<TestRuntime>::put(crate::types::LockScheduleInfo::new(
+        start,
+        initial_penalty_percent,
+    ));
+}
+
+/// Expired lock window: the penalty has decayed to zero, so reward payouts
+/// credit free balance directly (the pre-lock behaviour most existing tests
+/// assert).
+pub(crate) fn expire_lock_schedule() {
+    set_lock_schedule(52, 52);
+}
+
 /// Rolls desired block number of times.
 pub(crate) fn roll_forward(num_blocks_to_roll: u64) {
     let mut current_block = System::block_number();
@@ -340,6 +372,22 @@ pub(crate) fn roll_forward(num_blocks_to_roll: u64) {
     }
 }
 
+thread_local! {
+    /// Idle weight budget handed to `NodeManager::on_idle` from `roll_one_block`,
+    /// mirroring the executive handing leftover block weight to the hook.
+    /// Defaults to zero so existing tests that drive the drain explicitly are
+    /// unaffected; tests exercising the production `on_initialize` -> `on_idle`
+    /// sequencing set a real budget via `set_idle_drain_weight`.
+    static IDLE_DRAIN_WEIGHT: RefCell<Weight> = const { RefCell::new(Weight::zero()) };
+}
+
+/// Set the idle weight budget that `roll_one_block` feeds to `on_idle`, so a
+/// test can have the drain run as it would in production at the end of each
+/// block. Pass `Weight::zero()` to restore the default no-op behaviour.
+pub(crate) fn set_idle_drain_weight(weight: Weight) {
+    IDLE_DRAIN_WEIGHT.with(|w| *w.borrow_mut() = weight);
+}
+
 pub(crate) fn roll_one_block() -> u64 {
     Balances::on_finalize(System::block_number());
     System::on_finalize(System::block_number());
@@ -347,42 +395,9 @@ pub(crate) fn roll_one_block() -> u64 {
     System::on_initialize(System::block_number());
     Balances::on_initialize(System::block_number());
     NodeManager::on_initialize(System::block_number());
+    // Mirror production: the executive runs `on_idle` with the block's leftover
+    // weight after `on_initialize` and the extrinsics.
+    let idle_weight = IDLE_DRAIN_WEIGHT.with(|w| *w.borrow());
+    NodeManager::on_idle(System::block_number(), idle_weight);
     System::block_number()
-}
-
-pub fn mock_get_finalised_block(state: &mut OffchainState, response: &Option<Vec<u8>>) {
-    let url = "http://127.0.0.1:2020/latest_finalised_block".to_string();
-
-    state.expect_request(PendingRequest {
-        method: "GET".into(),
-        uri: url.into(),
-        response: response.clone(),
-        sent: true,
-        ..Default::default()
-    });
-}
-
-impl FeePaymentHandler for TestRuntime {
-    type Token = H160;
-    type TokenBalance = u128;
-    type AccountId = AccountId;
-    type Error = DispatchError;
-
-    fn pay_fee(
-        _token: &Self::Token,
-        _amount: &Self::TokenBalance,
-        _payer: &Self::AccountId,
-        _recipient: &Self::AccountId,
-    ) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn pay_treasury(
-        amount: &Self::TokenBalance,
-        payer: &Self::AccountId,
-    ) -> Result<(), Self::Error> {
-        let balance = Balances::free_balance(payer);
-        Balances::make_free_balance_be(payer, balance.saturating_sub(*amount));
-        Ok(())
-    }
 }
