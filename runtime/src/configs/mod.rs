@@ -932,4 +932,43 @@ impl pallet_pm_combinatorial_tokens::Config for Runtime {
     type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
 }
 
+parameter_types! {
+    pub const NodeManagerRewardPotId: PalletId = NODE_MANAGER_PALLET_ID;
+    pub const NodeManagerSignedTxLifetime: u32 = 64;
+    /// Halve `NextRewardAmountPerPeriod` once per year.
+    pub const NodeManagerHalvingInterval: BlockNumber = BLOCKS_PER_YEAR;
+    /// Halving stays off until root enables it via `set_halving_enabled`.
+    pub const NodeManagerHalvingEnabledAtGenesis: bool = false;
+    pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
+    /// Network-wide registered-node cap, fixed at 30,000 by the PRDCTR
+    /// hard-fork proposal. Deregistration frees capacity under the cap.
+    pub const NodeManagerMaxRegisteredNodes: u32 = 30_000;
+    /// Number of reward periods a failed-funding snapshot stays recoverable via
+    /// `top_up_reward_pot` before the drain abandons it, so one unfunded period
+    /// cannot indefinitely block the payout stream behind it.
+    pub const NodeManagerMaxFailedFundingRecoveryPeriods: u64 = 100;
+    /// Reward-period rollover funds the reward pot from the TokenManager treasury.
+    pub NodeManagerTreasurySource: AccountId =
+        pallet_token_manager::Pallet::<Runtime>::compute_treasury_account_id();
+}
+
+impl pallet_node_manager::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type SignerId = pallet_node_manager::sr25519::AuthorityId;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type TimeProvider = Timestamp;
+    type Signature = Signature;
+    type RewardPotId = NodeManagerRewardPotId;
+    type TreasurySource = NodeManagerTreasurySource;
+    type HalvingInterval = NodeManagerHalvingInterval;
+    type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
+    type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
+    type MaxRegisteredNodes = NodeManagerMaxRegisteredNodes;
+    type MaxFailedFundingRecoveryPeriods = NodeManagerMaxFailedFundingRecoveryPeriods;
+    type SignedTxLifetime = NodeManagerSignedTxLifetime;
+    type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
+}
+
 impl_fee_types!();

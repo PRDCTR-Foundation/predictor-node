@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
 use sp_runtime::{DispatchError, Perbill};
@@ -29,7 +29,7 @@ fn origin_is_checked_signed() {
 
         let config = AdminConfig::NodeRegistrar(new_registrar);
         assert_noop!(
-            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar.clone()), config,),
+            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar), config,),
             DispatchError::BadOrigin
         );
     });
@@ -312,33 +312,6 @@ mod reward_amount_per_period {
     }
 }
 
-mod num_periods_to_mint {
-    use super::*;
-
-    #[test]
-    fn can_be_set() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            let new_periods = 5u32;
-
-            let config = AdminConfig::NumPeriodsToMint(new_periods);
-            assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), config,));
-            System::assert_last_event(Event::NumPeriodsToMintSet { periods: new_periods }.into());
-        });
-    }
-
-    #[test]
-    fn can_be_set_to_zero_to_disable_future_minting() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            let config = AdminConfig::NumPeriodsToMint(0u32);
-            assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), config,));
-            assert_eq!(NumPeriodsToMint::<TestRuntime>::get(), 0u32);
-            System::assert_last_event(Event::NumPeriodsToMintSet { periods: 0u32 }.into());
-        });
-    }
-}
-
 mod reward_enabled {
     use super::*;
 
@@ -352,56 +325,6 @@ mod reward_enabled {
             let config = AdminConfig::RewardEnabled(new_flag);
             assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), config,));
             System::assert_last_event(Event::RewardEnabledSet { enabled: new_flag }.into());
-        });
-    }
-}
-
-mod genesis_bonus_50 {
-    use super::*;
-
-    #[test]
-    fn can_be_set() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            let new_range = BonusRange::new(100, 500);
-
-            let config = AdminConfig::GenesisBonus50(new_range);
-            assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), config));
-            assert_eq!(GenesisBonus50::<TestRuntime>::get(), new_range);
-            System::assert_last_event(Event::GenesisBonus50Set { range: new_range }.into());
-        });
-    }
-
-    #[test]
-    fn returns_default_when_not_set() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            assert_eq!(GenesisBonus50::<TestRuntime>::get(), BonusRange::new(3001, 6000));
-        });
-    }
-}
-
-mod genesis_bonus_25 {
-    use super::*;
-
-    #[test]
-    fn can_be_set() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            let new_range = BonusRange::new(501, 1000);
-
-            let config = AdminConfig::GenesisBonus25(new_range);
-            assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), config));
-            assert_eq!(GenesisBonus25::<TestRuntime>::get(), new_range);
-            System::assert_last_event(Event::GenesisBonus25Set { range: new_range }.into());
-        });
-    }
-
-    #[test]
-    fn returns_default_when_not_set() {
-        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-        ext.execute_with(|| {
-            assert_eq!(GenesisBonus25::<TestRuntime>::get(), BonusRange::new(6001, 11000));
         });
     }
 }

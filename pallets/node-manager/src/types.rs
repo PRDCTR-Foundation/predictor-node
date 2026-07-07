@@ -1,32 +1,13 @@
 // Copyright 2026 Aventus DAO Ltd
 
 use crate::*;
-use frame_support::traits::Get;
-use sp_runtime::{
-    traits::{AtLeast32BitUnsigned, Zero},
-    ArithmeticError, FixedPointNumber, FixedU128, Saturating,
-};
-use sp_std::fmt::Debug;
+use sp_runtime::Saturating;
 // This is used to scale a single heartbeat so we can preserve precision when applying the reward
 // weight.
 pub const HEARTBEAT_BASE_WEIGHT: u128 = 100_000_000;
 pub type Duration = u64;
 pub type RewardPeriodIndex = u64;
-
-/// Local mirror of sp_avn_common's TotalSupplyUpdatedData. Lives here while
-/// the published sp_avn_common on the consumed branch lacks it; the pallet
-/// only needs the struct shape, not the EventData wiring.
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
-pub struct TotalSupplyUpdatedData {
-    pub amount: u128,
-    pub t2_tx_id: u32,
-}
-
-impl TotalSupplyUpdatedData {
-    pub fn is_valid(&self) -> bool {
-        self.amount > 0u128
-    }
-}
+pub const SECONDS_PER_WEEK: Duration = 7 * 24 * 60 * 60;
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 /// The current era index and transition information
@@ -116,11 +97,21 @@ pub struct RewardPotInfo<Balance> {
     pub uptime_threshold: u32,
     /// The last timestamp of the previous reward period, used to calculate genesis bonus
     pub reward_end_time: Duration,
+    /// `true` when the rollover treasury transfer for this period failed, so the
+    /// snapshot exists with `total_reward == 0` and is awaiting recovery via
+    /// `top_up_reward_pot`. Distinguishes a recoverable failed-funding period
+    /// from a legitimately zero-reward period (which the drain may skip).
+    pub funding_failed: bool,
 }
 
 impl<Balance: Copy> RewardPotInfo<Balance> {
-    pub fn new(total_reward: Balance, uptime_threshold: u32, reward_end_time: Duration) -> Self {
-        RewardPotInfo { total_reward, uptime_threshold, reward_end_time }
+    pub fn new(
+        total_reward: Balance,
+        uptime_threshold: u32,
+        reward_end_time: Duration,
+        funding_failed: bool,
+    ) -> Self {
+        RewardPotInfo { total_reward, uptime_threshold, reward_end_time, funding_failed }
     }
 }
 
@@ -159,179 +150,27 @@ impl<AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo> PaymentPointer<Acc
     }
 }
 
-#[derive(
-    Encode, Decode, Copy, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
-)]
-pub enum UnstakeRestriction<Balance> {
-    /// Default state. Unstaking is not permitted.
-    #[default]
-    Locked,
-    /// There are no restrictions on unstaking
-    Free,
-    /// A periodic unlock allowance applies until `expires_sec`, after which the node is
-    /// treated identically to `Free`.
-    Periodic {
-        /// Amount unlocked per `unstake_period` (snapshot_amount x `MaxUnstakePercentage`).
-        per_period_allowance: Balance,
-        /// Timestamp at which all restrictions are fully lifted.
-        expires_sec: Duration,
-    },
-}
-
-impl<Balance: Copy> UnstakeRestriction<Balance> {
-    pub fn per_period_allowance(&self) -> Option<Balance> {
-        match self {
-            UnstakeRestriction::Periodic { per_period_allowance, .. } =>
-                Some(*per_period_allowance),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
-pub struct NodeInfo<SignerId, AccountId, Balance> {
+pub struct NodeInfo<SignerId, AccountId> {
     /// The node owner
     pub owner: AccountId,
     /// The node signing key
     pub signing_key: SignerId,
     /// serial number of the node
     pub serial_number: u32,
-    /// Expiry block number for auto stake
-    pub auto_stake_expiry: Duration,
-    /// Whether to automatically stake the node's rewards when the auto_stake_expiry is reached
-    pub auto_stake_rewards: bool,
-    /// The stake information for this node
-    pub stake: StakeInfo<Balance>,
 }
 
 impl<
         AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo,
         SignerId: Clone + FullCodec + MaxEncodedLen + TypeInfo,
-        Balance: Clone + FullCodec + MaxEncodedLen + TypeInfo + Zero + AtLeast32BitUnsigned + Debug + Copy,
-    > NodeInfo<SignerId, AccountId, Balance>
+    > NodeInfo<SignerId, AccountId>
 {
     pub fn new(
         owner: AccountId,
         signing_key: SignerId,
         serial_number: u32,
-        auto_stake_expiry: Duration,
-        auto_stake_rewards: bool,
-        stake: StakeInfo<Balance>,
-    ) -> NodeInfo<SignerId, AccountId, Balance> {
-        NodeInfo { owner, signing_key, serial_number, auto_stake_expiry, auto_stake_rewards, stake }
-    }
-
-    pub fn can_unstake(&self, now_sec: Duration) -> bool {
-        now_sec >= self.auto_stake_expiry
-    }
-
-    pub fn try_snapshot_stake(
-        &mut self,
-        now_sec: Duration,
-        max_pct: Perbill,
-        restriction_duration: Duration,
-    ) {
-        match &self.stake.restriction {
-            // Periodic restriction has fully expired - promote to Free.
-            UnstakeRestriction::Periodic { expires_sec, .. } if now_sec >= *expires_sec => {
-                self.stake.restriction = UnstakeRestriction::Free;
-                return
-            },
-            // Already resolved or restriction not yet expired - nothing to do.
-            UnstakeRestriction::Free | UnstakeRestriction::Periodic { .. } => return,
-            // Locked - fall through to snapshot logic below.
-            UnstakeRestriction::Locked => {},
-        }
-
-        // Expiry not yet reached — stay Locked.
-        if now_sec < self.auto_stake_expiry {
-            return
-        }
-
-        self.stake.restriction = if self.stake.amount.is_zero() {
-            // No stake was present at expiry. User is free to operate without restriction.
-            UnstakeRestriction::Free
-        } else {
-            // Snapshot the stake present at expiry and set up periodic unlock.
-            UnstakeRestriction::Periodic {
-                per_period_allowance: max_pct * self.stake.amount,
-                expires_sec: self.auto_stake_expiry.saturating_add(restriction_duration),
-            }
-        };
-    }
-
-    pub fn available_to_unstake(
-        &self,
-        now_sec: Duration,
-        unstake_period: Duration,
-    ) -> Result<(Balance, Option<Duration>), DispatchError> {
-        if self.stake.amount.is_zero() || unstake_period == 0 {
-            return Ok((Zero::zero(), self.stake.next_unstake_time_sec))
-        }
-
-        match &self.stake.restriction {
-            UnstakeRestriction::Locked => Ok((Zero::zero(), None)),
-            UnstakeRestriction::Free => Ok((self.stake.amount, None)),
-            UnstakeRestriction::Periodic { per_period_allowance, expires_sec } => {
-                // All restrictions lifted — treat as Free.
-                if now_sec >= *expires_sec {
-                    return Ok((self.stake.amount, None))
-                }
-
-                // Determine the boundary of the current unstake period.
-                let next_unstake =
-                    self.stake.next_unstake_time_sec.unwrap_or(self.auto_stake_expiry);
-
-                // Still within the current period return already free allowance only.
-                if now_sec < next_unstake {
-                    return Ok((
-                        self.stake.unlocked_stake.min(self.stake.amount),
-                        Some(next_unstake),
-                    ))
-                }
-
-                let elapsed = now_sec.saturating_sub(next_unstake);
-                let periods = 1u64.saturating_add(elapsed / unstake_period);
-                let newly_unlocked = per_period_allowance.saturating_mul((periods as u32).into());
-                let available = self
-                    .stake
-                    .unlocked_stake
-                    .checked_add(&newly_unlocked)
-                    .ok_or(ArithmeticError::Overflow)?
-                    .min(self.stake.amount);
-
-                let next = next_unstake
-                    .checked_add(periods.saturating_mul(unstake_period))
-                    .ok_or(ArithmeticError::Overflow)?;
-
-                Ok((available, Some(next)))
-            },
-        }
-    }
-}
-
-#[derive(
-    Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
-)]
-pub struct StakeInfo<Balance> {
-    /// The amount staked
-    pub amount: Balance,
-    /// Allowance carried over (how much they can withdraw right now).
-    pub unlocked_stake: Balance,
-    /// The timestamp (seconds) that represents the next unstaking period.
-    pub next_unstake_time_sec: Option<Duration>,
-    /// Unstake restriction state.
-    pub restriction: UnstakeRestriction<Balance>,
-}
-
-impl<Balance: Copy + Debug> StakeInfo<Balance> {
-    pub fn new(
-        amount: Balance,
-        unlocked_stake: Balance,
-        next_unstake_time_sec: Option<Duration>,
-        restriction: UnstakeRestriction<Balance>,
-    ) -> Self {
-        StakeInfo { amount, unlocked_stake, next_unstake_time_sec, restriction }
+    ) -> NodeInfo<SignerId, AccountId> {
+        NodeInfo { owner, signing_key, serial_number }
     }
 }
 
@@ -342,16 +181,46 @@ pub enum AdminConfig<AccountId, Balance> {
     BatchSize(u32),
     NextHeartbeatPeriod(u32),
     NextRewardAmountPerPeriod(Balance),
-    NumPeriodsToMint(u32),
     RewardEnabled(bool),
     MinUptimeThreshold(Perbill),
-    AutoStakeDuration(Duration),
-    MaxUnstakePercentage(Perbill),
-    UnstakePeriod(Duration),
-    RestrictedUnstakeDuration(Duration),
-    RewardFee(Perbill),
-    GenesisBonus50(BonusRange),
-    GenesisBonus25(BonusRange),
+    LockSchedule(LockScheduleInfo),
+    ForfeitureDestination(AccountId),
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+/// The single global reward-lock window. Rewards paid out while the window is
+/// active accumulate in `LockedRewards` instead of the owner's free balance;
+/// withdrawing early forfeits a percentage that decays by 1% per elapsed week
+/// (52% in week one -> 0% from week 53 on, mirroring the T1 migration-claim
+/// schedule). Once the penalty reaches zero the lock is expired and payouts
+/// credit free balance directly again.
+pub struct LockScheduleInfo {
+    /// Window anchor as a unix timestamp in seconds (the migration
+    /// "Global Start Date"). A start in the future charges the week-one rate.
+    pub start: Duration,
+    /// Forfeiture percentage during the first week (52 per the proposal).
+    pub initial_penalty_percent: u32,
+}
+
+impl LockScheduleInfo {
+    pub fn new(start: Duration, initial_penalty_percent: u32) -> Self {
+        LockScheduleInfo { start, initial_penalty_percent }
+    }
+
+    /// Forfeiture rate for a withdrawal happening at `now` (unix seconds).
+    /// Decays by one percentage point per full week elapsed since `start`.
+    pub fn penalty_at(&self, now: Duration) -> Perbill {
+        let elapsed_weeks = now.saturating_sub(self.start) / SECONDS_PER_WEEK;
+        let percent = self
+            .initial_penalty_percent
+            .saturating_sub(elapsed_weeks.min(u32::MAX as u64) as u32);
+        Perbill::from_percent(percent)
+    }
+
+    /// The lock no longer withholds anything once the penalty hits zero.
+    pub fn is_expired(&self, now: Duration) -> bool {
+        self.penalty_at(now).is_zero()
+    }
 }
 
 #[derive(
@@ -367,62 +236,5 @@ pub struct TotalUptimeInfo {
 impl TotalUptimeInfo {
     pub fn new(total_heartbeats: u64, total_weight: u128) -> TotalUptimeInfo {
         TotalUptimeInfo { total_heartbeats, total_weight }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct RewardWeight {
-    pub genesis_bonus: FixedU128,
-    pub stake_multiplier: FixedU128,
-}
-
-impl RewardWeight {
-    pub fn to_heartbeat_weight(&self) -> u128 {
-        let scaled_stake_weight = self.stake_multiplier.saturating_mul_int(HEARTBEAT_BASE_WEIGHT);
-        // apply the bonus last to preserve precision.
-        self.genesis_bonus.saturating_mul_int(scaled_stake_weight)
-    }
-}
-
-pub enum StakeOperation {
-    Add,
-    Remove,
-}
-
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct PendingMintRequest<Balance> {
-    pub tx_id: EthereumId,
-    pub amount: Balance,
-    pub bridge_confirmed: bool,
-    pub credit_received: bool,
-}
-
-#[derive(Encode, Decode, Clone, Copy, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct BonusRange {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl BonusRange {
-    pub fn new(start: u32, end: u32) -> Self {
-        BonusRange { start, end }
-    }
-
-    pub fn contains(&self, n: &u32) -> bool {
-        *n >= self.start && *n <= self.end
-    }
-}
-
-pub struct DefaultGenesisBonus50;
-impl Get<BonusRange> for DefaultGenesisBonus50 {
-    fn get() -> BonusRange {
-        BonusRange::new(3001, 6000)
-    }
-}
-
-pub struct DefaultGenesisBonus25;
-impl Get<BonusRange> for DefaultGenesisBonus25 {
-    fn get() -> BonusRange {
-        BonusRange::new(6001, 11000)
     }
 }

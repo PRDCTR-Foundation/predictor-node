@@ -7,38 +7,25 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 
-use core::convert::TryFrom;
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
     storage::{generator::StorageDoubleMap as StorageDoubleMapTrait, PrefixIterator},
-    traits::{
-        Currency, ExistenceRequirement, IsSubType, ReservableCurrency, StorageVersion, UnixTime,
-    },
+    traits::{Currency, ExistenceRequirement, IsSubType, StorageVersion, UnixTime},
     PalletId,
 };
 use frame_system::{
     offchain::{SendTransactionTypes, SubmitTransaction},
     pallet_prelude::*,
 };
-use pallet_avn::{
-    self as avn, BridgeInterface, BridgeInterfaceNotification, ProcessedEventsChecker,
-};
+use pallet_avn::{self as avn};
 use parity_scale_codec::{Decode, Encode, FullCodec};
 use sp_application_crypto::RuntimeAppPublic;
-use sp_avn_common::{
-    eth::EthereumId,
-    event_types::{EthEvent, ProcessedEventHandler, Validator},
-    FeePaymentHandler,
-};
-use sp_core::{MaxEncodedLen, H160};
+use sp_core::MaxEncodedLen;
 use sp_runtime::{
     offchain::storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
     scale_info::TypeInfo,
-    traits::{
-        AccountIdConversion, CheckedAdd, CheckedMul, CheckedSub, Dispatchable, IdentifyAccount,
-        SaturatedConversion, Verify, Zero,
-    },
+    traits::{AccountIdConversion, Dispatchable, IdentifyAccount, Verify, Zero},
     transaction_validity::{
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         ValidTransaction,
@@ -48,7 +35,6 @@ use sp_runtime::{
 
 pub mod offchain;
 pub mod reward;
-pub mod stake;
 pub mod types;
 use crate::types::*;
 pub mod default_weights;
@@ -58,29 +44,7 @@ pub use default_weights::WeightInfo;
 mod benchmarking;
 
 #[cfg(test)]
-#[path = "tests/mock.rs"]
-mod mock;
-#[cfg(test)]
-#[path = "tests/test_admin.rs"]
-mod test_admin;
-#[cfg(test)]
-#[path = "tests/test_auto_stake_preference.rs"]
-mod test_auto_stake_preference;
-#[cfg(test)]
-#[path = "tests/test_heartbeat.rs"]
-mod test_heartbeat;
-#[cfg(test)]
-#[path = "tests/test_node_deregistration.rs"]
-mod test_node_deregistration;
-#[cfg(test)]
-#[path = "tests/test_node_registration.rs"]
-mod test_node_registration;
-#[cfg(test)]
-#[path = "tests/test_reward_payment.rs"]
-mod test_reward_payment;
-#[cfg(test)]
-#[path = "tests/test_stake_weight.rs"]
-mod test_stake_weight;
+mod tests;
 
 // Definition of the crypto to use for signing
 pub mod sr25519 {
@@ -95,24 +59,22 @@ pub mod sr25519 {
 #[cfg(not(feature = "std"))]
 use sp_std::prelude::*;
 
-const PAYOUT_REWARD_CONTEXT: &'static [u8] = b"NodeManager_RewardPayout";
-const MINT_REWARDS_CONTEXT: &'static [u8] = b"NodeManager_MintRewards";
-const HEARTBEAT_CONTEXT: &'static [u8] = b"NodeManager_heartbeat";
+const HEARTBEAT_CONTEXT: &[u8] = b"NodeManager_heartbeat";
 const MAX_BATCH_SIZE: u32 = 1_000;
-const MINT_SAFETY_CAP_MULTIPLIER: u32 = 4;
+/// Fraction of a block's leftover (`on_idle`) weight the reward drain may
+/// consume, leaving headroom for other `on_idle` consumers so the pallet is
+/// not greedy.
+const ON_IDLE_WEIGHT_SHARE: Perbill = Perbill::from_percent(75);
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
 pub const SIGNED_DEREGISTER_NODE_CONTEXT: &[u8] = b"deregister_node";
+pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
-pub const MAX_STAKE_CHANGES_PER_PERIOD: u32 = 256;
 
-const PALLET_ID: &'static [u8; 12] = b"node-manager";
 /// Offchain-worker storage key under which the local node's registered AccountId is persisted.
-pub const REGISTERED_NODE_KEY: &'static [u8; 26] = b"ocw_pallet_registered_node";
+pub const REGISTERED_NODE_KEY: &[u8; 26] = b"ocw_pallet_registered_node";
 
 // Error codes returned by validate unsigned methods
-/// Invalid signature for `paying` transaction
-pub const ERROR_CODE_INVALID_PAY_SIGNATURE: u8 = 1;
 /// Invalid signature for `heartbeat` transaction
 pub const ERROR_CODE_INVALID_HEARTBEAT_SIGNATURE: u8 = 2;
 /// Node not found
@@ -121,25 +83,16 @@ pub const ERROR_CODE_INVALID_NODE: u8 = 3;
 pub const ERROR_CODE_REWARD_DISABLED: u8 = 4;
 /// Invalid heartbeat submission
 pub const ERROR_CODE_INVALID_HEARTBEAT: u8 = 5;
-/// Invalid signature for `mint rewards` transaction
-pub const ERROR_CODE_INVALID_MINT_SIGNATURE: u8 = 6;
 
 pub type AVN<T> = avn::Pallet<T>;
-pub type Author<T> =
-    Validator<<T as avn::Config>::AuthorityId, <T as frame_system::Config>::AccountId>;
 pub use pallet::*;
 
 pub(crate) type BalanceOf<T> =
     <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-pub(crate) type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
-    <T as frame_system::Config>::AccountId,
->>::PositiveImbalance;
 /// Node account ID
 pub(crate) type NodeId<T> = <T as frame_system::Config>::AccountId;
 /// Max nodes per deregistration call
 pub type MaxNodesToDeregister = ConstU32<MAX_NODES_TO_DEREGISTER>;
-/// Max stake changes per period
-pub type MaxStakeChangesPerPeriod = ConstU32<MAX_STAKE_CHANGES_PER_PERIOD>;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -157,7 +110,7 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         NodeId<T>,
-        NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
+        NodeInfo<T::SignerId, T::AccountId>,
         OptionQuery,
     >;
 
@@ -207,10 +160,6 @@ pub mod pallet {
     #[pallet::storage]
     pub type NextRewardAmountPerPeriod<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
-    /// Future periods to keep funded
-    #[pallet::storage]
-    pub type NumPeriodsToMint<T: Config> = StorageValue<_, u32, ValueQuery>;
-
     /// Reward snapshots by period
     #[pallet::storage]
     pub(super) type RewardPot<T: Config> = StorageMap<
@@ -256,12 +205,6 @@ pub mod pallet {
         OptionQuery,
     >;
 
-    /// Pending mint request state
-    #[pallet::storage]
-    #[pallet::getter(fn pending_mint_request)]
-    pub type PendingMintRequestState<T: Config> =
-        StorageValue<_, PendingMintRequest<BalanceOf<T>>, OptionQuery>;
-
     /// Total uptime by reward period
     #[pallet::storage]
     pub(super) type TotalUptime<T: Config> =
@@ -275,83 +218,75 @@ pub mod pallet {
     #[pallet::storage]
     pub type MinUptimeThreshold<T: Config> = StorageValue<_, Perbill, OptionQuery>;
 
-    /// Auto-stake duration in seconds
-    #[pallet::storage]
-    pub type AutoStakeDurationSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
-
-    /// Unstake period in seconds
-    #[pallet::storage]
-    pub type UnstakePeriodSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
-
-    /// Max unstake percentage
-    #[pallet::storage]
-    pub type MaxUnstakePercentage<T: Config> = StorageValue<_, Perbill, ValueQuery>;
-
     /// Next node serial number
     #[pallet::storage]
     pub type NextNodeSerialNumber<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-    /// Next bonus node serial number (starts at T::BonusNodeSerialStart)
+    /// Cumulative count of reward-amount halvings applied since genesis.
+    /// Updated by `apply_halving_if_due` at most once per `HalvingInterval`
+    /// boundary. Idempotent within the same block.
     #[pallet::storage]
-    pub type NextBonusNodeSerialNumber<T: Config> =
-        StorageValue<_, u32, ValueQuery, T::BonusNodeSerialStart>;
+    pub type RewardAmountHalvingsApplied<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-    /// Restricted unstake duration in seconds
+    /// Whether automatic reward-amount halving is enabled. Defaults to
+    /// `HalvingEnabledAtGenesis` at genesis; flipped at runtime via the
+    /// root-only `set_halving_enabled` extrinsic.
     #[pallet::storage]
-    pub type RestrictedUnstakeDurationSec<T: Config> = StorageValue<_, Duration, ValueQuery>;
+    pub type HalvingEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-    /// Reward fee percentage
+    /// Rewards earned by an owner while the global lock window is active.
+    /// The funds themselves stay in the reward-pot account; this map records
+    /// each owner's claim, realised via `withdraw_rewards`.
     #[pallet::storage]
-    pub type RewardFeePercentage<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+    pub type LockedRewards<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, ValueQuery>;
 
-    /// Total stake by owner
+    /// Sum of all `LockedRewards` entries - the pot's outstanding locked
+    /// liability. The reward-pot balance must always cover this plus any
+    /// undrained period pots.
     #[pallet::storage]
-    pub type TotalStake<T: Config> =
-        StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, OptionQuery>;
+    pub type TotalLockedRewards<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
-    /// 50% genesis bonus serial nodes
+    /// The single global reward-lock window (one-off, anchored to the
+    /// migration Global Start Date). While unset, payouts are locked
+    /// defensively and withdrawal is blocked - root must configure the
+    /// window before any locked reward can be released.
     #[pallet::storage]
-    pub type GenesisBonus50<T: Config> =
-        StorageValue<_, BonusRange, ValueQuery, DefaultGenesisBonus50>;
+    pub type LockSchedule<T: Config> = StorageValue<_, LockScheduleInfo, OptionQuery>;
 
-    /// 25% genesis bonus serial nodes
+    /// Destination for forfeited (early-withdrawn) reward amounts - the
+    /// foundation forfeiture-liquidity wallet on mainnet. Falls back to
+    /// `T::TreasurySource` while unset, which keeps forfeits in-system.
     #[pallet::storage]
-    pub type GenesisBonus25<T: Config> =
-        StorageValue<_, BonusRange, ValueQuery, DefaultGenesisBonus25>;
-
-    /// Total registered bonus nodes
-    #[pallet::storage]
-    pub type TotalRegisteredBonusNodes<T: Config> = StorageValue<_, u32, ValueQuery>;
+    pub type ForfeitureDestination<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
-        pub _phantom: sp_std::marker::PhantomData<T>,
         pub max_batch_size: u32,
         pub reward_period: u32,
         pub heartbeat_period: u32,
         pub reward_amount_per_period: BalanceOf<T>,
-        pub num_periods_to_mint: u32,
-        pub auto_stake_duration_sec: Duration,
-        pub max_unstake_percentage: Perbill,
-        pub unstake_period_sec: Duration,
-        pub restricted_unstake_duration_sec: Duration,
-        pub reward_fee_percentage: Perbill,
+        /// Unix-seconds anchor of the global reward-lock window. `None`
+        /// leaves the schedule unset (payouts lock, withdrawals blocked,
+        /// until root configures it).
+        pub lock_schedule_start: Option<Duration>,
+        /// Week-one forfeiture percentage of the lock window.
+        pub lock_initial_penalty_percent: u32,
+        /// Destination for forfeited amounts; `None` falls back to
+        /// `T::TreasurySource` at withdrawal time.
+        pub forfeiture_destination: Option<T::AccountId>,
     }
 
     impl<T: Config> Default for GenesisConfig<T> {
         fn default() -> Self {
             Self {
-                _phantom: Default::default(),
                 max_batch_size: 1,
                 reward_period: 2,
                 heartbeat_period: 1,
                 reward_amount_per_period: Default::default(),
-                num_periods_to_mint: 1,
-                auto_stake_duration_sec: 180 * 24 * 60 * 60, // 180 days
-                max_unstake_percentage: Perbill::from_percent(10),
-                unstake_period_sec: 7 * 24 * 60 * 60, // 1 week
-                restricted_unstake_duration_sec: 10 * 7 * 24 * 60 * 60, // 10 weeks
-                reward_fee_percentage: Perbill::from_percent(0),
+                lock_schedule_start: None,
+                lock_initial_penalty_percent: 52,
+                forfeiture_destination: None,
             }
         }
     }
@@ -359,21 +294,22 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
+            // The reward pot is a pallet-derived account that only ever
+            // receives funds at runtime. On a chain with a zero existential
+            // deposit, a credit to a provider-less account does not persist
+            // (the transfer succeeds but the funds are lost), so the pot
+            // gets its provider reference at genesis - the same pattern
+            // pallet-treasury uses for its pot account.
+            frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
+
             assert!(self.reward_period > self.heartbeat_period);
-            assert!(self.unstake_period_sec > 0);
             let default_threshold = Pallet::<T>::get_default_threshold();
 
             NextRewardPeriodLength::<T>::set(self.reward_period);
             NextRewardAmountPerPeriod::<T>::set(self.reward_amount_per_period);
-            NumPeriodsToMint::<T>::set(self.num_periods_to_mint);
             MaxBatchSize::<T>::set(self.max_batch_size);
             NextHeartbeatPeriod::<T>::set(self.heartbeat_period);
             MinUptimeThreshold::<T>::set(Some(default_threshold));
-            AutoStakeDurationSec::<T>::set(self.auto_stake_duration_sec);
-            MaxUnstakePercentage::<T>::set(self.max_unstake_percentage);
-            UnstakePeriodSec::<T>::set(self.unstake_period_sec);
-            RestrictedUnstakeDurationSec::<T>::set(self.restricted_unstake_duration_sec);
-            RewardFeePercentage::<T>::set(self.reward_fee_percentage);
 
             let uptime_threshold =
                 Pallet::<T>::calculate_uptime_threshold(self.reward_period, self.heartbeat_period);
@@ -389,6 +325,18 @@ pub mod pallet {
 
             <RewardPeriod<T>>::put(reward_period);
             OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
+            HalvingEnabled::<T>::put(T::HalvingEnabledAtGenesis::get());
+
+            assert!(self.lock_initial_penalty_percent <= 100, "lock penalty must be a percentage");
+            if let Some(start) = self.lock_schedule_start {
+                LockSchedule::<T>::put(LockScheduleInfo::new(
+                    start,
+                    self.lock_initial_penalty_percent,
+                ));
+            }
+            if let Some(ref destination) = self.forfeiture_destination {
+                ForfeitureDestination::<T>::put(destination.clone());
+            }
         }
     }
 
@@ -426,13 +374,6 @@ pub mod pallet {
             node: NodeId<T>,
             error: DispatchError,
         },
-        /// Reward auto-staked
-        RewardAutoStaked {
-            reward_period: RewardPeriodIndex,
-            owner: T::AccountId,
-            node: NodeId<T>,
-            amount: BalanceOf<T>,
-        },
         /// Node registrar set
         NodeRegistrarSet { new_registrar: T::AccountId },
         /// Batch size set
@@ -443,56 +384,60 @@ pub mod pallet {
         HeartbeatReceived { reward_period_index: RewardPeriodIndex, node: NodeId<T> },
         /// Reward amount per period set
         NextRewardAmountPerPeriodSet { new_amount: BalanceOf<T> },
-        /// Number of periods to mint set
-        NumPeriodsToMintSet { periods: u32 },
         /// Reward payment toggled
         RewardEnabledSet { enabled: bool },
         /// Min uptime threshold set
         MinUptimeThresholdSet { threshold: Perbill },
-        /// Max unstake percentage set
-        MaxUnstakePercentageSet { percentage: Perbill },
-        /// Unstake period set
-        UnstakePeriodSet { duration_sec: Duration },
         /// Node deregistered
         NodeDeregistered { owner: T::AccountId, node: NodeId<T> },
         /// Signing key updated
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
-        /// Auto-stake duration set
-        AutoStakeDurationSet { duration_sec: Duration },
-        /// Stake added
-        StakeAdded {
-            owner: T::AccountId,
-            node_id: NodeId<T>,
+        /// Reward pot funded for a period (treasury transfer succeeded)
+        RewardPotFunded { period: RewardPeriodIndex, amount: BalanceOf<T> },
+        /// Reward pot funding failed at rollover; period is recoverable via top_up_reward_pot
+        RewardPotFundingFailed {
+            period: RewardPeriodIndex,
+            requested_amount: BalanceOf<T>,
+            reason: DispatchError,
+        },
+        /// Halving applied to `NextRewardAmountPerPeriod`. `total_halvings` is
+        /// the cumulative count since genesis; `new_amount` is the post-halving
+        /// value (post all pending halvings if more than one boundary was
+        /// crossed between calls).
+        RewardHalvingApplied {
+            period_index: RewardPeriodIndex,
+            new_amount: BalanceOf<T>,
+            total_halvings: u32,
+        },
+        /// `HalvingEnabled` toggled by root
+        HalvingEnabledSet { enabled: bool },
+        /// A reward accrued into `LockedRewards` instead of free balance
+        /// (the global lock window is active or not yet configured).
+        RewardLocked {
             reward_period: RewardPeriodIndex,
-            amount: BalanceOf<T>,
-            new_total: BalanceOf<T>,
-        },
-        /// Stake removed
-        StakeRemoved {
             owner: T::AccountId,
-            node_id: NodeId<T>,
-            reward_period: RewardPeriodIndex,
+            node: NodeId<T>,
             amount: BalanceOf<T>,
-            new_total: BalanceOf<T>,
         },
-        /// Restricted unstake duration set
-        RestrictedUnstakeDurationSet { duration_sec: Duration },
-        /// Reward fee percentage set
-        RewardFeePercentageSet { percentage: Perbill },
-        /// Genesis bonus 50% range set
-        GenesisBonus50Set { range: BonusRange },
-        /// Genesis bonus 25% range set
-        GenesisBonus25Set { range: BonusRange },
-        /// Auto-stake preference updated
-        AutoStakePreferenceUpdated {
+        /// Locked rewards withdrawn. `net` went to the owner, `forfeited`
+        /// (`penalty` of `gross`) to the forfeiture destination.
+        RewardWithdrawn {
             owner: T::AccountId,
-            node_id: NodeId<T>,
-            auto_stake_rewards: bool,
+            gross: BalanceOf<T>,
+            net: BalanceOf<T>,
+            forfeited: BalanceOf<T>,
+            penalty: Perbill,
         },
-        /// Mint request submitted
-        MintRequestSubmitted { amount: BalanceOf<T>, tx_id: EthereumId },
-        /// Mint request resolved
-        MintRequestResolved { tx_id: EthereumId, succeeded: bool },
+        /// A non-distributable period's funded reward was returned from the
+        /// pot to the treasury (the period had no reportable uptime).
+        UndistributedRewardReclaimed { reward_period: RewardPeriodIndex, amount: BalanceOf<T> },
+        /// Reclaim of a non-distributable period's reward failed; the funds
+        /// remain in the pot to be recovered by a later admin action.
+        UndistributedRewardReclaimFailed { reward_period: RewardPeriodIndex, amount: BalanceOf<T> },
+        /// The global lock window set by root
+        LockScheduleSet { start: Duration, initial_penalty_percent: u32 },
+        /// Forfeiture destination set by root
+        ForfeitureDestinationSet { destination: T::AccountId },
     }
 
     #[pallet::error]
@@ -547,28 +492,12 @@ pub mod pallet {
         HeartbeatThresholdReached,
         /// Uptime threshold is zero
         UptimeThresholdZero,
-        /// Node not owned by owner
-        NodeNotOwnedByOwner,
         /// Unauthorized signing key update
         UnauthorizedSigningKeyUpdate,
         /// Signing key must be different
         SigningKeyMustBeDifferent,
         /// Amount must be greater than zero
         ZeroAmount,
-        /// Insufficient free balance
-        InsufficientFreeBalance,
-        /// Insufficient staked balance
-        InsufficientStakedBalance,
-        /// Reserve failed
-        ReserveFailed,
-        /// Duration must be greater than zero
-        DurationZero,
-        /// No stake found
-        NoStakeFound,
-        /// Auto-stake still active
-        AutoStakeStillActive,
-        /// No stake available to unstake
-        NoAvailableStakeToUnstake,
         /// Node not found
         NodeNotFound,
         /// Balance overflow
@@ -579,16 +508,24 @@ pub mod pallet {
         RewardPotNotFound,
         /// Reward amount per period must be greater than zero
         NextRewardAmountPerPeriodZero,
-        /// Mint amount cannot fit balance type
-        MintAmountOverflow,
-        /// No Tier1 event found for reward minting
-        NoTier1MintEventFound,
-        /// Mint request already in progress
-        MintRequestInProgress,
-        /// Regular node serial limit reached; no more non-bonus nodes can be registered
-        NodeSerialLimitReached,
-        /// The range provided is invalid (e.g. start >= end)
-        InvalidBonusRange,
+        /// Reward pot already funded for the given period
+        RewardPotAlreadyFunded,
+        /// Treasury could not supply the requested amount
+        TreasuryUnderfunded,
+        /// `proof.signer` does not resolve to a registered node
+        ProverNotRegistered,
+        /// A node in the batch is not registered or not owned by the prover
+        NodeNotOwnedByProver,
+        /// The caller has no locked rewards to withdraw
+        NoLockedRewards,
+        /// The global lock window has not been configured yet
+        LockScheduleNotSet,
+        /// Requested withdrawal exceeds the caller's locked balance
+        WithdrawAmountExceedsLocked,
+        /// Lock schedule parameters are invalid (penalty must be <= 100%)
+        InvalidLockSchedule,
+        /// The network-wide registered-node cap has been reached
+        MaxNodesReached,
     }
 
     #[pallet::config]
@@ -605,7 +542,7 @@ pub mod pallet {
             + IsSubType<Call<Self>>
             + From<Call<Self>>;
         /// Currency used by this pallet
-        type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+        type Currency: Currency<Self::AccountId>;
         // The identifier type for an offchain transaction signer.
         type SignerId: Member
             + Parameter
@@ -619,32 +556,49 @@ pub mod pallet {
         type TimeProvider: UnixTime;
         /// Signature type
         type Signature: Verify<Signer = Self::Public> + Member + Decode + Encode + TypeInfo;
-        /// Token identifier type
-        type Token: Parameter + Default + Copy + From<H160> + Into<H160> + MaxEncodedLen;
-        /// Reward fee handler
-        type RewardFeeHandler: FeePaymentHandler<
-            AccountId = Self::AccountId,
-            Token = Self::Token,
-            TokenBalance = <Self::Currency as Currency<Self::AccountId>>::Balance,
-            Error = DispatchError,
-        >;
         /// Reward pot ID
         #[pallet::constant]
         type RewardPotId: Get<PalletId>;
+        /// Source account from which the reward pot is funded at each period rollover
+        type TreasurySource: Get<Self::AccountId>;
+        /// Number of blocks between halving applications. Setting this to
+        /// `BLOCKS_PER_YEAR` (predictor's annual cadence) is the production
+        /// default. Setting it small in tests makes halving observable on a
+        /// budget.
+        #[pallet::constant]
+        type HalvingInterval: Get<BlockNumberFor<Self>>;
+        /// Whether `HalvingEnabled` defaults to `true` at genesis. Runtime
+        /// flips it via `set_halving_enabled`.
+        #[pallet::constant]
+        type HalvingEnabledAtGenesis: Get<bool>;
+        /// Maximum number of nodes covered by a single
+        /// `heartbeat_for_owned_nodes` call. Bounds extrinsic weight and
+        /// validation work.
+        #[pallet::constant]
+        type MaxNodesPerAggregateHeartbeat: Get<u32>;
+        /// Hard cap on concurrently registered nodes. The hard-fork proposal
+        /// fixes the Predictor network at 30,000 nodes; registration fails
+        /// once `TotalRegisteredNodes` reaches this value, and deregistering
+        /// frees capacity.
+        #[pallet::constant]
+        type MaxRegisteredNodes: Get<u32>;
+        /// Recovery window, in reward periods, for a period whose rollover
+        /// funding failed (`funding_failed == true`). While such a period's age
+        /// (`current period index - the period`) stays within this window the
+        /// `on_idle` drain leaves it in place so `top_up_reward_pot` can still
+        /// fund it retroactively, head-of-line-blocking the payout stream. Once
+        /// the age exceeds this window the drain abandons the unrecovered period
+        /// (completing it without payout, as nothing was ever funded) so the
+        /// cursor advances and later periods' operators get paid. This bounds
+        /// the maximum payout stall to this many periods rather than an
+        /// indefinite freeze behind one never-recovered period.
+        #[pallet::constant]
+        type MaxFailedFundingRecoveryPeriods: Get<RewardPeriodIndex>;
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
-        /// Stake needed for one virtual node bonus
-        #[pallet::constant]
-        type VirtualNodeStake: Get<BalanceOf<Self>>;
         /// Extrinsic weight provider
         type WeightInfo: WeightInfo;
-        /// Interface to the Ethereum bridge pallet
-        type BridgeInterface: BridgeInterface;
-        /// Hook to check for processed events
-        type ProcessedEventsChecker: ProcessedEventsChecker;
-        #[pallet::constant]
-        type BonusNodeSerialStart: Get<u32>;
     }
 
     #[pallet::call]
@@ -662,8 +616,7 @@ pub mod pallet {
             let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
             ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
 
-            // Default to auto_stake true
-            Self::do_register_node(node, owner, signing_key, true, false)?;
+            Self::do_register_node(node, owner, signing_key)?;
             Ok(())
         }
 
@@ -676,17 +629,15 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_reward_batch_size())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_heartbeat())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_amount())
-            .max(<T as Config>::WeightInfo::set_admin_config_num_periods_to_mint())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_enabled())
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
-            .max(<T as Config>::WeightInfo::set_admin_config_auto_stake_duration())
-            .max(<T as Config>::WeightInfo::set_admin_config_max_unstake_percentage())
-            .max(<T as Config>::WeightInfo::set_admin_config_unstake_period())
-            .max(<T as Config>::WeightInfo::set_admin_config_restricted_unstake_duration())
-            .max(<T as Config>::WeightInfo::set_admin_config_reward_fee_percentage())
-            .max(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_50())
-            .max(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_25())
+            .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
+            .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
         )]
+        // The `.into()` calls on the `Ok(Some(weight).into())` arms are required for the
+        // `DispatchResultWithPostInfo` return type; clippy misattributes them as useless through
+        // the pallet macro expansion.
+        #[allow(clippy::useless_conversion)]
         pub fn set_admin_config(
             origin: OriginFor<T>,
             config: AdminConfig<T::AccountId, BalanceOf<T>>,
@@ -748,12 +699,6 @@ pub mod pallet {
                     Self::deposit_event(Event::NextRewardAmountPerPeriodSet { new_amount: amount });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_reward_amount()).into())
                 },
-                AdminConfig::NumPeriodsToMint(periods) => {
-                    <NumPeriodsToMint<T>>::put(periods);
-                    Self::deposit_event(Event::NumPeriodsToMintSet { periods });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_num_periods_to_mint())
-                        .into())
-                },
                 AdminConfig::RewardEnabled(enabled) => {
                     <RewardEnabled<T>>::put(enabled);
                     Self::deposit_event(Event::RewardEnabledSet { enabled });
@@ -766,160 +711,25 @@ pub mod pallet {
                     Self::deposit_event(Event::MinUptimeThresholdSet { threshold });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_min_threshold()).into())
                 },
-                AdminConfig::AutoStakeDuration(duration_sec) => {
-                    <AutoStakeDurationSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::AutoStakeDurationSet { duration_sec });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_auto_stake_duration())
-                        .into())
-                },
-                AdminConfig::MaxUnstakePercentage(percentage) => {
-                    <MaxUnstakePercentage<T>>::put(percentage);
-                    Self::deposit_event(Event::MaxUnstakePercentageSet { percentage });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_max_unstake_percentage())
-                        .into())
-                },
-                AdminConfig::UnstakePeriod(duration_sec) => {
-                    ensure!(duration_sec > 0, Error::<T>::DurationZero);
-                    <UnstakePeriodSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::UnstakePeriodSet { duration_sec });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_unstake_period()).into())
-                },
-                AdminConfig::RestrictedUnstakeDuration(duration_sec) => {
-                    <RestrictedUnstakeDurationSec<T>>::put(duration_sec);
-                    Self::deposit_event(Event::RestrictedUnstakeDurationSet { duration_sec });
-                    Ok(Some(
-                        <T as Config>::WeightInfo::set_admin_config_restricted_unstake_duration(),
-                    )
-                    .into())
-                },
-                AdminConfig::RewardFee(percentage) => {
-                    <RewardFeePercentage<T>>::put(percentage);
-                    Self::deposit_event(Event::RewardFeePercentageSet { percentage });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_reward_fee_percentage())
-                        .into())
-                },
-                AdminConfig::GenesisBonus50(range) => {
-                    ensure!(range.start < range.end, Error::<T>::InvalidBonusRange);
-                    <GenesisBonus50<T>>::put(range.clone());
-                    Self::deposit_event(Event::GenesisBonus50Set { range });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_50()).into())
-                },
-                AdminConfig::GenesisBonus25(range) => {
-                    ensure!(range.start < range.end, Error::<T>::InvalidBonusRange);
-                    <GenesisBonus25<T>>::put(range.clone());
-                    Self::deposit_event(Event::GenesisBonus25Set { range });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_genesis_bonus_25()).into())
-                },
-            }
-        }
-
-        /// Offchain call: pay and remove up to `MAX_BATCH_SIZE` nodes in the oldest unpaid period.
-        #[pallet::call_index(2)]
-        #[pallet::weight(<T as Config>::WeightInfo::offchain_pay_nodes(MAX_BATCH_SIZE))]
-        pub fn offchain_pay_nodes(
-            origin: OriginFor<T>,
-            reward_period_index: RewardPeriodIndex,
-            _author: Author<T>,
-            _signature: <T::AuthorityId as RuntimeAppPublic>::Signature,
-        ) -> DispatchResultWithPostInfo {
-            ensure_none(origin)?;
-
-            let oldest_period = OldestUnpaidRewardPeriodIndex::<T>::get();
-            // Be careful when using current period. Everything here should be based on previous
-            // period
-            let RewardPeriodInfo { current, .. } = RewardPeriod::<T>::get();
-
-            // Only pay for completed periods
-            ensure!(
-                reward_period_index == oldest_period && oldest_period < current,
-                Error::<T>::InvalidRewardPaymentRequest
-            );
-
-            let total_uptime = TotalUptime::<T>::get(&oldest_period);
-            let maybe_node_uptime = NodeUptime::<T>::iter_prefix(oldest_period).next();
-
-            if total_uptime.total_weight == 0 && maybe_node_uptime.is_none() {
-                // No nodes to pay for this period so complete it
-                Self::complete_reward_payout(oldest_period);
-                return Ok(Some(<T as Config>::WeightInfo::offchain_pay_nodes(1u32)).into())
-            }
-
-            ensure!(total_uptime.total_weight > 0, Error::<T>::TotalUptimeNotFound);
-            ensure!(maybe_node_uptime.is_some(), Error::<T>::NodeUptimeNotFound);
-
-            let reward_pot =
-                RewardPot::<T>::get(&oldest_period).ok_or(Error::<T>::RewardPotNotFound)?;
-            let total_reward = reward_pot.total_reward;
-
-            let mut paid_nodes = Vec::new();
-            let mut last_node_paid: Option<T::AccountId> = None;
-            let mut iter;
-
-            match LastPaidPointer::<T>::get() {
-                Some(pointer) => {
-                    iter = Self::get_iterator_from_last_paid(oldest_period, pointer)?;
-                },
-                None => {
-                    iter = NodeUptime::<T>::iter_prefix(oldest_period);
-                    // This is a new payout so validate that the reward pot has enough to pay
+                AdminConfig::LockSchedule(schedule) => {
                     ensure!(
-                        Self::reward_pot_balance().ge(&total_reward),
-                        Error::<T>::InsufficientBalanceForReward
+                        schedule.initial_penalty_percent <= 100,
+                        Error::<T>::InvalidLockSchedule
                     );
+                    <LockSchedule<T>>::put(schedule);
+                    Self::deposit_event(Event::LockScheduleSet {
+                        start: schedule.start,
+                        initial_penalty_percent: schedule.initial_penalty_percent,
+                    });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_lock_schedule()).into())
+                },
+                AdminConfig::ForfeitureDestination(destination) => {
+                    <ForfeitureDestination<T>>::put(destination.clone());
+                    Self::deposit_event(Event::ForfeitureDestinationSet { destination });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
+                        .into())
                 },
             }
-
-            let pay = |node: &NodeId<T>,
-                       uptime: UptimeInfo<BlockNumberFor<T>>|
-             -> Result<(), DispatchError> {
-                let node_info =
-                    NodeRegistry::<T>::get(node).ok_or(Error::<T>::NodeNotRegistered)?;
-
-                let node_weight = Self::calculate_node_weight(
-                    node,
-                    uptime,
-                    &node_info,
-                    reward_pot.uptime_threshold,
-                    reward_pot.reward_end_time,
-                );
-
-                let (reward_amount, reward_percentage) =
-                    Self::calculate_reward(node_weight, &total_uptime.total_weight, &total_reward)?;
-
-                Self::pay_reward(
-                    &oldest_period,
-                    node.clone(),
-                    &node_info,
-                    reward_amount,
-                    reward_percentage,
-                )?;
-                Ok(())
-            };
-
-            for (node, uptime) in iter.by_ref().take(MaxBatchSize::<T>::get() as usize) {
-                if let Err(e) = pay(&node, uptime) {
-                    Self::deposit_event(Event::ErrorPayingReward {
-                        reward_period: oldest_period,
-                        node: node.clone(),
-                        error: e,
-                    });
-                }
-                // We always move on even if payment fails. Failed payments will be handled
-                // offchain.
-                last_node_paid = Some(node.clone());
-                paid_nodes.push(node.clone());
-            }
-
-            Self::remove_paid_nodes(oldest_period, &paid_nodes);
-
-            if iter.next().is_some() {
-                Self::update_last_paid_pointer(oldest_period, last_node_paid);
-            } else {
-                Self::complete_reward_payout(oldest_period);
-            }
-            return Ok(
-                Some(<T as Config>::WeightInfo::offchain_pay_nodes(paid_nodes.len() as u32)).into()
-            )
         }
 
         /// Offchain call: Submit heartbeat to show node is still alive
@@ -942,15 +752,16 @@ pub mod pallet {
             let node_info = NodeRegistry::<T>::get(&node).ok_or(Error::<T>::NodeNotRegistered)?;
             let now = frame_system::Pallet::<T>::block_number();
 
-            let weight = <NodeUptime<T>>::mutate(&current_reward_period, &node, |maybe_info| {
+            let weight = <NodeUptime<T>>::mutate(current_reward_period, &node, |maybe_info| {
                 let info = maybe_info.get_or_insert_with(|| UptimeInfo {
                     count: 0,
                     last_reported: now,
                     weight: 0,
                 });
 
-                let node_weight =
-                    Self::effective_heartbeat_weight(&node_info, Self::time_now_sec());
+                // Stake removed: every heartbeat counts as one base unit.
+                let _ = node_info;
+                let node_weight = HEARTBEAT_BASE_WEIGHT;
 
                 info.count = info.count.saturating_add(1);
                 info.last_reported = now;
@@ -960,7 +771,7 @@ pub mod pallet {
                 node_weight
             });
 
-            <TotalUptime<T>>::mutate(&current_reward_period, |total| {
+            <TotalUptime<T>>::mutate(current_reward_period, |total| {
                 total.total_heartbeats = total.total_heartbeats.saturating_add(1);
                 total.total_weight = total.total_weight.saturating_add(weight);
             });
@@ -973,6 +784,7 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Register a new node via a relayer-proxied (avn-proxy) signed transaction.
         #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::signed_register_node())]
         pub fn signed_register_node(
@@ -1008,12 +820,12 @@ pub mod pallet {
                 Error::<T>::UnauthorizedSignedTransaction
             );
 
-            // Perform the actual registration. Default to auto_stake_rewards = true
-            Self::do_register_node(node, owner, signing_key, true, false)?;
+            Self::do_register_node(node, owner, signing_key)?;
 
             Ok(())
         }
 
+        /// Deregister one or more of `owner`'s nodes. Registrar-only.
         #[pallet::call_index(5)]
         #[pallet::weight(<T as Config>::WeightInfo::deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn deregister_nodes(
@@ -1031,6 +843,8 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Deregister one or more of `owner`'s nodes via a relayer-proxied
+        /// (avn-proxy) signed transaction.
         #[pallet::call_index(6)]
         #[pallet::weight(<T as Config>::WeightInfo::signed_deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn signed_deregister_nodes(
@@ -1109,134 +923,233 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Root: top up the reward pot for a period whose rollover funding
+        /// failed. The period's `RewardPotInfo` must exist with
+        /// `funding_failed == true` (i.e. produced by a failed rollover
+        /// transfer); a legitimately-zero funded period is rejected.
+        /// Pulls `amount` from `TreasurySource` into the reward pot account
+        /// and bumps `OutstandingRewardToPay`.
         #[pallet::call_index(8)]
-        #[pallet::weight(<T as Config>::WeightInfo::add_stake())]
-        pub fn add_stake(
+        #[pallet::weight(<T as Config>::WeightInfo::top_up_reward_pot())]
+        pub fn top_up_reward_pot(
             origin: OriginFor<T>,
-            node_id: NodeId<T>,
+            period: RewardPeriodIndex,
             amount: BalanceOf<T>,
         ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
-            ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
-            );
-            let reward_period = RewardPeriod::<T>::get().current;
-            let new_total = Self::do_add_stake(&owner, &node_id, amount)?;
+            ensure_root(origin)?;
+            ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
 
-            Self::deposit_event(Event::StakeAdded {
-                owner,
-                node_id,
-                reward_period,
-                amount,
-                new_total,
+            let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
+            ensure!(pot_info.funding_failed, Error::<T>::RewardPotAlreadyFunded);
+
+            let treasury = T::TreasurySource::get();
+            let pot = Self::compute_reward_account_id();
+            T::Currency::transfer(&treasury, &pot, amount, ExistenceRequirement::KeepAlive)
+                .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
+
+            pot_info.total_reward = amount;
+            pot_info.funding_failed = false;
+            RewardPot::<T>::insert(period, pot_info);
+            OutstandingRewardToPay::<T>::mutate(|outstanding| {
+                *outstanding = outstanding.saturating_add(amount);
             });
+
+            Self::deposit_event(Event::RewardPotFunded { period, amount });
             Ok(())
         }
 
+        /// Root: toggle automatic reward-amount halving. When enabled the
+        /// pallet halves `NextRewardAmountPerPeriod` at every `HalvingInterval`
+        /// block boundary (idempotent per block, catch-up across multiple
+        /// boundaries if disabled and re-enabled later).
         #[pallet::call_index(9)]
-        #[pallet::weight(<T as Config>::WeightInfo::remove_stake())]
-        pub fn remove_stake(
-            origin: OriginFor<T>,
-            node_id: NodeId<T>,
-            maybe_amount: Option<BalanceOf<T>>,
-        ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
-            ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
-            );
-
-            let reward_period = RewardPeriod::<T>::get().current;
-            let (amount, new_total) = Self::do_remove_stake(&owner, &node_id, maybe_amount)?;
-
-            Self::deposit_event(Event::StakeRemoved {
-                owner,
-                node_id,
-                reward_period,
-                amount,
-                new_total,
-            });
-
+        #[pallet::weight(<T as Config>::WeightInfo::set_halving_enabled())]
+        pub fn set_halving_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
+            ensure_root(origin)?;
+            HalvingEnabled::<T>::put(enabled);
+            Self::deposit_event(Event::HalvingEnabledSet { enabled });
             Ok(())
         }
 
-        #[pallet::call_index(10)]
-        #[pallet::weight(<T as Config>::WeightInfo::update_auto_stake_preference())]
-        pub fn update_auto_stake_preference(
+        /// Aggregate heartbeat: a single prover node signs a batch of node
+        /// ids it owns. Mirrors `signed_register_node`'s avn-proxy shape:
+        /// `proof.signer` is the prover's NodeId (==AccountId), sender must
+        /// equal proof.signer. The pallet validates every node in `nodes`
+        /// is registered to the prover's owner; on any failure the whole
+        /// call rolls back (all-or-nothing). ("Prover" rather than "anchor"
+        /// is used here to avoid conflating with the chain's separate
+        /// anchoring mechanism.)
+        ///
+        /// Successful dispatch records one heartbeat per node into
+        /// `NodeUptime` for the current reward period and emits one
+        /// `HeartbeatReceived` per node. Duplicate entries in `nodes` are
+        /// silently deduped via a BTreeSet so callers don't accidentally
+        /// double-count.
+        #[pallet::call_index(12)]
+        #[pallet::weight(<T as Config>::WeightInfo::heartbeat_for_owned_nodes(nodes.len() as u32))]
+        pub fn heartbeat_for_owned_nodes(
             origin: OriginFor<T>,
-            node_id: NodeId<T>,
-            auto_stake_rewards: bool,
+            proof: Proof<T::Signature, T::AccountId>,
+            nodes: BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat>,
+            block_number: BlockNumberFor<T>,
         ) -> DispatchResult {
-            let owner = ensure_signed(origin)?;
+            let sender = ensure_signed(origin)?;
+            ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
             ensure!(
-                <OwnedNodes<T>>::contains_key(&owner, &node_id),
-                Error::<T>::NodeNotOwnedByOwner
+                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
+                    frame_system::Pallet::<T>::block_number(),
+                Error::<T>::SignedTransactionExpired
             );
 
-            <NodeRegistry<T>>::try_mutate(&node_id, |maybe_info| -> Result<(), DispatchError> {
-                let info = maybe_info.as_mut().ok_or(Error::<T>::NodeNotFound)?;
-                info.auto_stake_rewards = auto_stake_rewards;
-                Ok(())
-            })?;
-
-            Self::deposit_event(Event::AutoStakePreferenceUpdated {
-                owner,
-                node_id,
-                auto_stake_rewards,
-            });
-
-            Ok(())
-        }
-
-        #[pallet::call_index(11)]
-        #[pallet::weight(<T as Config>::WeightInfo::offchain_mint_rewards())]
-        pub fn offchain_mint_rewards(
-            origin: OriginFor<T>,
-            amount: BalanceOf<T>,
-            author: Author<T>,
-            signature: <T::AuthorityId as RuntimeAppPublic>::Signature,
-        ) -> DispatchResult {
-            ensure_none(origin)?;
-
-            // Signature re-use is not an issue because this transaction is forced to be sent by the
-            // validator of this node. Its not propagated on the network
+            let signed_payload = encode_aggregate_heartbeat_params::<T>(
+                &proof.relayer,
+                &nodes,
+                &(nodes.len() as u32),
+                &block_number,
+            );
             ensure!(
-                AVN::<T>::signature_is_valid(&(MINT_REWARDS_CONTEXT, amount), &author, &signature),
+                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
                 Error::<T>::UnauthorizedSignedTransaction
             );
 
-            ensure!(amount > BalanceOf::<T>::zero(), Error::<T>::ZeroAmount);
-            ensure!(!PendingMintRequestState::<T>::exists(), Error::<T>::MintRequestInProgress);
+            // The prover must be a registered node; its owner is the
+            // asserted owner of every node in the batch.
+            let prover_info =
+                NodeRegistry::<T>::get(&proof.signer).ok_or(Error::<T>::ProverNotRegistered)?;
+            let asserted_owner = prover_info.owner.clone();
 
-            let tx_id = Self::send_mint_to_ethereum(amount)?;
-            PendingMintRequestState::<T>::put(PendingMintRequest {
-                tx_id,
-                amount,
-                bridge_confirmed: false,
-                credit_received: false,
+            let reward_period = RewardPeriod::<T>::get();
+            let current_period = reward_period.current;
+            let now = frame_system::Pallet::<T>::block_number();
+
+            // Pre-flight validation: every node must be registered to the
+            // asserted owner - a false ownership claim is fatal and rejects the
+            // whole batch. Rate-limiting mirrors the OCW path
+            // (`validate_heartbeats`) but is per-node isolated: a node already at
+            // the uptime threshold or still inside the spacing window is skipped,
+            // not fatal, so a single maxed/recent node cannot block heartbeat
+            // progress for the rest of the batch. Dedup is via BTreeSet so the
+            // loop below stays O(N log N) and silently drops duplicate entries
+            // within a single call. A second heartbeat for the same node in the
+            // same block across distinct outer nonces is barred instead by the
+            // spacing check below (`now < last_reported + heartbeat_period`),
+            // not by this in-call set.
+            use sp_std::collections::btree_set::BTreeSet;
+            let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
+            for node in nodes.iter() {
+                let info = NodeRegistry::<T>::get(node).ok_or(Error::<T>::NodeNotOwnedByProver)?;
+                ensure!(info.owner == asserted_owner, Error::<T>::NodeNotOwnedByProver);
+
+                if let Some(uptime_info) = NodeUptime::<T>::get(current_period, node) {
+                    if uptime_info.count >= reward_period.uptime_threshold as u64 {
+                        continue
+                    }
+                    let expected_submission = uptime_info.last_reported +
+                        BlockNumberFor::<T>::from(reward_period.heartbeat_period);
+                    if now < expected_submission {
+                        continue
+                    }
+                }
+
+                unique.insert(node.clone());
+            }
+
+            // All validations passed; record heartbeats. From this point on
+            // we mutate state and cannot fail (modulo storage I/O).
+            let mut total_new_weight: u128 = 0;
+            let mut new_heartbeat_count: u64 = 0;
+
+            for node in unique {
+                NodeUptime::<T>::mutate(current_period, &node, |maybe_info| {
+                    let info = maybe_info.get_or_insert_with(|| UptimeInfo {
+                        count: 0,
+                        last_reported: now,
+                        weight: 0,
+                    });
+                    info.count = info.count.saturating_add(1);
+                    info.last_reported = now;
+                    info.weight = info.weight.saturating_add(HEARTBEAT_BASE_WEIGHT);
+                });
+                total_new_weight = total_new_weight.saturating_add(HEARTBEAT_BASE_WEIGHT);
+                new_heartbeat_count = new_heartbeat_count.saturating_add(1);
+                Self::deposit_event(Event::HeartbeatReceived {
+                    reward_period_index: current_period,
+                    node,
+                });
+            }
+
+            TotalUptime::<T>::mutate(current_period, |total| {
+                total.total_heartbeats = total.total_heartbeats.saturating_add(new_heartbeat_count);
+                total.total_weight = total.total_weight.saturating_add(total_new_weight);
             });
-
-            Self::deposit_event(Event::MintRequestSubmitted { amount, tx_id });
 
             Ok(())
         }
 
-        /// Register a bonus node
-        #[pallet::call_index(12)]
-        #[pallet::weight(<T as Config>::WeightInfo::register_bonus_node())]
-        pub fn register_bonus_node(
+        /// Withdraw locked rewards. `amount = None` withdraws the caller's
+        /// full locked balance; `Some(limit)` withdraws exactly `limit`.
+        /// The forfeiture rate of the global lock window at the time of the
+        /// call applies to the withdrawn slice: `forfeited = penalty x gross`
+        /// goes to the forfeiture destination, the remainder to the caller's
+        /// free balance. From week 53 of the window onward the penalty is
+        /// zero and a withdrawal returns the full amount.
+        ///
+        /// Fails while the global lock window is unconfigured: rewards
+        /// accrued before the window is set stay locked until root sets it.
+        #[pallet::call_index(13)]
+        #[pallet::weight(<T as Config>::WeightInfo::withdraw_rewards())]
+        pub fn withdraw_rewards(
             origin: OriginFor<T>,
-            node: NodeId<T>,
-            owner: T::AccountId,
-            signing_key: T::SignerId,
+            amount: Option<BalanceOf<T>>,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
-            ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
 
-            // Default to auto_stake true; bonus nodes use the bonus serial counter
-            Self::do_register_node(node, owner, signing_key, true, true)?;
+            let locked = LockedRewards::<T>::get(&who);
+            ensure!(!locked.is_zero(), Error::<T>::NoLockedRewards);
+            let schedule = LockSchedule::<T>::get().ok_or(Error::<T>::LockScheduleNotSet)?;
+
+            let gross = amount.unwrap_or(locked);
+            ensure!(!gross.is_zero(), Error::<T>::ZeroAmount);
+            ensure!(gross <= locked, Error::<T>::WithdrawAmountExceedsLocked);
+
+            let penalty = schedule.penalty_at(Self::time_now_sec());
+            let forfeited = penalty.mul_floor(gross);
+            let net = gross.saturating_sub(forfeited);
+
+            // Both transfers come out of the reward-pot account, where locked
+            // rewards physically live. Extrinsic transactionality reverts the
+            // first transfer if the second fails.
+            let reward_pot = Self::compute_reward_account_id();
+            if !net.is_zero() {
+                T::Currency::transfer(&reward_pot, &who, net, ExistenceRequirement::AllowDeath)?;
+            }
+            if !forfeited.is_zero() {
+                let destination =
+                    ForfeitureDestination::<T>::get().unwrap_or_else(T::TreasurySource::get);
+                T::Currency::transfer(
+                    &reward_pot,
+                    &destination,
+                    forfeited,
+                    ExistenceRequirement::AllowDeath,
+                )?;
+            }
+
+            let remaining = locked.saturating_sub(gross);
+            if remaining.is_zero() {
+                LockedRewards::<T>::remove(&who);
+            } else {
+                LockedRewards::<T>::insert(&who, remaining);
+            }
+            TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_sub(gross));
+
+            Self::deposit_event(Event::RewardWithdrawn {
+                owner: who,
+                gross,
+                net,
+                forfeited,
+                penalty,
+            });
+
             Ok(())
         }
     }
@@ -1245,13 +1158,21 @@ pub mod pallet {
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         // Keep this logic light and bounded
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+            // Halving runs unconditionally before the rollover guard so that a
+            // halving + rollover that fall on the same block use the post-
+            // halved amount. Its weight is charged onto every return path
+            // below so a halving-due block is accounted for its worst case.
+            let halving_weight = Self::apply_halving_if_due(n);
+
             if !RewardEnabled::<T>::get() {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
+                    .saturating_add(halving_weight)
             }
 
             let reward_period = RewardPeriod::<T>::get();
             if !reward_period.should_update(n) {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
+                    .saturating_add(halving_weight)
             }
 
             let previous_index = reward_period.current;
@@ -1264,6 +1185,7 @@ pub mod pallet {
             if next_reward_period_length == 0 || next_heartbeat_period == 0 {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
                     .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
+                    .saturating_add(halving_weight)
             }
 
             let next_reward_amount = NextRewardAmountPerPeriod::<T>::get();
@@ -1277,21 +1199,61 @@ pub mod pallet {
                 next_uptime_threshold,
                 next_reward_amount,
             );
-            RewardPeriod::<T>::put(&next_reward_period);
+            RewardPeriod::<T>::put(next_reward_period);
 
-            // take a snapshot of the reward pot amount to pay for the previous reward period
+            // Fund the previous period's reward pot synchronously from the
+            // treasury source. The pot account is recorded either way so the
+            // period is recoverable via `top_up_reward_pot` if the transfer
+            // fails (treasury underfunded, ED violation, etc.). If the period
+            // turns out to have no distributable uptime, the funds are
+            // reclaimed back to the treasury when the drain skips it (see
+            // `drain_outstanding_payouts`), so they are never stranded.
+            let treasury = T::TreasurySource::get();
+            let pot = Self::compute_reward_account_id();
+            let (funded_amount, funding_failed) = match T::Currency::transfer(
+                &treasury,
+                &pot,
+                reward_amount,
+                ExistenceRequirement::KeepAlive,
+            ) {
+                Ok(()) => {
+                    OutstandingRewardToPay::<T>::mutate(|outstanding| {
+                        *outstanding = outstanding.saturating_add(reward_amount);
+                    });
+                    Self::deposit_event(Event::RewardPotFunded {
+                        period: previous_index,
+                        amount: reward_amount,
+                    });
+                    (reward_amount, false)
+                },
+                Err(reason) => {
+                    Self::deposit_event(Event::RewardPotFundingFailed {
+                        period: previous_index,
+                        requested_amount: reward_amount,
+                        reason,
+                    });
+                    // A genuine funding failure only happens when a non-zero
+                    // reward could not be transferred. A zero `reward_amount`
+                    // transfers trivially via the `Ok` arm, so reaching here
+                    // with a non-zero requested amount marks the period as
+                    // awaiting recovery.
+                    (BalanceOf::<T>::zero(), !reward_amount.is_zero())
+                },
+            };
+
+            // Always record the period snapshot. On funding failure the entry
+            // carries `total_reward = 0` and `funding_failed = true`, so the
+            // drain leaves it recoverable and `top_up_reward_pot` can later
+            // replace it with the actual funded amount.
             <RewardPot<T>>::insert(
                 previous_index,
                 RewardPotInfo::<BalanceOf<T>>::new(
-                    reward_amount,
+                    funded_amount,
                     previous_uptime_threshold,
                     Self::time_now_sec(),
+                    funding_failed,
                 ),
             );
-
-            OutstandingRewardToPay::<T>::mutate(|outstanding| {
-                *outstanding = outstanding.saturating_add(reward_amount);
-            });
 
             Self::deposit_event(Event::NewRewardPeriodStarted {
                 reward_period_index: next_reward_period.current,
@@ -1301,23 +1263,33 @@ pub mod pallet {
             });
 
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
+                .saturating_add(halving_weight)
+        }
+
+        /// `on_idle` drain: when block production has remaining weight, walk
+        /// the oldest unpaid reward period and pay nodes one at a time until
+        /// (a) the weight budget is exhausted, (b) the per-block batch cap is
+        /// hit, or (c) the period is fully paid (in which case
+        /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`
+        /// and we may roll into the next period if weight remains).
+        fn on_idle(_n: BlockNumberFor<T>, remaining_weight: Weight) -> Weight {
+            if !RewardEnabled::<T>::get() {
+                return Weight::zero()
+            }
+            // Hand the drain only a share of the block's leftover weight so
+            // other `on_idle` consumers keep headroom.
+            let budget = Weight::from_parts(
+                ON_IDLE_WEIGHT_SHARE.mul_floor(remaining_weight.ref_time()),
+                ON_IDLE_WEIGHT_SHARE.mul_floor(remaining_weight.proof_size()),
+            );
+            Self::drain_outstanding_payouts(budget)
         }
 
         fn offchain_worker(n: BlockNumberFor<T>) {
             log::info!("🛠️  OCW for node manager");
 
-            if <RewardEnabled<T>>::get() == false {
+            if !<RewardEnabled<T>>::get() {
                 log::warn!("🛠️  OCW - rewards are disabled, skipping");
-                return
-            }
-
-            let maybe_author = Self::try_get_node_author(n);
-            if let Some(author) = maybe_author {
-                Self::trigger_mint_if_required(author.clone());
-
-                let oldest_unpaid_period = OldestUnpaidRewardPeriodIndex::<T>::get();
-                Self::trigger_payment_if_required(oldest_unpaid_period, author);
-                // If this is an author node, we don't need to send a heartbeat
                 return
             }
 
@@ -1328,49 +1300,20 @@ pub mod pallet {
     #[pallet::validate_unsigned]
     impl<T: Config> ValidateUnsigned for Pallet<T> {
         type Call = Call<T>;
-        fn validate_unsigned(source: TransactionSource, call: &Self::Call) -> TransactionValidity {
-            if <RewardEnabled<T>>::get() == false {
+        fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+            if !<RewardEnabled<T>>::get() {
                 return InvalidTransaction::Custom(ERROR_CODE_REWARD_DISABLED).into()
             }
 
             let reduce_priority: TransactionPriority = TransactionPriority::from(1000u64);
             match call {
-                Call::offchain_pay_nodes { reward_period_index, author, signature } => {
-                    // Discard unsinged tx's not coming from the local OCW.
-                    match source {
-                        TransactionSource::Local | TransactionSource::InBlock => { /* allowed */ },
-                        _ => return InvalidTransaction::Call.into(),
-                    }
-
-                    if AVN::<T>::signature_is_valid(
-                        // Technically this signature can be replayed for the duration of the
-                        // reward period but in reality, since we only
-                        // accept locally produced transactions and we don'
-                        // t propagate them, only an author can submit this transaction and there
-                        // is nothing to gain.
-                        &(PAYOUT_REWARD_CONTEXT, reward_period_index),
-                        &author,
-                        signature,
-                    ) {
-                        ValidTransaction::with_tag_prefix("NodeManagerPayout")
-                            .and_provides((PAYOUT_REWARD_CONTEXT, reward_period_index, author))
-                            .priority(TransactionPriority::max_value() - reduce_priority)
-                            .longevity(64_u64)
-                            // We don't propagate this transaction,
-                            // it ensures only block authors can pay rewards
-                            .propagate(false)
-                            .build()
-                    } else {
-                        InvalidTransaction::Custom(ERROR_CODE_INVALID_PAY_SIGNATURE).into()
-                    }
-                },
                 Call::offchain_submit_heartbeat {
                     node,
                     reward_period_index,
                     heartbeat_count,
                     signature,
                 } => {
-                    let node_info = NodeRegistry::<T>::get(&node);
+                    let node_info = NodeRegistry::<T>::get(node);
                     match node_info {
                         Some(info) => {
                             if Self::validate_heartbeats(
@@ -1395,43 +1338,18 @@ pub mod pallet {
                                 .into()
                             }
 
-                            return ValidTransaction::with_tag_prefix("NodeManagerHeartbeat")
+                            ValidTransaction::with_tag_prefix("NodeManagerHeartbeat")
                                 .and_provides((
                                     HEARTBEAT_CONTEXT,
                                     node,
                                     reward_period_index,
                                     heartbeat_count,
                                 ))
-                                .priority(TransactionPriority::max_value() - reduce_priority)
+                                .priority(TransactionPriority::MAX - reduce_priority)
                                 .longevity(64_u64)
                                 .build()
                         },
                         _ => InvalidTransaction::Custom(ERROR_CODE_INVALID_NODE).into(),
-                    }
-                },
-                Call::offchain_mint_rewards { amount, author, signature } => {
-                    match source {
-                        TransactionSource::Local | TransactionSource::InBlock => {},
-                        _ => return InvalidTransaction::Call.into(),
-                    }
-
-                    if PendingMintRequestState::<T>::exists() {
-                        return InvalidTransaction::Stale.into()
-                    }
-
-                    if AVN::<T>::signature_is_valid(
-                        &(MINT_REWARDS_CONTEXT, amount),
-                        author,
-                        signature,
-                    ) {
-                        ValidTransaction::with_tag_prefix("NodeManagerMint")
-                            .and_provides((MINT_REWARDS_CONTEXT, amount, author))
-                            .priority(TransactionPriority::max_value() - reduce_priority)
-                            .longevity(64_u64)
-                            .propagate(false)
-                            .build()
-                    } else {
-                        InvalidTransaction::Custom(ERROR_CODE_INVALID_MINT_SIGNATURE).into()
                     }
                 },
                 _ => InvalidTransaction::Call.into(),
@@ -1477,10 +1395,7 @@ pub mod pallet {
             nodes: &BoundedVec<NodeId<T>, MaxNodesToDeregister>,
         ) -> DispatchResult {
             for node in nodes {
-                ensure!(
-                    <OwnedNodes<T>>::contains_key(owner, node),
-                    Error::<T>::NodeNotOwnedByOwner
-                );
+                ensure!(<OwnedNodes<T>>::contains_key(owner, node), Error::<T>::NodeNotRegistered);
 
                 let info = NodeRegistry::<T>::take(node).ok_or(Error::<T>::NodeNotRegistered)?;
                 Self::remove_signing_key_index(node, &info.signing_key)?;
@@ -1488,15 +1403,7 @@ pub mod pallet {
                 <OwnedNodes<T>>::remove(owner, node);
                 <OwnedNodesCount<T>>::mutate(owner, |count| *count = count.saturating_sub(1));
                 <TotalRegisteredNodes<T>>::mutate(|n| *n = n.saturating_sub(1));
-
-                if Self::is_bonus_node(&info) {
-                    <TotalRegisteredBonusNodes<T>>::mutate(|n| *n = n.saturating_sub(1));
-                }
-
-                // Unreserve stake for this node if there is any
-                if !info.stake.amount.is_zero() {
-                    Self::update_reserves(owner, info.stake.amount, StakeOperation::Remove)?;
-                }
+                let _ = info;
 
                 Self::deposit_event(Event::NodeDeregistered {
                     owner: owner.clone(),
@@ -1520,23 +1427,16 @@ pub mod pallet {
             node: NodeId<T>,
             owner: T::AccountId,
             signing_key: T::SignerId,
-            auto_stake_rewards: bool,
-            is_bonus: bool,
         ) -> DispatchResult {
             ensure!(!<NodeRegistry<T>>::contains_key(&node), Error::<T>::DuplicateNode);
             ensure!(
                 !SigningKeyToNodeId::<T>::contains_key(&signing_key),
                 Error::<T>::SigningKeyAlreadyInUse
             );
-
-            if !is_bonus {
-                ensure!(
-                    NextNodeSerialNumber::<T>::get() < T::BonusNodeSerialStart::get(),
-                    Error::<T>::NodeSerialLimitReached
-                );
-            }
-
-            let auto_stake_expiry = Self::calculate_auto_stake_expiry();
+            ensure!(
+                TotalRegisteredNodes::<T>::get() < T::MaxRegisteredNodes::get(),
+                Error::<T>::MaxNodesReached
+            );
 
             <OwnedNodes<T>>::insert(&owner, &node, ());
             <OwnedNodesCount<T>>::mutate(&owner, |count| *count = count.saturating_add(1));
@@ -1545,30 +1445,16 @@ pub mod pallet {
                 *n = n.saturating_add(1);
             });
 
-            if is_bonus {
-                <TotalRegisteredBonusNodes<T>>::mutate(|n| {
-                    *n = n.saturating_add(1);
-                });
-            }
-
             Self::insert_signing_key_index(&node, &signing_key)?;
 
-            let node_serial_number = Self::calculate_node_serial(is_bonus);
+            let node_serial_number = Self::calculate_node_serial();
 
             <NodeRegistry<T>>::insert(
                 &node,
-                NodeInfo::<T::SignerId, T::AccountId, BalanceOf<T>>::new(
+                NodeInfo::<T::SignerId, T::AccountId>::new(
                     owner.clone(),
                     signing_key,
                     node_serial_number,
-                    auto_stake_expiry,
-                    auto_stake_rewards,
-                    StakeInfo::<BalanceOf<T>>::new(
-                        Zero::zero(),
-                        Zero::zero(),
-                        None,
-                        UnstakeRestriction::Locked,
-                    ),
                 ),
             );
 
@@ -1577,26 +1463,12 @@ pub mod pallet {
             Ok(())
         }
 
-        pub fn calculate_node_serial(is_bonus: bool) -> u32 {
-            if is_bonus {
-                <NextBonusNodeSerialNumber<T>>::mutate(|n| {
-                    let current = *n;
-                    *n = n.saturating_add(1);
-                    current
-                })
-            } else {
-                <NextNodeSerialNumber<T>>::mutate(|n| {
-                    let current = *n;
-                    *n = n.saturating_add(1);
-                    current
-                })
-            }
-        }
-
-        pub fn is_bonus_node(
-            node_info: &NodeInfo<T::SignerId, T::AccountId, BalanceOf<T>>,
-        ) -> bool {
-            node_info.serial_number >= T::BonusNodeSerialStart::get()
+        pub fn calculate_node_serial() -> u32 {
+            <NextNodeSerialNumber<T>>::mutate(|n| {
+                let current = *n;
+                *n = n.saturating_add(1);
+                current
+            })
         }
 
         pub fn offchain_signature_is_valid<D: Encode>(
@@ -1605,7 +1477,7 @@ pub mod pallet {
             signature: &<T::SignerId as RuntimeAppPublic>::Signature,
         ) -> bool {
             let signature_valid =
-                data.using_encoded(|encoded_data| signer.verify(&encoded_data, &signature));
+                data.using_encoded(|encoded_data| signer.verify(&encoded_data, signature));
 
             log::trace!(
                 "🪲 Validating signature: [ data {:?} - account {:?} - signature {:?} ] Result: {}",
@@ -1614,16 +1486,14 @@ pub mod pallet {
                 signature,
                 signature_valid
             );
-            return signature_valid
+            signature_valid
         }
 
+        #[allow(clippy::type_complexity)]
         pub fn get_encoded_call_param(
             call: &<T as Config>::RuntimeCall,
         ) -> Option<(&Proof<T::Signature, T::AccountId>, Vec<u8>)> {
-            let call = match call.is_sub_type() {
-                Some(call) => call,
-                None => return None,
-            };
+            let call = call.is_sub_type()?;
 
             match call {
                 Call::signed_register_node {
@@ -1659,94 +1529,22 @@ pub mod pallet {
 
                     Some((proof, encoded_data))
                 },
+                Call::heartbeat_for_owned_nodes { ref proof, ref nodes, ref block_number } => {
+                    let encoded_data = encode_aggregate_heartbeat_params::<T>(
+                        &proof.relayer,
+                        nodes,
+                        &(nodes.len() as u32),
+                        block_number,
+                    );
+
+                    Some((proof, encoded_data))
+                },
                 _ => None,
             }
         }
 
         pub fn get_default_threshold() -> Perbill {
             Perbill::from_percent(33)
-        }
-
-        pub fn calculate_auto_stake_expiry() -> Duration {
-            let current_time = Self::time_now_sec();
-            current_time.saturating_add(AutoStakeDurationSec::<T>::get())
-        }
-
-        pub fn next_mint_amount_to_request() -> Option<BalanceOf<T>> {
-            if PendingMintRequestState::<T>::exists() {
-                return None
-            }
-
-            let num_periods = NumPeriodsToMint::<T>::get();
-            if num_periods == 0 {
-                return None
-            }
-
-            let reward_per_period = NextRewardAmountPerPeriod::<T>::get();
-            if reward_per_period == BalanceOf::<T>::zero() {
-                return None
-            }
-
-            let outstanding = OutstandingRewardToPay::<T>::get();
-            let current_balance = Self::reward_pot_balance();
-
-            // N periods of runway
-            let runway = reward_per_period.checked_mul(&(num_periods.into())).or_else(|| {
-                log::error!(
-                    "💔 Mint overflow: reward_per_period * num_periods ({:?} * {:?})",
-                    reward_per_period,
-                    num_periods
-                );
-                None
-            })?;
-
-            // Mint triggers when pot drops below this (N periods of buffer above obligations)
-            let refill_threshold = outstanding.checked_add(&runway).or_else(|| {
-                log::error!(
-                    "💔 Mint overflow: outstanding + runway ({:?} + {:?})",
-                    outstanding,
-                    runway
-                );
-                None
-            })?;
-
-            // After minting, pot should reach this (2N periods of buffer above obligations)
-            let target = refill_threshold.checked_add(&runway).or_else(|| {
-                log::error!(
-                    "💔 Mint overflow: refill_threshold + runway ({:?} + {:?})",
-                    refill_threshold,
-                    runway
-                );
-                None
-            })?;
-
-            if current_balance >= refill_threshold {
-                // We have enough in the pot to cover obligations + runway, no need to mint yet
-                return None
-            }
-
-            let mint_amount = target.checked_sub(&current_balance).or_else(|| {
-                log::error!(
-                    "💔 Mint underflow: target - balance ({:?} - {:?})",
-                    target,
-                    current_balance
-                );
-                None
-            })?;
-
-            // In normal operation mint ≈ runway (N × reward).
-            // Add a cap as a safety ceiling.
-            let max_mint = runway.saturating_mul(MINT_SAFETY_CAP_MULTIPLIER.into());
-            if mint_amount > max_mint {
-                log::error!(
-                    "💔💔 Mint amount {:?} exceeds safety cap {:?} ({} x N x reward). There might be bridge issues or payout has stalled.",
-                    mint_amount, max_mint, MINT_SAFETY_CAP_MULTIPLIER
-                );
-
-                return None
-            }
-
-            Some(mint_amount)
         }
 
         /// Insert signing key reverse index. Fails if key already belongs to another node.
@@ -1783,104 +1581,6 @@ pub mod pallet {
             Self::insert_signing_key_index(node, new_key)?;
             Ok(())
         }
-
-        fn send_mint_to_ethereum(amount: BalanceOf<T>) -> Result<EthereumId, DispatchError> {
-            // Equivalent to sp_avn_common::BridgeContractMethod::MintRewards.name_as_bytes().
-            // Inlined while the upstream variant is not on the published branch.
-            let function_name: &[u8] = b"mintRewards";
-            let amount_u128: u128 = amount.saturated_into();
-            let params = vec![(b"uint128".to_vec(), amount_u128.to_string().into_bytes())];
-
-            T::BridgeInterface::publish(function_name, &params, PALLET_ID.to_vec())
-                .map_err(|e| DispatchError::Other(e.into()))
-        }
-
-        fn credit_reward_pot(raw_amount: u128) -> DispatchResult {
-            let amount = <BalanceOf<T> as TryFrom<u128>>::try_from(raw_amount)
-                .map_err(|_| Error::<T>::MintAmountOverflow)?;
-
-            let reward_account = Self::compute_reward_account_id();
-            let _imbalance: PositiveImbalanceOf<T> =
-                <T as Config>::Currency::deposit_creating(&reward_account, amount);
-
-            Ok(())
-        }
-
-        fn resolve_pending_mint_request(tx_id: EthereumId, succeeded: bool) {
-            PendingMintRequestState::<T>::kill();
-            Self::deposit_event(Event::MintRequestResolved { tx_id, succeeded });
-        }
-
-        fn process_mint_request_result(tx_id: EthereumId, succeeded: bool) -> DispatchResult {
-            match PendingMintRequestState::<T>::get() {
-                Some(mut pending) if pending.tx_id == tx_id => {
-                    if !succeeded {
-                        log::error!("💔 Mint request to Ethereum failed. tx_id: {:?}", tx_id);
-
-                        Self::resolve_pending_mint_request(tx_id, false);
-                        return Ok(())
-                    }
-
-                    if pending.credit_received {
-                        Self::resolve_pending_mint_request(tx_id, true);
-                    } else {
-                        pending.bridge_confirmed = true;
-                        PendingMintRequestState::<T>::put(pending);
-                    }
-                },
-                _ => {
-                    // Not the currently tracked node-manager mint request so ignore
-                },
-            }
-
-            Ok(())
-        }
-
-        #[cfg(feature = "rewards-minted-ingest")]
-        fn process_rewards_minted(
-            event: &EthEvent,
-            data: &TotalSupplyUpdatedData,
-        ) -> DispatchResult {
-            let event_id = &event.event_id;
-            let event_validity = T::ProcessedEventsChecker::processed_event_exists(event_id);
-            ensure!(event_validity, Error::<T>::NoTier1MintEventFound);
-
-            ensure!(data.amount > 0, Error::<T>::ZeroAmount);
-
-            Self::credit_reward_pot(data.amount)?;
-
-            // t2_tx_id == 0 means this mint was triggered directly by the owner on Ethereum,
-            // so it should credit the reward pot but must not affect pallet-tracked mint state.
-            if data.t2_tx_id == 0 {
-                return Ok(())
-            }
-
-            match PendingMintRequestState::<T>::get() {
-                Some(mut pending) if pending.tx_id == data.t2_tx_id =>
-                    if pending.bridge_confirmed {
-                        Self::resolve_pending_mint_request(data.t2_tx_id, true);
-                    } else {
-                        pending.credit_received = true;
-                        PendingMintRequestState::<T>::put(pending);
-                    },
-                _ => {
-                    // This rewards-minted log is either for an owner-triggered mint, some other
-                    // caller, or an old request we are no longer tracking. The credit has already
-                    // been applied, so nothing else to do.
-                },
-            }
-
-            Ok(())
-        }
-
-        fn processed_event_handler(_event: &EthEvent) -> DispatchResult {
-            // The rewards-minted ingest arm (EventData::LogRewardsMinted) requires that
-            // variant to exist on the upstream sp_avn_common::EventData enum, which the
-            // published branch consumed by this workspace does not currently expose.
-            // Once it lands upstream, gate this match arm and the helper above behind
-            // `rewards-minted-ingest` (or remove the cfg entirely).
-            Ok(())
-        }
     }
 
     impl<T: Config> InnerCallValidator for Pallet<T> {
@@ -1889,37 +1589,13 @@ pub mod pallet {
         fn signature_is_valid(call: &Box<Self::Call>) -> bool {
             if let Some((proof, signed_payload)) = Self::get_encoded_call_param(call) {
                 return verify_signature::<T::Signature, T::AccountId>(
-                    &proof,
-                    &signed_payload.as_slice(),
+                    proof,
+                    signed_payload.as_slice(),
                 )
                 .is_ok()
             }
 
             false
-        }
-    }
-
-    impl<T: Config> ProcessedEventHandler for Pallet<T> {
-        fn on_event_processed(event: &EthEvent) -> DispatchResult {
-            Self::processed_event_handler(event)
-        }
-    }
-
-    impl<T: Config> BridgeInterfaceNotification for Pallet<T> {
-        fn process_result(
-            tx_id: EthereumId,
-            caller_id: Vec<u8>,
-            succeeded: bool,
-        ) -> DispatchResult {
-            if caller_id.as_slice() != PALLET_ID {
-                return Ok(())
-            }
-
-            Self::process_mint_request_result(tx_id, succeeded)
-        }
-
-        fn on_incoming_event_processed(event: &EthEvent) -> DispatchResult {
-            Self::processed_event_handler(event)
         }
     }
 }
@@ -1932,6 +1608,15 @@ pub fn encode_signed_register_node_params<T: Config>(
     block_number: &BlockNumberFor<T>,
 ) -> Vec<u8> {
     (SIGNED_REGISTER_NODE_CONTEXT, relayer.clone(), node, owner, signing_key, block_number).encode()
+}
+
+pub fn encode_aggregate_heartbeat_params<T: Config>(
+    relayer: &T::AccountId,
+    nodes: &BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat>,
+    number_of_nodes: &u32,
+    block_number: &BlockNumberFor<T>,
+) -> Vec<u8> {
+    (AGGREGATE_HEARTBEAT_CONTEXT, relayer.clone(), nodes, number_of_nodes, block_number).encode()
 }
 
 pub fn encode_signed_deregister_node_params<T: Config>(
