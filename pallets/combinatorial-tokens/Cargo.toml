@@ -26,8 +26,7 @@ pallet-pm-market-commons = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 test-case = { workspace = true }
-# Remove the mock feature to avoid a circular dependency
-# pallet-pm-combinatorial-tokens = { workspace = true, features = ["default", "mock"] }
+pallet-pm-combinatorial-tokens = { workspace = true, features = ["default", "mock"] }
 
 [features]
 default = ["std"]
@@ -69,4 +68,4 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-combinatorial-tokens"
-version = "0.2.0"
+version.workspace = true

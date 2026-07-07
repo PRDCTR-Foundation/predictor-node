@@ -45,8 +45,7 @@ sp-keystore = { workspace = true, optional = true }
 [dev-dependencies]
 more-asserts = { workspace = true }
 test-case = { workspace = true }
-# Remove when pallet-pm-neo-swaps is added to the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
-# pallet-pm-neo-swaps = { workspace = true, features = ["mock"] }
+pallet-pm-neo-swaps = { workspace = true, features = ["mock"] }
 sp-keystore = { workspace = true, features = ["default"]}
 sp-avn-common = { workspace = true, features=["test-utils"] }
 
@@ -122,5 +121,5 @@ try-runtime = [
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-neo-swaps"
-version = "0.2.0"
+version.workspace = true
 

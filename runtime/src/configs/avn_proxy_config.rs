@@ -46,8 +46,8 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     t1_recipient: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_create_market_and_deploy_pool {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_create_market_and_deploy_pool {
                     proof,
                     base_asset: _,
                     creator_fee: _,
@@ -62,37 +62,42 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     swap_fee: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(pallet_prediction_markets::Call::signed_report {
-                proof,
-                market_id: _,
-                outcome: _,
-            }) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_transfer_asset {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_report {
+                    proof,
+                    market_id: _,
+                    outcome: _,
+                },
+            ) => return Some(proof.clone()),
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_transfer_asset {
                     proof,
                     token: _,
                     to: _,
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_redeem_shares { proof, market_id: _ },
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_redeem_shares {
+                    proof,
+                    market_id: _,
+                },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_withdraw_tokens {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_withdraw_tokens {
                     proof,
                     token: _,
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::PredictionMarkets(
-                pallet_prediction_markets::Call::signed_buy_complete_set {
+            RuntimeCall::SignedPredictionMarkets(
+                pallet_pm_signed_prediction_markets::Call::signed_buy_complete_set {
                     proof,
                     market_id: _,
                     amount: _,
                 },
             ) => return Some(proof.clone()),
-            RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_buy {
+            RuntimeCall::SignedHybridRouter(pallet_pm_signed_hybrid_router::Call::signed_buy {
                 proof,
                 market_id: _,
                 asset_count: _,
@@ -102,24 +107,26 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 orders: _,
                 strategy: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::HybridRouter(pallet_pm_hybrid_router::Call::signed_sell {
-                proof,
-                market_id: _,
-                asset_count: _,
-                asset: _,
-                amount_in: _,
-                min_price: _,
-                orders: _,
-                strategy: _,
-            }) => return Some(proof.clone()),
-            RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_join {
+            RuntimeCall::SignedHybridRouter(
+                pallet_pm_signed_hybrid_router::Call::signed_sell {
+                    proof,
+                    market_id: _,
+                    asset_count: _,
+                    asset: _,
+                    amount_in: _,
+                    min_price: _,
+                    orders: _,
+                    strategy: _,
+                },
+            ) => return Some(proof.clone()),
+            RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,
                 pool_shares_amount: _,
                 max_amounts_in: _,
                 block_number: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_exit {
+            RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_exit {
                 proof,
                 market_id: _,
                 pool_shares_amount_out: _,
