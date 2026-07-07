@@ -44,10 +44,7 @@ fn set_registrar<T: Config>(registrar: T::AccountId) {
 
 fn register_new_node<T: Config>(node: NodeId<T>, owner: T::AccountId) -> T::SignerId {
     let key = T::SignerId::generate_pair(None);
-    <NodeRegistry<T>>::insert(
-        node.clone(),
-        NodeInfo::new(owner.clone(), key.clone(), 0u32),
-    );
+    <NodeRegistry<T>>::insert(node.clone(), NodeInfo::new(owner.clone(), key.clone(), 0u32));
     <OwnedNodes<T>>::insert(owner.clone(), node, ());
     <OwnedNodesCount<T>>::mutate(owner, |count| *count += 1);
 
@@ -387,10 +384,101 @@ benchmarks! {
         assert!(node_info.signing_key == new_signing_key);
         assert_last_event::<T>(Event::SigningKeyUpdated {owner, node}.into());
     }
+
+    // Worst-case cost of paying one node in the `on_idle` drain: owner lookup,
+    // reward transfer from the pot, and the `RewardPaid` event.
+    pay_one_node {
+        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
+        enable_rewards::<T>();
+        fund_reward_pot::<T>();
+        // Expired lock window (zero penalty) so the pay path takes the direct
+        // transfer branch and credits the owner's free balance, exercising the
+        // heavier of the two per-node payout paths.
+        <LockSchedule<T>>::put(LockScheduleInfo::new(0u64, 0u32));
+
+        let reward_period = <RewardPeriod<T>>::get();
+        let period = reward_period.current;
+        let owner: T::AccountId = account("owner", 0, 0);
+        let node: NodeId<T> = account("node", 1, 1);
+        let _ = register_new_node::<T>(node.clone(), owner.clone());
+        create_heartbeat::<T>(node.clone(), period);
+
+        let uptime_info = <NodeUptime<T>>::get(period, &node).expect("uptime recorded");
+        let total_weight = <TotalUptime<T>>::get(period).total_weight;
+        let reward_amount = <NextRewardAmountPerPeriod<T>>::get();
+        let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
+            reward_amount,
+            reward_period.uptime_threshold,
+            Pallet::<T>::time_now_sec(),
+            false,
+        );
+    }: {
+        let _ = Pallet::<T>::pay_one_node(period, &pot_info, &total_weight, node.clone(), uptime_info);
+    }
+    verify {
+        assert!(T::Currency::free_balance(&owner) > BalanceOf::<T>::zero());
+    }
+
+    // Worst-case cost of the applied-halving path in `on_initialize`.
+    apply_halving {
+        let interval = T::HalvingInterval::get();
+        <HalvingEnabled<T>>::put(true);
+        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
+        // One interval in makes exactly one halving due.
+        let n: BlockNumberFor<T> = interval;
+    }: {
+        let _ = Pallet::<T>::apply_halving_if_due(n);
+    }
+    verify {
+        assert!(<RewardAmountHalvingsApplied<T>>::get() >= 1);
+    }
+    set_admin_config_lock_schedule {
+        let schedule = LockScheduleInfo::new(1_000_000u64, 52u32);
+        let config = AdminConfig::LockSchedule(schedule);
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert!(<LockSchedule<T>>::get() == Some(schedule));
+    }
+
+    set_admin_config_forfeiture_destination {
+        let destination: T::AccountId = account("forfeiture", 0, 0);
+        let config = AdminConfig::ForfeitureDestination(destination.clone());
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert!(<ForfeitureDestination<T>>::get() == Some(destination));
+    }
+
+    withdraw_rewards {
+        enable_rewards::<T>();
+        fund_reward_pot::<T>();
+
+        let owner: T::AccountId = account("owner", 1, 1);
+        let destination: T::AccountId = account("forfeiture", 0, 0);
+        <ForfeitureDestination<T>>::put(destination.clone());
+        // Active window at the week-one rate: worst case, both transfers run.
+        <LockSchedule<T>>::put(LockScheduleInfo::new(0u64, 52u32));
+
+        // A concrete amount: `minimum_balance()` can be zero (e.g. the mock),
+        // which would make the locked claim vanish.
+        let locked: BalanceOf<T> = 1_000_000_000u32.into();
+        let reward_pot = Pallet::<T>::compute_reward_account_id();
+        T::Currency::make_free_balance_be(
+            &reward_pot,
+            locked * 10u32.into() + T::Currency::minimum_balance(),
+        );
+        T::Currency::make_free_balance_be(&owner, T::Currency::minimum_balance());
+        <LockedRewards<T>>::insert(&owner, locked);
+        <TotalLockedRewards<T>>::put(locked);
+    }: withdraw_rewards(RawOrigin::Signed(owner.clone()), None)
+    verify {
+        assert!(<LockedRewards<T>>::get(&owner).is_zero());
+        assert!(<TotalLockedRewards<T>>::get().is_zero());
+        assert!(!T::Currency::free_balance(&destination).is_zero());
+    }
 }
 
 impl_benchmark_test_suite!(
     Pallet,
-    crate::mock::ExtBuilder::build_default().with_genesis_config().as_externality(),
-    crate::mock::TestRuntime,
+    crate::tests::mock::ExtBuilder::build_default().with_genesis_config().as_externality(),
+    crate::tests::mock::TestRuntime,
 );

@@ -51,6 +51,14 @@ pub trait WeightInfo {
 	fn deregister_nodes(b: u32, ) -> Weight;
 	fn signed_deregister_nodes(b: u32, ) -> Weight;
 	fn update_signing_key() -> Weight;
+	fn top_up_reward_pot() -> Weight;
+	fn set_halving_enabled() -> Weight;
+	fn heartbeat_for_owned_nodes(b: u32, ) -> Weight;
+	fn pay_one_node() -> Weight;
+	fn apply_halving() -> Weight;
+	fn set_admin_config_lock_schedule() -> Weight;
+	fn set_admin_config_forfeiture_destination() -> Weight;
+	fn withdraw_rewards() -> Weight;
 }
 
 /// Weights for pallet_node_manager using the Substrate node and recommended hardware.
@@ -329,6 +337,62 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(4_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
+	
+	fn top_up_reward_pot() -> Weight {
+		Weight::from_parts(50_000_000, 3656)
+			.saturating_add(T::DbWeight::get().reads(3_u64))
+			.saturating_add(T::DbWeight::get().writes(3_u64))
+	}
+	// One storage write to `HalvingEnabled` + one event.
+	fn set_halving_enabled() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	// Per node: 1 NodeRegistry read (validate), 1 NodeUptime mutate (write).
+	// Plus 1 TotalUptime mutate, 1 RewardPeriod read, 1 Timestamp read,
+	// signature verification (~50M ps), and the BTreeSet dedup.
+	fn heartbeat_for_owned_nodes(b: u32, ) -> Weight {
+		Weight::from_parts(60_000_000, 3656)
+			.saturating_add(T::DbWeight::get().reads(3_u64))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+			.saturating_add(Weight::from_parts(30_000_000, 0).saturating_mul(b.into()))
+			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(b.into())))
+			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(b.into())))
+	}
+	// Per-node payout: 1 NodeRegistry read (owner lookup) + 1 Currency::transfer
+	// (2 reads, 2 writes on Balances) + 1 RewardPaid event.
+	fn pay_one_node() -> Weight {
+		Weight::from_parts(45_000_000, 3656)
+			.saturating_add(T::DbWeight::get().reads(3_u64))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
+	// Applied-halving path: reads HalvingEnabled + RewardAmountHalvingsApplied +
+	// NextRewardAmountPerPeriod + RewardPeriod; writes NextRewardAmountPerPeriod +
+	// RewardAmountHalvingsApplied; plus one event.
+	fn apply_halving() -> Weight {
+		Weight::from_parts(20_000_000, 0)
+			.saturating_add(T::DbWeight::get().reads(4_u64))
+			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
+	// One storage write to `LockSchedule` + one event.
+	fn set_admin_config_lock_schedule() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	// One storage write to `ForfeitureDestination` + one event.
+	fn set_admin_config_forfeiture_destination() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	// Reads: LockedRewards, LockSchedule, Timestamp, ForfeitureDestination,
+	// 3 account balances (pot, owner, forfeiture destination). Writes: up to
+	// two `Currency::transfer`s out of the pot, LockedRewards,
+	// TotalLockedRewards.
+	fn withdraw_rewards() -> Weight {
+		Weight::from_parts(80_000_000, 6196)
+			.saturating_add(T::DbWeight::get().reads(7_u64))
+			.saturating_add(T::DbWeight::get().writes(5_u64))
+	}
 }
 
 // For backwards compatibility and tests.
@@ -605,5 +669,45 @@ impl WeightInfo for () {
 		Weight::from_parts(41_311_000, 6100)
 			.saturating_add(RocksDbWeight::get().reads(4_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	fn top_up_reward_pot() -> Weight {
+		Weight::from_parts(50_000_000, 3656)
+			.saturating_add(RocksDbWeight::get().reads(3_u64))
+			.saturating_add(RocksDbWeight::get().writes(3_u64))
+	}
+	fn set_halving_enabled() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	fn heartbeat_for_owned_nodes(b: u32, ) -> Weight {
+		Weight::from_parts(60_000_000, 3656)
+			.saturating_add(RocksDbWeight::get().reads(3_u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+			.saturating_add(Weight::from_parts(30_000_000, 0).saturating_mul(b.into()))
+			.saturating_add(RocksDbWeight::get().reads((1_u64).saturating_mul(b.into())))
+			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(b.into())))
+	}
+	fn pay_one_node() -> Weight {
+		Weight::from_parts(45_000_000, 3656)
+			.saturating_add(RocksDbWeight::get().reads(3_u64))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	fn apply_halving() -> Weight {
+		Weight::from_parts(20_000_000, 0)
+			.saturating_add(RocksDbWeight::get().reads(4_u64))
+			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	fn set_admin_config_lock_schedule() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	fn set_admin_config_forfeiture_destination() -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	fn withdraw_rewards() -> Weight {
+		Weight::from_parts(80_000_000, 6196)
+			.saturating_add(RocksDbWeight::get().reads(7_u64))
+			.saturating_add(RocksDbWeight::get().writes(5_u64))
 	}
 }

@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock, tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
 
@@ -20,7 +20,7 @@ impl Default for Context {
         setup_registrar(&registrar);
 
         Context {
-            origin: RuntimeOrigin::signed(registrar.clone()),
+            origin: RuntimeOrigin::signed(registrar),
             owner: TestAccount::new([101u8; 32]).account_id(),
             node_id: TestAccount::new([202u8; 32]).account_id(),
             signing_key: <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(None),
@@ -29,7 +29,7 @@ impl Default for Context {
 }
 
 fn setup_registrar(registrar: &AccountId) {
-    <NodeRegistrar<TestRuntime>>::set(Some(registrar.clone()));
+    <NodeRegistrar<TestRuntime>>::set(Some(*registrar));
 }
 
 mod node_registration {
@@ -48,9 +48,9 @@ mod node_registration {
             ));
 
             // The node is owned by the owner
-            assert!(<OwnedNodes<TestRuntime>>::get(&context.owner, &context.node_id).is_some());
+            assert!(<OwnedNodes<TestRuntime>>::get(context.owner, context.node_id).is_some());
             // The node is registered
-            let node_info = <NodeRegistry<TestRuntime>>::get(&context.node_id);
+            let node_info = <NodeRegistry<TestRuntime>>::get(context.node_id);
             assert!(node_info.is_some());
             // Total node counter is increased
             assert_eq!(<TotalRegisteredNodes<TestRuntime>>::get(), 1);
@@ -76,7 +76,7 @@ mod node_registration {
                 // Setup accounts BUT do not set the registrar
                 let registrar = TestAccount::new([1u8; 32]).account_id();
                 let context = Context {
-                    origin: RuntimeOrigin::signed(registrar.clone()),
+                    origin: RuntimeOrigin::signed(registrar),
                     owner: TestAccount::new([101u8; 32]).account_id(),
                     node_id: TestAccount::new([202u8; 32]).account_id(),
                     signing_key: <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(
@@ -101,7 +101,7 @@ mod node_registration {
             let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
             ext.execute_with(|| {
                 let context = Context::default();
-                let bad_origin = RuntimeOrigin::signed(context.owner.clone());
+                let bad_origin = RuntimeOrigin::signed(context.owner);
                 assert_noop!(
                     NodeManager::register_node(
                         bad_origin,
@@ -121,8 +121,8 @@ mod node_registration {
                 let context = Context::default();
                 assert_ok!(NodeManager::register_node(
                     context.origin.clone(),
-                    context.node_id.clone(),
-                    context.owner.clone(),
+                    context.node_id,
+                    context.owner,
                     context.signing_key.clone(),
                 ));
 
@@ -158,16 +158,16 @@ mod rotating_signing_key {
                     context.signing_key,
                 ));
 
-                let old_info = NodeRegistry::<TestRuntime>::get(&context.node_id).unwrap();
+                let old_info = NodeRegistry::<TestRuntime>::get(context.node_id).unwrap();
                 let new_signing_key =
                     <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(None);
                 assert_ok!(NodeManager::update_signing_key(
                     RuntimeOrigin::signed(NodeRegistrar::<TestRuntime>::get().unwrap()),
-                    context.node_id.clone(),
+                    context.node_id,
                     new_signing_key.clone(),
                 ));
 
-                let info = NodeRegistry::<TestRuntime>::get(&context.node_id).unwrap();
+                let info = NodeRegistry::<TestRuntime>::get(context.node_id).unwrap();
                 assert_ne!(info.signing_key, old_info.signing_key);
                 assert_eq!(info.signing_key, new_signing_key);
 
@@ -190,17 +190,17 @@ mod rotating_signing_key {
                     context.signing_key,
                 ));
 
-                let old_info = NodeRegistry::<TestRuntime>::get(&context.node_id).unwrap();
+                let old_info = NodeRegistry::<TestRuntime>::get(context.node_id).unwrap();
 
                 let new_signing_key =
                     <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(None);
                 assert_ok!(NodeManager::update_signing_key(
-                    RuntimeOrigin::signed(context.owner.clone()),
-                    context.node_id.clone(),
+                    RuntimeOrigin::signed(context.owner),
+                    context.node_id,
                     new_signing_key.clone(),
                 ));
 
-                let info = NodeRegistry::<TestRuntime>::get(&context.node_id).unwrap();
+                let info = NodeRegistry::<TestRuntime>::get(context.node_id).unwrap();
                 assert_ne!(info.signing_key, old_info.signing_key);
                 assert_eq!(info.signing_key, new_signing_key);
 
@@ -232,7 +232,7 @@ mod rotating_signing_key {
                 assert_noop!(
                     NodeManager::update_signing_key(
                         RawOrigin::None.into(),
-                        context.node_id.clone(),
+                        context.node_id,
                         new_signing_key.clone(),
                     ),
                     DispatchError::BadOrigin
@@ -259,7 +259,7 @@ mod rotating_signing_key {
                 assert_noop!(
                     NodeManager::update_signing_key(
                         bad_origin,
-                        context.node_id.clone(),
+                        context.node_id,
                         new_signing_key.clone(),
                     ),
                     Error::<TestRuntime>::UnauthorizedSigningKeyUpdate
@@ -283,7 +283,7 @@ mod rotating_signing_key {
                 assert_noop!(
                     NodeManager::update_signing_key(
                         RuntimeOrigin::signed(NodeRegistrar::<TestRuntime>::get().unwrap()),
-                        context.node_id.clone(),
+                        context.node_id,
                         bad_signing_key.clone(),
                     ),
                     Error::<TestRuntime>::SigningKeyMustBeDifferent
@@ -341,14 +341,14 @@ mod rotating_signing_key {
 
                     assert_ok!(NodeManager::register_node(
                         context.origin.clone(),
-                        node_b.clone(),
-                        owner_b.clone(),
+                        node_b,
+                        owner_b,
                         key_b,
                     ));
 
                     // Corrupt storage: map key_a to node_b, so removing key_a for node_a should
                     // fail.
-                    SigningKeyToNodeId::<TestRuntime>::insert(context.signing_key, node_b.clone());
+                    SigningKeyToNodeId::<TestRuntime>::insert(context.signing_key, node_b);
 
                     assert_noop!(
                         NodeManager::update_signing_key(
@@ -360,5 +360,54 @@ mod rotating_signing_key {
                     );
                 });
         }
+    }
+}
+
+mod node_cap {
+    use super::*;
+
+    #[test]
+    fn registration_fails_at_cap_and_deregistration_frees_capacity() {
+        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+        ext.execute_with(|| {
+            let context = Context::default();
+            assert_ok!(NodeManager::register_node(
+                context.origin.clone(),
+                context.node_id,
+                context.owner,
+                context.signing_key.clone(),
+            ));
+
+            // Pretend the rest of the network has filled the cap.
+            let cap = <TestRuntime as pallet::Config>::MaxRegisteredNodes::get();
+            TotalRegisteredNodes::<TestRuntime>::put(cap);
+
+            let blocked_node = TestAccount::new([203u8; 32]).account_id();
+            let blocked_key = <mock::TestRuntime as pallet::Config>::SignerId::generate_pair(None);
+            assert_noop!(
+                NodeManager::register_node(
+                    context.origin.clone(),
+                    blocked_node,
+                    context.owner,
+                    blocked_key.clone(),
+                ),
+                Error::<TestRuntime>::MaxNodesReached
+            );
+
+            // Deregistering an existing node frees one slot under the cap.
+            let nodes = BoundedVec::truncate_from(vec![context.node_id]);
+            assert_ok!(
+                NodeManager::deregister_nodes(context.origin.clone(), context.owner, nodes,)
+            );
+            assert_eq!(TotalRegisteredNodes::<TestRuntime>::get(), cap - 1);
+
+            assert_ok!(NodeManager::register_node(
+                context.origin,
+                blocked_node,
+                context.owner,
+                blocked_key,
+            ));
+            assert_eq!(TotalRegisteredNodes::<TestRuntime>::get(), cap);
+        });
     }
 }

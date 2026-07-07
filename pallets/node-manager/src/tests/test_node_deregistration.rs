@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use sp_avn_common::Proof;
 use sp_core::Pair;
@@ -29,7 +29,7 @@ impl Context {
             &NodeManager::compute_reward_account_id(),
             reward_amount * 2u128,
         );
-        <NodeRegistrar<TestRuntime>>::set(Some(registrar.clone()));
+        <NodeRegistrar<TestRuntime>>::set(Some(registrar));
         let registered_nodes = register_nodes(registrar, owner, num_of_nodes);
 
         Context { registrar_key_pair, registrar, owner, registered_nodes, relayer }
@@ -45,21 +45,16 @@ fn register_nodes(
     let reward_period = <RewardPeriod<TestRuntime>>::get().current;
 
     for i in 0..num_of_nodes {
-        registered_nodes.push(register_node_and_send_heartbeat(
-            registrar,
-            owner.clone(),
-            reward_period,
-            i,
-        ));
+        registered_nodes.push(register_node_and_send_heartbeat(registrar, owner, reward_period, i));
     }
 
-    let this_node = TestAccount::new([0 as u8; 32]).account_id();
+    let this_node = TestAccount::new([0_u8; 32]).account_id();
     let this_node_signing_key = 0;
 
     set_ocw_node_id(this_node);
     UintAuthorityId::set_all_keys(vec![UintAuthorityId(this_node_signing_key)]);
 
-    return registered_nodes
+    registered_nodes
 }
 
 fn register_node_and_send_heartbeat(
@@ -68,7 +63,7 @@ fn register_node_and_send_heartbeat(
     reward_period: RewardPeriodIndex,
     id: u8,
 ) -> AccountId {
-    let node_id = TestAccount::new([id as u8; 32]).account_id();
+    let node_id = TestAccount::new([id; 32]).account_id();
     let signing_key_id = id + 1;
 
     assert_ok!(NodeManager::register_node(
@@ -84,10 +79,10 @@ fn register_node_and_send_heartbeat(
 
 fn incr_heartbeats(reward_period: RewardPeriodIndex, nodes: Vec<NodeId<TestRuntime>>, uptime: u64) {
     for node in nodes {
-        let _ = <NodeRegistry<TestRuntime>>::get(&node).unwrap();
+        let _ = <NodeRegistry<TestRuntime>>::get(node).unwrap();
         let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(uptime.into());
 
-        <NodeUptime<TestRuntime>>::mutate(&reward_period, &node, |maybe_info| {
+        <NodeUptime<TestRuntime>>::mutate(reward_period, node, |maybe_info| {
             if let Some(info) = maybe_info.as_mut() {
                 info.count = info.count.saturating_add(uptime);
                 info.last_reported = System::block_number();
@@ -97,16 +92,11 @@ fn incr_heartbeats(reward_period: RewardPeriodIndex, nodes: Vec<NodeId<TestRunti
             }
         });
 
-        <TotalUptime<TestRuntime>>::mutate(&reward_period, |total| {
+        <TotalUptime<TestRuntime>>::mutate(reward_period, |total| {
             total.total_heartbeats = total.total_heartbeats.saturating_add(uptime);
             total.total_weight = total.total_weight.saturating_add(weight);
         });
     }
-}
-
-fn pop_tx_from_mempool(pool_state: Arc<RwLock<PoolState>>) -> Extrinsic {
-    let tx = pool_state.write().transactions.pop().unwrap();
-    Extrinsic::decode(&mut &*tx).unwrap()
 }
 
 fn set_ocw_node_id(node_id: AccountId) {
@@ -133,17 +123,12 @@ fn create_signed_deregister_proof(
         owner,
         nodes_to_deregister,
         number_of_nodes_to_deregister,
-        &block_number,
+        block_number,
     );
 
     let signature = SignatureTest::from(registrar_key_pair.key_pair().sign(&encoded_payload));
-    let proof = Proof {
-        signer: registrar_key_pair.key_pair().public(),
-        relayer: relayer.clone(),
-        signature,
-    };
 
-    proof
+    Proof { signer: registrar_key_pair.key_pair().public(), relayer: *relayer, signature }
 }
 
 #[test]
@@ -159,7 +144,7 @@ fn deregistration_succeeds() {
 
         // Show that nodes are registered before deregistration
         for node in &context.registered_nodes {
-            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner.clone(), node));
+            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
             assert!(<NodeRegistry<TestRuntime>>::contains_key(node));
         }
 
@@ -170,13 +155,13 @@ fn deregistration_succeeds() {
         ));
 
         for node in &context.registered_nodes {
-            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner.clone(), node));
+            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
             assert!(!<NodeRegistry<TestRuntime>>::contains_key(node));
         }
         System::assert_last_event(
             Event::NodeDeregistered {
                 owner: context.owner,
-                node: context.registered_nodes[num_nodes_to_deregister - 1].clone(),
+                node: context.registered_nodes[num_nodes_to_deregister - 1],
             }
             .into(),
         );
@@ -197,7 +182,7 @@ fn signed_deregistration_succeeds() {
 
         // Show that nodes are registered before deregistration
         for node in &context.registered_nodes {
-            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner.clone(), node));
+            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
             assert!(<NodeRegistry<TestRuntime>>::contains_key(node));
         }
 
@@ -219,23 +204,18 @@ fn signed_deregistration_succeeds() {
         ));
 
         for node in &context.registered_nodes {
-            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner.clone(), node));
+            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
             assert!(!<NodeRegistry<TestRuntime>>::contains_key(node));
         }
         System::assert_last_event(
             Event::NodeDeregistered {
                 owner: context.owner,
-                node: context.registered_nodes[num_nodes_to_deregister - 1].clone(),
+                node: context.registered_nodes[num_nodes_to_deregister - 1],
             }
             .into(),
         );
     });
 }
-
-// payment_works_all_nodes_deregistered and payment_works_some_nodes_deregistered
-// were OCW-payout-flow tests dressed as deregistration tests. With offchain_pay_nodes
-// retired in PR2 the equivalent coverage will be reintroduced in PR6 against the
-// on_idle drain.
 
 #[test]
 fn deregistration_cleans_up_signing_key_index() {
@@ -247,7 +227,7 @@ fn deregistration_cleans_up_signing_key_index() {
     ext.execute_with(|| {
         let context = Context::new(1u8);
         let node = context.registered_nodes[0];
-        let node_info = NodeRegistry::<TestRuntime>::get(&node).unwrap();
+        let node_info = NodeRegistry::<TestRuntime>::get(node).unwrap();
 
         assert!(SigningKeyToNodeId::<TestRuntime>::contains_key(&node_info.signing_key));
 
@@ -273,7 +253,7 @@ fn signing_key_can_be_reused_after_deregistration() {
         // Deregister node A, then register node B with the same signing key
         let context = Context::new(1u8);
         let node_a = context.registered_nodes[0];
-        let signing_key = NodeRegistry::<TestRuntime>::get(&node_a).unwrap().signing_key;
+        let signing_key = NodeRegistry::<TestRuntime>::get(node_a).unwrap().signing_key;
 
         assert_ok!(NodeManager::deregister_nodes(
             RuntimeOrigin::signed(context.registrar),
@@ -331,7 +311,7 @@ mod fails_when {
                 NodeManager::deregister_nodes(
                     RuntimeOrigin::signed(context.registrar),
                     context.owner,
-                    BoundedVec::truncate_from(vec![bad_node, context.registered_nodes[0].clone()]),
+                    BoundedVec::truncate_from(vec![bad_node, context.registered_nodes[0]]),
                 ),
                 Error::<TestRuntime>::NodeNotRegistered
             );

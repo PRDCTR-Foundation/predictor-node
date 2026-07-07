@@ -1,7 +1,7 @@
 // Copyright 2026 Aventus DAO Ltd
 
 use crate::*;
-use sp_runtime::{ArithmeticError, SaturatedConversion};
+use sp_runtime::{traits::CheckedDiv, ArithmeticError, SaturatedConversion};
 
 impl<T: Config> Pallet<T> {
     // Nodes should not be able to submit over the min uptime required.
@@ -17,8 +17,7 @@ impl<T: Config> Pallet<T> {
         let weight = uptime_info.weight;
 
         if actual_uptime > uptime_threshold.into() {
-            log::warn!("⚠️ Node ({:?}) has been up for more than the expected uptime. Actual: {:?}, Expected: {:?}",
-                node_id, actual_uptime, uptime_threshold);
+            log::warn!("⚠️ Node ({node_id:?}) has been up for more than the expected uptime. Actual: {actual_uptime:?}, Expected: {uptime_threshold:?}");
 
             // Cap at threshold. With staking removed, each heartbeat carries
             // HEARTBEAT_BASE_WEIGHT, so the capped contribution is exactly
@@ -45,8 +44,6 @@ impl<T: Config> Pallet<T> {
         Ok((ratio.mul_floor(total_rewards_u128).saturated_into(), ratio))
     }
 
-    // ** Note **: this function will not roll back in case of error, so make sure storage changes
-    // are done in the right order.
     pub fn pay_reward(
         period: &RewardPeriodIndex,
         node_id: NodeId<T>,
@@ -56,9 +53,28 @@ impl<T: Config> Pallet<T> {
     ) -> DispatchResult {
         let node_owner = node_info.owner.clone();
 
-        if amount.is_zero() {
-            // Even if the reward is 0, we still want to emit the event for better visibility.
-            Self::deposit_event(Event::RewardPaid {
+        // While the global lock window is active - or not yet configured
+        // (lock-by-default, so rewards can't escape the lock through an ops
+        // mis-ordering) - rewards accrue in `LockedRewards` and the funds
+        // stay in the reward pot, to be released via `withdraw_rewards`.
+        // Once the window's penalty decays to zero the lock is spent and
+        // payouts credit free balance directly again.
+        let lock_active = match LockSchedule::<T>::get() {
+            None => true,
+            Some(schedule) => !schedule.is_expired(Self::time_now_sec()),
+        };
+
+        if lock_active {
+            // A zero reward still emits the event for visibility, and skips
+            // the storage writes (nothing to accrue).
+            if !amount.is_zero() {
+                LockedRewards::<T>::mutate(&node_owner, |locked| {
+                    *locked = locked.saturating_add(amount)
+                });
+                TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_add(amount));
+            }
+
+            Self::deposit_event(Event::RewardLocked {
                 reward_period: *period,
                 owner: node_owner,
                 node: node_id,
@@ -68,15 +84,17 @@ impl<T: Config> Pallet<T> {
             return Ok(())
         }
 
-        let reward_pot_account_id = Self::compute_reward_account_id();
-
-        // Pay the owner the full reward (no fee taken at the pallet level).
-        T::Currency::transfer(
-            &reward_pot_account_id,
-            &node_owner,
-            amount,
-            ExistenceRequirement::KeepAlive,
-        )?;
+        // A zero reward still emits the event for visibility, and skips the
+        // transfer (nothing to move).
+        if !amount.is_zero() {
+            let reward_pot = Self::compute_reward_account_id();
+            T::Currency::transfer(
+                &reward_pot,
+                &node_owner,
+                amount,
+                ExistenceRequirement::AllowDeath,
+            )?;
+        }
 
         Self::deposit_event(Event::RewardPaid {
             reward_period: *period,
@@ -88,6 +106,280 @@ impl<T: Config> Pallet<T> {
         Ok(())
     }
 
+    /// Worst-case weight charged per `on_idle` per-node iteration. Set
+    /// conservatively above the sum of a NodeRegistry read, a
+    /// `Currency::transfer` (reward pot -> owner, touching two accounts), the
+    /// NodeUptime removal write, and the event deposit - or the equivalent
+    /// locked-accrual writes when the lock window is active.
+    pub fn worst_case_iteration_weight() -> Weight {
+        // ref_time is denominated in picoseconds, so 200_000_000_000 is ~200 ms
+        // per iteration - a generous safety margin over the measured cost on
+        // similar runtimes. The block-weight cap and `MaxBatchSize` are the
+        // real upper bounds; this is the granularity at which `on_idle` decides
+        // whether to attempt another iteration.
+        Weight::from_parts(200_000_000_000, 4096)
+            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(4))
+            .saturating_add(<T as frame_system::Config>::DbWeight::get().writes(4))
+    }
+
+    /// Pay one node out of the given period. Returns the amount paid (or
+    /// `Zero` on a soft-failure path that emitted `ErrorPayingReward`).
+    pub(crate) fn pay_one_node(
+        period: RewardPeriodIndex,
+        pot_info: &RewardPotInfo<BalanceOf<T>>,
+        total_weight: &u128,
+        node: T::AccountId,
+        uptime_info: UptimeInfo<BlockNumberFor<T>>,
+    ) -> Result<BalanceOf<T>, ()> {
+        let node_info = match NodeRegistry::<T>::get(&node) {
+            Some(n) => n,
+            None => {
+                Self::deposit_event(Event::ErrorPayingReward {
+                    reward_period: period,
+                    node,
+                    error: Error::<T>::NodeNotRegistered.into(),
+                });
+                return Err(())
+            },
+        };
+        let weight = Self::calculate_node_weight(
+            &node,
+            uptime_info,
+            &node_info,
+            pot_info.uptime_threshold,
+            pot_info.reward_end_time,
+        );
+        let (amount, percentage) =
+            match Self::calculate_reward(weight, total_weight, &pot_info.total_reward) {
+                Ok(x) => x,
+                Err(e) => {
+                    Self::deposit_event(Event::ErrorPayingReward {
+                        reward_period: period,
+                        node,
+                        error: e,
+                    });
+                    return Err(())
+                },
+            };
+
+        if let Err(e) = Self::pay_reward(&period, node.clone(), &node_info, amount, percentage) {
+            Self::deposit_event(Event::ErrorPayingReward { reward_period: period, node, error: e });
+            return Err(())
+        }
+        Ok(amount)
+    }
+
+    /// Walk the oldest unpaid reward period (and the next one if weight is
+    /// left) paying nodes one at a time. Each iteration consumes at most
+    /// `worst_case_iteration_weight`; the loop terminates when the weight
+    /// budget cannot cover one more iteration, `MaxBatchSize` per-block is
+    /// hit, or the iterator is exhausted (in which case
+    /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`).
+    pub fn drain_outstanding_payouts(remaining_weight: Weight) -> Weight {
+        let per_iter = Self::worst_case_iteration_weight();
+        let max_batch = MaxBatchSize::<T>::get();
+        let mut used = Weight::zero();
+        let mut paid_this_block: u32 = 0;
+
+        loop {
+            // (A) Weight check: can we afford another iteration's worst-case?
+            if remaining_weight.saturating_sub(used).any_lt(per_iter) {
+                break
+            }
+            // (B) Batch cap: prevents storage thrash regardless of weight headroom.
+            if paid_this_block >= max_batch {
+                break
+            }
+
+            let period = OldestUnpaidRewardPeriodIndex::<T>::get();
+            let current = RewardPeriod::<T>::get().current;
+            if period >= current {
+                // Nothing to drain yet (the period we'd pay hasn't rolled).
+                break
+            }
+
+            // Resolve the snapshot for this period. If missing, skip the period
+            // cleanly via `complete_reward_payout`.
+            let pot_info = match RewardPot::<T>::get(period) {
+                Some(p) => p,
+                None => {
+                    Self::complete_reward_payout(period);
+                    used = used.saturating_add(per_iter);
+                    continue
+                },
+            };
+            if pot_info.funding_failed {
+                // The rollover treasury transfer for this period failed, so it
+                // is recorded with `total_reward == 0` and awaits recovery via
+                // `top_up_reward_pot`. While the period is still within the
+                // bounded recovery window, leave the snapshot in place and do
+                // NOT advance the cursor past it as if paid - otherwise the
+                // documented recovery would be impossible. Stop the drain here
+                // (rather than spinning on an unadvanceable period); it resumes
+                // automatically once a top-up funds the period.
+                //
+                // Once the period's age exceeds the window, abandon it: a
+                // recovery may never arrive, and an indefinite head-of-line
+                // block would freeze the entire payout stream behind one
+                // unfunded period. Nothing was ever funded for it
+                // (`total_reward == 0`), so there is nothing to reclaim - just
+                // complete it so the cursor advances and later periods pay out.
+                let age = current.saturating_sub(period);
+                if age <= T::MaxFailedFundingRecoveryPeriods::get() {
+                    break
+                }
+                // Abandon: nodes may have recorded heartbeats into
+                // `NodeUptime[period]` before the rollover transfer failed, so
+                // clear those entries in weight-bounded batches (a one-shot
+                // `clear_prefix` could blow the per-block weight budget at the
+                // 30k-node cap) and only complete the period once they are
+                // fully drained - honouring the complete-only-when-empty
+                // invariant. Nothing was funded (`total_reward == 0`), so the
+                // entries are removed without any payment.
+                match Self::drain_period_in_batches(
+                    period,
+                    remaining_weight,
+                    per_iter,
+                    max_batch,
+                    &mut used,
+                    &mut paid_this_block,
+                    |_node, _uptime_info| {},
+                ) {
+                    Ok(true) => continue,
+                    Ok(false) => break,
+                    Err(()) => {
+                        Self::complete_reward_payout(period);
+                        used = used.saturating_add(per_iter);
+                        continue
+                    },
+                }
+            }
+            if pot_info.total_reward.is_zero() {
+                // Legitimately zero-reward period (funded successfully with a
+                // zero amount): nothing to distribute and nothing to reclaim.
+                Self::complete_reward_payout(period);
+                used = used.saturating_add(per_iter);
+                continue
+            }
+            let total_uptime = TotalUptime::<T>::get(period);
+            if total_uptime.total_weight == 0u128 {
+                // No reportable uptime this period - nothing to distribute. The
+                // pot was funded for this period at rollover, so reclaim those
+                // funds back to the treasury instead of stranding them in the
+                // pot, then advance.
+                Self::reclaim_undistributed_reward(period, pot_info.total_reward);
+                Self::complete_reward_payout(period);
+                used = used.saturating_add(per_iter);
+                continue
+            }
+
+            // Pay nodes in weight/batch-bounded batches, soft-failing with an
+            // `ErrorPayingReward` event per node. The shared helper handles the
+            // resume pointer and completes the period only once every node is
+            // drained.
+            match Self::drain_period_in_batches(
+                period,
+                remaining_weight,
+                per_iter,
+                max_batch,
+                &mut used,
+                &mut paid_this_block,
+                |node, uptime_info| {
+                    let _ = Self::pay_one_node(
+                        period,
+                        &pot_info,
+                        &total_uptime.total_weight,
+                        node,
+                        uptime_info,
+                    );
+                },
+            ) {
+                Ok(true) => continue,
+                Ok(false) => break,
+                Err(()) => {
+                    // Defensive: a pointer mismatch shouldn't happen but if it
+                    // does, advance and don't get stuck.
+                    Self::complete_reward_payout(period);
+                    used = used.saturating_add(per_iter);
+                    continue
+                },
+            }
+        }
+
+        used
+    }
+
+    /// Drain a period's `NodeUptime` entries in weight/batch-bounded batches,
+    /// invoking `on_node` for each entry before removing it. Resumes from the
+    /// `LastPaidPointer` if one is set, otherwise from the start of the period.
+    /// Advances the cursor via `complete_reward_payout` only once every entry
+    /// has been drained (across as many `on_idle` calls as needed); otherwise
+    /// records a fresh `LastPaidPointer` so the next call resumes where this one
+    /// stopped. Shared by the normal pay path and the failed-funding
+    /// abandonment path so both honour the complete-only-when-empty invariant.
+    /// Returns `Ok(true)` when the period is fully drained, `Ok(false)` when
+    /// stopped early on the weight/batch budget, and `Err(())` on a
+    /// pointer-resolution failure (the caller should complete the period).
+    fn drain_period_in_batches(
+        period: RewardPeriodIndex,
+        remaining_weight: Weight,
+        per_iter: Weight,
+        max_batch: u32,
+        used: &mut Weight,
+        paid_this_block: &mut u32,
+        mut on_node: impl FnMut(T::AccountId, UptimeInfo<BlockNumberFor<T>>),
+    ) -> Result<bool, ()> {
+        let iter_result = match LastPaidPointer::<T>::get() {
+            Some(ptr) => Self::get_iterator_from_last_paid(period, ptr),
+            None => Ok(NodeUptime::<T>::iter_prefix(period)),
+        };
+        let mut iter = iter_result.map_err(|_| ())?;
+
+        // Track the drained nodes so we can drop their NodeUptime entries after
+        // iterating (mutating the map mid-iteration is unsafe), keeping the
+        // pointer's "node not in storage" invariant on the next block.
+        let mut drained_nodes: Vec<T::AccountId> = Vec::new();
+        let mut last_node: Option<T::AccountId> = None;
+        let mut iterator_exhausted = false;
+        loop {
+            if remaining_weight.saturating_sub(*used).any_lt(per_iter) {
+                break
+            }
+            if *paid_this_block >= max_batch {
+                break
+            }
+            let (node, uptime_info) = match iter.next() {
+                Some(x) => x,
+                None => {
+                    iterator_exhausted = true;
+                    break
+                },
+            };
+            on_node(node.clone(), uptime_info);
+            drained_nodes.push(node.clone());
+            last_node = Some(node);
+            *paid_this_block = paid_this_block.saturating_add(1);
+            *used = used.saturating_add(per_iter);
+        }
+
+        Self::remove_paid_nodes(period, &drained_nodes);
+        if iterator_exhausted {
+            // Completing a period with no drained entries (e.g. an empty
+            // failed-funding abandonment) still does real storage work but
+            // charged no `per_iter` in the loop above; charge one so the outer
+            // loop's weight/batch guards bound how many empty periods complete
+            // per block. The outer loop only enters here with at least one
+            // `per_iter` of budget left, so progress is still guaranteed.
+            if drained_nodes.is_empty() {
+                *used = used.saturating_add(per_iter);
+            }
+            Self::complete_reward_payout(period);
+        } else {
+            Self::update_last_paid_pointer(period, last_node);
+        }
+        Ok(iterator_exhausted)
+    }
+
     pub fn remove_paid_nodes(
         period_index: RewardPeriodIndex,
         paid_nodes_to_remove: &Vec<T::AccountId>,
@@ -96,6 +388,40 @@ impl<T: Config> Pallet<T> {
         // it
         for node in paid_nodes_to_remove {
             NodeUptime::<T>::remove(period_index, node);
+        }
+    }
+
+    /// Return a non-distributable period's funded reward from the pot to the
+    /// treasury source. Called when the drain skips a period that was funded at
+    /// rollover but has no reportable uptime, so the funds are recycled instead
+    /// of being orphaned in the pot. Best-effort: if the transfer fails the
+    /// funds remain in the pot and `OutstandingRewardToPay` is still cleared by
+    /// `complete_reward_payout`, leaving the pot's surplus reclaimable by a
+    /// later top-up/admin action rather than blocking the drain.
+    pub fn reclaim_undistributed_reward(period_index: RewardPeriodIndex, amount: BalanceOf<T>) {
+        if amount.is_zero() {
+            return
+        }
+        let pot = Self::compute_reward_account_id();
+        let treasury = T::TreasurySource::get();
+        // `AllowDeath`: in the earliest periods the reclaimed amount can be the
+        // pot's only balance, so a `KeepAlive` transfer would fail the `>= ED`
+        // check and strand the funds. The pot's genesis provider reference keeps
+        // the account from being reaped, and it is re-funded at the next
+        // rollover, so allowing the balance to reach zero here is safe.
+        match T::Currency::transfer(&pot, &treasury, amount, ExistenceRequirement::AllowDeath) {
+            Ok(()) => {
+                Self::deposit_event(Event::UndistributedRewardReclaimed {
+                    reward_period: period_index,
+                    amount,
+                });
+            },
+            Err(_) => {
+                Self::deposit_event(Event::UndistributedRewardReclaimFailed {
+                    reward_period: period_index,
+                    amount,
+                });
+            },
         }
     }
 
@@ -137,6 +463,7 @@ impl<T: Config> Pallet<T> {
             .saturating_sub(<T as pallet::Config>::Currency::minimum_balance())
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_iterator_from_last_paid(
         oldest_period: RewardPeriodIndex,
         last_paid_pointer: PaymentPointer<T::AccountId>,
@@ -156,5 +483,58 @@ impl<T: Config> Pallet<T> {
     /// Get the current time in seconds
     pub fn time_now_sec() -> Duration {
         T::TimeProvider::now().as_secs()
+    }
+
+    /// Apply any pending halvings to `NextRewardAmountPerPeriod`. Idempotent
+    /// within a block: the operation is counter-based, comparing the number
+    /// of halvings the current block-height implies against the running
+    /// `RewardAmountHalvingsApplied`. If the chain has skipped past several
+    /// halving boundaries between calls (extended downtime, manual replay)
+    /// the catch-up applies in a single tick.
+    pub fn apply_halving_if_due(n: BlockNumberFor<T>) -> Weight {
+        if !HalvingEnabled::<T>::get() {
+            return <T as frame_system::Config>::DbWeight::get().reads(1)
+        }
+        let interval = T::HalvingInterval::get();
+        if interval.is_zero() {
+            return <T as frame_system::Config>::DbWeight::get().reads(1)
+        }
+
+        let n_u128: u128 = n.saturated_into();
+        let interval_u128: u128 = interval.saturated_into();
+        let expected = (n_u128 / interval_u128).min(u32::MAX as u128) as u32;
+        let applied = RewardAmountHalvingsApplied::<T>::get();
+        if expected <= applied {
+            return <T as frame_system::Config>::DbWeight::get().reads(2)
+        }
+        let pending = expected - applied;
+
+        let two = BalanceOf::<T>::from(2u32);
+        NextRewardAmountPerPeriod::<T>::mutate(|amt| {
+            for _ in 0..pending {
+                // Floor at one base unit: the reward must asymptotically
+                // approach zero without ever reaching it (Truth paper /
+                // Andrey's halving directive). A zero amount stays zero -
+                // the floor only protects a non-zero reward from vanishing.
+                let halved = amt.checked_div(&two).unwrap_or_else(BalanceOf::<T>::zero);
+                if halved.is_zero() && !amt.is_zero() {
+                    *amt = BalanceOf::<T>::from(1u32);
+                    break
+                }
+                *amt = halved;
+            }
+        });
+        RewardAmountHalvingsApplied::<T>::put(expected);
+
+        let new_amount = NextRewardAmountPerPeriod::<T>::get();
+        let period_index = RewardPeriod::<T>::get().current;
+        Self::deposit_event(Event::RewardHalvingApplied {
+            period_index,
+            new_amount,
+            total_halvings: expected,
+        });
+
+        // Worst-case cost of the applied path (benchmarked).
+        <T as Config>::WeightInfo::apply_halving()
     }
 }

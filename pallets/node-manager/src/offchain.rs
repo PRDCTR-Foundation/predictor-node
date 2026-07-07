@@ -10,7 +10,7 @@ use crate::*;
 
 // We allow up to 5 blocks for ocw transactions
 const BLOCK_INCLUSION_PERIOD: u32 = 5;
-pub const OCW_ID: &'static [u8; 22] = b"node_manager::last_run";
+pub const OCW_ID: &[u8; 22] = b"node_manager::last_run";
 const OC_HB_DB_PREFIX: &[u8] = b"tnf/node-manager-heartbeat/";
 
 impl<T: Config> Pallet<T> {
@@ -29,9 +29,7 @@ impl<T: Config> Pallet<T> {
                 heartbeat_count,
             ) {
                 log::info!(
-                    "🛠️  Sending heartbeat for reward period: {:?}, block number: {:?}",
-                    current_reward_period,
-                    block_number
+                    "🛠️  Sending heartbeat for reward period: {current_reward_period:?}, block number: {block_number:?}"
                 );
 
                 let signature = signing_key
@@ -58,18 +56,15 @@ impl<T: Config> Pallet<T> {
                                 );
                             },
                             Err(e) => log::error!(
-                                "💔 Error submitting heartbeat transaction. Period: {:?}, Heartbeat count: {:?}, Error: {:?}",
-                                current_reward_period, heartbeat_count, e),
+                                "💔 Error submitting heartbeat transaction. Period: {current_reward_period:?}, Heartbeat count: {heartbeat_count:?}, Error: {e:?}"),
                         }
 
                         log::info!(
-                            "🛠️  heartbeat transaction sent. Reward period: {:?}, Block number: {:?}",
-                            current_reward_period, block_number);
+                            "🛠️  heartbeat transaction sent. Reward period: {current_reward_period:?}, Block number: {block_number:?}");
                     },
                     None => {
                         log::error!(
-                            "💔 Error signing heartbeat transaction. Reward period: {:?}, Block number: {:?}",
-                            current_reward_period, block_number);
+                            "💔 Error signing heartbeat transaction. Reward period: {current_reward_period:?}, Block number: {block_number:?}");
                     },
                 }
             }
@@ -131,13 +126,13 @@ impl<T: Config> Pallet<T> {
             let below_threshold = uptime_info.count < reward_period.uptime_threshold as u64;
             // Send heartbeat if threshold is not reached and the current block is at or past the
             // next allowed block.
-            return below_threshold &&
+            below_threshold &&
                 block_number >=
                     last_submission +
                         BlockNumberFor::<T>::from(reward_period.heartbeat_period)
         } else {
             // First heartbeat
-            return true
+            true
         }
     }
 
@@ -157,7 +152,7 @@ impl<T: Config> Pallet<T> {
             Err(MutateStorageError::ValueFunctionFailed(e)) => Err(e),
             Err(MutateStorageError::ConcurrentModification(_)) =>
                 Err(Error::<T>::FailedToAcquireOcwDbLock),
-            Ok(_) => return Ok(()),
+            Ok(_) => Ok(()),
         }
     }
 
@@ -168,7 +163,7 @@ impl<T: Config> Pallet<T> {
             Err(MutateStorageError::ValueFunctionFailed(e)) => Err(e),
             Err(MutateStorageError::ConcurrentModification(_)) =>
                 Err(Error::<T>::FailedToAcquireOcwDbLock),
-            Ok(_) => return Ok(()),
+            Ok(_) => Ok(()),
         }
     }
 
@@ -183,7 +178,7 @@ impl<T: Config> Pallet<T> {
         match StorageValueRef::persistent(&key).get::<BlockNumberFor<T>>().ok().flatten() {
             Some(last_submission) => {
                 // Allow BLOCK_INCLUSION_PERIOD blocks for the transaction to be included
-                return current_block <=
+                current_block <=
                     last_submission
                         .saturating_add(BlockNumberFor::<T>::from(BLOCK_INCLUSION_PERIOD))
             },
@@ -224,7 +219,7 @@ impl<T: Config> Pallet<T> {
 
     fn match_node_id_to_signing_key(
         node_id: NodeId<T>,
-        local_keys: &Vec<T::SignerId>,
+        local_keys: &[T::SignerId],
     ) -> Option<(T::AccountId, T::SignerId)> {
         if let Some(node_info) = NodeRegistry::<T>::get(&node_id) {
             if local_keys.binary_search(&node_info.signing_key).is_ok() {
@@ -240,7 +235,7 @@ impl<T: Config> Pallet<T> {
     }
 
     pub fn search_node_id_by_signing_key(
-        local_keys: &Vec<T::SignerId>,
+        local_keys: &[T::SignerId],
     ) -> Option<(NodeId<T>, T::SignerId)> {
         log::warn!("🔐 Fallback - Looking up node from onchain state storage.");
         for key in local_keys.iter() {
