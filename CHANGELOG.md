@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.1.1](https://github.com/Predictor-Foundation/predictor-node/compare/v1.1.0...v1.1.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* **ci:** derive spec_version at compile time and fix release-please sync ([#80](https://github.com/Predictor-Foundation/predictor-node/issues/80)) ([99f1a0c](https://github.com/Predictor-Foundation/predictor-node/commit/99f1a0c5d9c9dca35d463792fb9c24b99b5aa8fa))
+* release PR checkout ([#82](https://github.com/Predictor-Foundation/predictor-node/issues/82)) ([ad10e9b](https://github.com/Predictor-Foundation/predictor-node/commit/ad10e9b6fbbd428ef201751727cd31bf75f01ccf))
+
+## [1.1.0](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.2...v1.1.0) (2026-06-30)
+
+
+### Features
+
+* make testnet a static config by default ([b4efe7c](https://github.com/Predictor-Foundation/predictor-node/commit/b4efe7ccae3677bf5ed0a565643cb80db6bdbf69))
+
+
+### Bug Fixes
+
+* Align token decimals to PRD ([f5aba62](https://github.com/Predictor-Foundation/predictor-node/commit/f5aba62496218f7955cf86c7e5c84a5648c2c4fb))
+* Reset release 1.1.0 ([#78](https://github.com/Predictor-Foundation/predictor-node/issues/78)) ([01334c3](https://github.com/Predictor-Foundation/predictor-node/commit/01334c3e144cc9f1485a42d3d8c19ed13cd45c5c))
+* set existential deposit to 0 ([82e6592](https://github.com/Predictor-Foundation/predictor-node/commit/82e6592978440dee9bb3491257850c90bacfcb2e))
+
+## [1.1.0](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.2...v1.1.0) (2026-06-29)
+
+
+### Features
+
+* make testnet a static config by default ([b4efe7c](https://github.com/Predictor-Foundation/predictor-node/commit/b4efe7ccae3677bf5ed0a565643cb80db6bdbf69))
+
+
+### Bug Fixes
+
+* Align token decimals to PRD ([f5aba62](https://github.com/Predictor-Foundation/predictor-node/commit/f5aba62496218f7955cf86c7e5c84a5648c2c4fb))
+* set existential deposit to 0 ([82e6592](https://github.com/Predictor-Foundation/predictor-node/commit/82e6592978440dee9bb3491257850c90bacfcb2e))
+
 ## [1.0.2](https://github.com/Predictor-Foundation/predictor-node/compare/v1.0.1...v1.0.2) (2026-06-18)
 
 

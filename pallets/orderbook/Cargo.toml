@@ -5,7 +5,10 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 log = { workspace = true }
 orml-traits = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
 prediction-market-primitives = { workspace = true }
@@ -27,33 +30,31 @@ pallet-pm-order-book = { workspace = true, features = ["mock", "default"] }
 [features]
 default = ["std"]
 mock = [
-    "orml-tokens/default",
-    "pallet-balances/default",
-    "pallet-timestamp/default",
-    "pallet-pm-market-commons/default",
-    "orml-currencies/default",
-    "sp-io/default",
-    "prediction-market-primitives/mock",
-    "env_logger/default",
+  "orml-tokens/default",
+  "pallet-balances/default",
+  "pallet-timestamp/default",
+  "pallet-pm-market-commons/default",
+  "orml-currencies/default",
+  "sp-io/default",
+  "prediction-market-primitives/mock",
+  "env_logger/default",
 ]
 runtime-benchmarks = [
-    "frame-benchmarking/runtime-benchmarks",
-    "frame-support/runtime-benchmarks",
-    "frame-system/runtime-benchmarks",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
 ]
 std = [
-    "frame-benchmarking?/std",
-    "frame-support/std",
-    "frame-system/std",
-    "orml-traits/std",
-    "parity-scale-codec/std",
-    "sp-runtime/std",
-    "prediction-market-primitives/std",
-    "common-primitives/std",
+  "frame-benchmarking?/std",
+  "frame-support/std",
+  "frame-system/std",
+  "orml-traits/std",
+  "parity-scale-codec/std",
+  "sp-runtime/std",
+  "prediction-market-primitives/std",
+  "common-primitives/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true
