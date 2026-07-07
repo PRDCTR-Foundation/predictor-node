@@ -7603,7 +7603,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-node-manager"
-version = "1.0.2"
+version = "1.1.1"
 dependencies = [
  "frame-benchmarking",
  "frame-support",

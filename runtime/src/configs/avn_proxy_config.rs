@@ -133,7 +133,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 min_amounts_out: _,
                 block_number: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::NeoSwaps(pallet_pm_neo_swaps::Call::signed_withdraw_fees {
+            RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_withdraw_fees {
                 proof,
                 market_id: _,
                 block_number: _,
@@ -172,14 +172,16 @@ impl InnerCallValidator for AvnProxyConfig {
         match **call {
             RuntimeCall::TokenManager(..) =>
                 return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::PredictionMarkets(..) =>
-                return pallet_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::HybridRouter(..) =>
-                return pallet_pm_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::SignedPredictionMarkets(..) =>
+                return pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(
+                    call,
+                ),
+            RuntimeCall::SignedHybridRouter(..) =>
+                return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NodeManager(..) =>
                 return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
-            RuntimeCall::NeoSwaps(..) =>
-                return pallet_pm_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::SignedNeoSwaps(..) =>
+                return pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,
         }
     }
