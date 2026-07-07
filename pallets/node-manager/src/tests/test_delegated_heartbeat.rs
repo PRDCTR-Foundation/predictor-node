@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 use frame_system::RawOrigin;
 use sp_avn_common::Proof;

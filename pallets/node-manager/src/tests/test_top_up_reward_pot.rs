@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock::*, *};
 use frame_support::{
     assert_noop, assert_ok,
     traits::{Currency, ExistenceRequirement},

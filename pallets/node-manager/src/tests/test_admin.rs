@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use crate::{mock::*, *};
+use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
 use sp_runtime::{DispatchError, Perbill};
