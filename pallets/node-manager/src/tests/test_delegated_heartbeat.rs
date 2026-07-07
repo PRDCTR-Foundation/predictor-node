@@ -6,7 +6,6 @@ use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok, BoundedVec};
 use frame_system::RawOrigin;
 use sp_avn_common::Proof;
-use sp_runtime::traits::IdentifyAccount;
 
 const SIGNED_TX_LIFETIME: u32 = 64;
 
@@ -24,12 +23,7 @@ fn register_node_for(
 ) -> AccountId {
     let node = TestAccount::new([node_seed; 32]).account_id();
     let key = UintAuthorityId(key_seed as u64);
-    assert_ok!(NodeManager::register_node(
-        RawOrigin::Signed(registrar).into(),
-        node,
-        owner,
-        key,
-    ));
+    assert_ok!(NodeManager::register_node(RawOrigin::Signed(registrar).into(), node, owner, key,));
     node
 }
 
@@ -354,13 +348,224 @@ fn rejects_unsigned_origin() {
         let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
 
         assert_noop!(
-            NodeManager::heartbeat_for_owned_nodes(
-                RawOrigin::None.into(),
-                proof,
-                nodes,
-                bn,
-            ),
+            NodeManager::heartbeat_for_owned_nodes(RawOrigin::None.into(), proof, nodes, bn,),
             sp_runtime::DispatchError::BadOrigin,
+        );
+    });
+}
+
+/// A second heartbeat for the same node within the spacing window is skipped,
+/// even when submitted via a distinct call in the same block (the
+/// replay-across-nonces grief vector). Per-node isolation: the call succeeds but
+/// `count` is not advanced, mirroring the OCW `DuplicateHeartbeat` guard without
+/// failing the whole batch.
+#[test]
+fn skips_second_heartbeat_within_spacing_window() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([60u8; 32]).account_id();
+        let prover_seed = 61u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 71);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        // First heartbeat records the node.
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes.clone(),
+            bn,
+        ));
+
+        // A second call in the same block (same period, no spacing elapsed)
+        // succeeds but skips the node, so `count` cannot be inflated past one
+        // per window.
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime recorded");
+        assert_eq!(info.count, 1, "count must not advance past the spacing window");
+        let total = TotalUptime::<TestRuntime>::get(period);
+        assert_eq!(total.total_heartbeats, 1, "skipped heartbeat must not inflate the denominator");
+    });
+}
+
+/// Once the spacing window has elapsed, a follow-up heartbeat is accepted and
+/// advances the count.
+#[test]
+fn allows_heartbeat_after_spacing_window() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([62u8; 32]).account_id();
+        let prover_seed = 63u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 73);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes.clone(),
+            bn,
+        ));
+
+        // Advance past `heartbeat_period` blocks, then submit again.
+        let heartbeat_period = RewardPeriod::<TestRuntime>::get().heartbeat_period as u64;
+        roll_forward(heartbeat_period);
+        let bn2 = System::block_number();
+        let proof2 = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn2));
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof2,
+            nodes,
+            bn2,
+        ));
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime recorded");
+        assert_eq!(info.count, 2, "count should advance once spacing has elapsed");
+    });
+}
+
+/// A node already at the uptime threshold is skipped, so the delegated path
+/// cannot inflate `TotalUptime.total_weight` past the cap the reward maths
+/// assumes. Per-node isolation: the call succeeds but the maxed node is not
+/// advanced, mirroring the OCW `HeartbeatThresholdReached` guard.
+#[test]
+fn skips_heartbeat_at_uptime_threshold() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([64u8; 32]).account_id();
+        let prover_seed = 65u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 75);
+
+        let reward_period = RewardPeriod::<TestRuntime>::get();
+        let threshold = reward_period.uptime_threshold as u64;
+        assert!(threshold > 0, "threshold expected to be non-zero in this config");
+
+        // Seed the node at exactly the threshold, with the spacing window
+        // already satisfied so the threshold guard is what fires.
+        let period = reward_period.current;
+        let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(threshold as u128);
+        NodeUptime::<TestRuntime>::insert(period, prover, UptimeInfo::new(threshold, weight, 0u64));
+        TotalUptime::<TestRuntime>::mutate(period, |t| {
+            t.total_heartbeats = t.total_heartbeats.saturating_add(threshold);
+            t.total_weight = t.total_weight.saturating_add(weight);
+        });
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
+
+        let info = NodeUptime::<TestRuntime>::get(period, prover).expect("uptime present");
+        assert_eq!(info.count, threshold, "count must not exceed the threshold");
+        let total = TotalUptime::<TestRuntime>::get(period);
+        assert_eq!(
+            total.total_heartbeats, threshold,
+            "maxed node must not inflate the denominator"
+        );
+    });
+}
+
+/// Heterogeneous batch: one node at the uptime threshold, one heartbeated within
+/// the spacing window, and several eligible nodes in a single call. The maxed
+/// and recent nodes are skipped while every eligible node still records, proving
+/// the delegated path is per-node isolated rather than all-or-nothing.
+#[test]
+fn heterogeneous_batch_records_eligible_skips_offending() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let owner = TestAccount::new([210u8; 32]).account_id();
+        let prover_seed = 211u8;
+        let prover = register_node_for(registrar, owner, prover_seed, 220);
+
+        let reward_period = RewardPeriod::<TestRuntime>::get();
+        let threshold = reward_period.uptime_threshold as u64;
+        assert!(threshold > 0, "threshold expected to be non-zero in this config");
+        let period = reward_period.current;
+        let now = System::block_number();
+
+        // A node already at the uptime threshold: must be skipped.
+        let maxed = register_node_for(registrar, owner, 212, 221);
+        let maxed_weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(threshold as u128);
+        NodeUptime::<TestRuntime>::insert(
+            period,
+            maxed,
+            UptimeInfo::new(threshold, maxed_weight, now),
+        );
+
+        // A node heartbeated this block (spacing window not elapsed): must be
+        // skipped. count = 1 with last_reported = now.
+        let recent = register_node_for(registrar, owner, 213, 222);
+        NodeUptime::<TestRuntime>::insert(
+            period,
+            recent,
+            UptimeInfo::new(1, HEARTBEAT_BASE_WEIGHT, now),
+        );
+
+        TotalUptime::<TestRuntime>::mutate(period, |t| {
+            t.total_heartbeats = t.total_heartbeats.saturating_add(threshold + 1);
+            t.total_weight = t.total_weight.saturating_add(maxed_weight + HEARTBEAT_BASE_WEIGHT);
+        });
+
+        // Two fresh, eligible nodes (plus the prover, also eligible).
+        let eligible_a = register_node_for(registrar, owner, 214, 223);
+        let eligible_b = register_node_for(registrar, owner, 215, 224);
+
+        let relayer = TestAccount::new([99u8; 32]).account_id();
+        let nodes: BoundedVec<_, MaxNodesPerAggregateHeartbeat> =
+            BoundedVec::try_from(vec![prover, maxed, recent, eligible_a, eligible_b]).unwrap();
+        let bn = System::block_number();
+        let proof = build_proof(prover_seed, relayer, &payload(&relayer, &nodes, bn));
+
+        assert_ok!(NodeManager::heartbeat_for_owned_nodes(
+            RawOrigin::Signed(prover).into(),
+            proof,
+            nodes,
+            bn,
+        ));
+
+        // The three eligible nodes recorded a heartbeat...
+        for node in [prover, eligible_a, eligible_b] {
+            let info = NodeUptime::<TestRuntime>::get(period, node).expect("eligible recorded");
+            assert_eq!(info.count, 1, "eligible node must record despite offending siblings");
+        }
+        // ...while the maxed and recent nodes were left untouched.
+        assert_eq!(
+            NodeUptime::<TestRuntime>::get(period, maxed).unwrap().count,
+            threshold,
+            "maxed node must not advance",
+        );
+        assert_eq!(
+            NodeUptime::<TestRuntime>::get(period, recent).unwrap().count,
+            1,
+            "recent node must not advance",
         );
     });
 }
@@ -384,7 +589,10 @@ fn happy_path_one_thousand_nodes() {
             // Distinct seed-byte tuples to keep AccountIds unique.
             let lo = (i & 0xff) as u8;
             let hi = ((i >> 8) & 0xff) as u8;
-            let seed = [222, lo, hi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let seed = [
+                222, lo, hi, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ];
             let key_seed = (i as u64) + 1_000_000;
             let node = AccountId::from_raw(TestAccount::new(seed).key_pair().public().0);
             let _ = node;

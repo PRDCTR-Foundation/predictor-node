@@ -111,10 +111,10 @@ fn halving_does_not_fire_when_disabled() {
 }
 
 #[test]
-fn halving_floor_is_zero() {
+fn halving_floors_at_one_base_unit() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
-        // Tiny initial amount so a handful of halvings drives it to zero.
+        // Tiny initial amount so a handful of halvings reaches the floor.
         let initial: u128 = 4;
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
@@ -122,10 +122,17 @@ fn halving_floor_is_zero() {
         ));
         enable_halving();
 
-        // After 4 halvings: 4 → 2 → 1 → 0 → 0.
+        // Four pending halvings applied in one catch-up tick: 4 → 2 → 1,
+        // then the floor holds - the reward approaches zero asymptotically
+        // but never reaches it (per the Truth-paper halving directive).
         roll_to(4 * HALVING_INTERVAL);
-        assert_eq!(NextRewardAmountPerPeriod::<TestRuntime>::get(), 0);
+        assert_eq!(NextRewardAmountPerPeriod::<TestRuntime>::get(), 1);
         assert_eq!(RewardAmountHalvingsApplied::<TestRuntime>::get(), 4);
+
+        // Stepwise boundaries hold the floor too.
+        roll_to(5 * HALVING_INTERVAL);
+        assert_eq!(NextRewardAmountPerPeriod::<TestRuntime>::get(), 1);
+        assert_eq!(RewardAmountHalvingsApplied::<TestRuntime>::get(), 5);
     });
 }
 
@@ -135,10 +142,7 @@ fn set_halving_enabled_rejects_non_root() {
     ext.execute_with(|| {
         let caller = TestAccount::new([7u8; 32]).account_id();
         assert_noop!(
-            NodeManager::set_halving_enabled(
-                RuntimeOrigin::signed(caller.clone()),
-                true,
-            ),
+            NodeManager::set_halving_enabled(RuntimeOrigin::signed(caller), true,),
             DispatchError::BadOrigin
         );
     });
