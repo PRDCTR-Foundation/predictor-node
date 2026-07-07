@@ -29,7 +29,7 @@ fn origin_is_checked_signed() {
 
         let config = AdminConfig::NodeRegistrar(new_registrar);
         assert_noop!(
-            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar.clone()), config,),
+            NodeManager::set_admin_config(RuntimeOrigin::signed(new_registrar), config,),
             DispatchError::BadOrigin
         );
     });
