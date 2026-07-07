@@ -35,11 +35,8 @@ fn testnet_genesis(
     // TokenManager treasury account, pre-funded so pallet-node-manager's
     // reward-period rollover transfer into the reward pot succeeds.
     let treasury_account: AccountId = PalletId(*b"Treasury").into_account_truncating();
-    let mut balances: Vec<(AccountId, u128)> = endowed_accounts
-        .iter()
-        .cloned()
-        .map(|k| (k, 1u128 << 60))
-        .collect();
+    let mut balances: Vec<(AccountId, u128)> =
+        endowed_accounts.iter().cloned().map(|k| (k, 1u128 << 60)).collect();
     balances.push((treasury_account, 1u128 << 60));
     let config = RuntimeGenesisConfig {
         balances: BalancesConfig { balances },

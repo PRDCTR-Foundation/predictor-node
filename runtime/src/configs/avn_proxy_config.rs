@@ -133,11 +133,13 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 min_amounts_out: _,
                 block_number: _,
             }) => return Some(proof.clone()),
-            RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_withdraw_fees {
-                proof,
-                market_id: _,
-                block_number: _,
-            }) => return Some(proof.clone()),
+            RuntimeCall::SignedNeoSwaps(
+                pallet_pm_signed_neo_swaps::Call::signed_withdraw_fees {
+                    proof,
+                    market_id: _,
+                    block_number: _,
+                },
+            ) => return Some(proof.clone()),
             RuntimeCall::NodeManager(pallet_node_manager::pallet::Call::signed_register_node {
                 proof,
                 node: _,

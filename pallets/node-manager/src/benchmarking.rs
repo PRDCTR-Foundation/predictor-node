@@ -479,6 +479,8 @@ benchmarks! {
 
 impl_benchmark_test_suite!(
     Pallet,
-    crate::tests::mock::ExtBuilder::build_default().with_genesis_config().as_externality(),
+    crate::tests::mock::ExtBuilder::build_default()
+        .with_genesis_config()
+        .as_externality(),
     crate::tests::mock::TestRuntime,
 );
