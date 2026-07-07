@@ -61,7 +61,7 @@ fn fast_periods() {
     ));
     assert_ok!(NodeManager::set_admin_config(
         RawOrigin::Root.into(),
-        AdminConfig::NextRewardAmountPerPeriod(1_000 * AVT),
+        AdminConfig::NextRewardAmountPerPeriod(1_000 * PRD),
     ));
     // Generous batch cap so the per-test scenarios don't accidentally hit it.
     assert_ok!(NodeManager::set_admin_config(
@@ -81,8 +81,8 @@ fn set_batch_size(n: u32) {
 }
 
 /// With `with_genesis_config()` the chain starts on period 0 with
-/// `length=200` and `reward_amount=20 AVT`. `fast_periods` sets the NEXT
-/// period to `length=20, amount=1000 AVT`. This helper crosses the first
+/// `length=200` and `reward_amount=20 PRD`. `fast_periods` sets the NEXT
+/// period to `length=20, amount=1000 PRD`. This helper crosses the first
 /// rollover so the chain is in period 1 (the new config), records uptime
 /// for caller-supplied nodes, then crosses the second rollover so period 1
 /// is snapshot-funded and ready to be drained.

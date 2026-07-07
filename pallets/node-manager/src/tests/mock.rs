@@ -31,8 +31,8 @@ pub type Signature = sr25519::Signature;
 pub type AccountId = <Signature as Verify>::Signer;
 pub type Extrinsic = TestXt<RuntimeCall, ()>;
 
-/// Native token unit used for mock balances. Mirrors `runtime/common::constants::currency::AVT`.
-pub const AVT: u128 = 1_000_000_000_000_000_000;
+/// One whole PRD in base units. PRD has 10 decimals, so 1 PRD = 10^10.
+pub const PRD: u128 = 10_000_000_000;
 
 #[derive(Clone)]
 pub struct TestAccount {
@@ -87,7 +87,7 @@ pub fn treasury_account() -> AccountId {
 
 /// Default treasury balance available in mock genesis (covers thousands of
 /// rollovers at the default reward_amount_per_period).
-pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * AVT;
+pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * PRD;
 
 impl Config for TestRuntime {
     type RuntimeEvent = RuntimeEvent;
@@ -238,7 +238,7 @@ impl ExtBuilder {
             reward_period: 200u32,
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
-            reward_amount_per_period: 20 * AVT,
+            reward_amount_per_period: 20 * PRD,
         }
         .assimilate_storage(&mut self.storage);
         self

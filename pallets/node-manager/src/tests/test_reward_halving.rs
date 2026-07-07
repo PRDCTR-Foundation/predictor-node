@@ -27,7 +27,7 @@ fn halving_fires_exactly_at_the_boundary() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         // Start with a known non-zero reward amount via admin.
-        let initial = 1_000_000 * AVT;
+        let initial = 1_000_000 * PRD;
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardAmountPerPeriod(initial),
@@ -50,7 +50,7 @@ fn halving_fires_exactly_at_the_boundary() {
 fn halving_is_idempotent_within_the_same_interval() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
-        let initial = 1_024 * AVT;
+        let initial = 1_024 * PRD;
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardAmountPerPeriod(initial),
@@ -73,7 +73,7 @@ fn halving_is_idempotent_within_the_same_interval() {
 fn halving_catches_up_across_multiple_boundaries() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
-        let initial = 1_024 * AVT;
+        let initial = 1_024 * PRD;
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardAmountPerPeriod(initial),
@@ -95,7 +95,7 @@ fn halving_catches_up_across_multiple_boundaries() {
 fn halving_does_not_fire_when_disabled() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
-        let initial = 1_024 * AVT;
+        let initial = 1_024 * PRD;
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardAmountPerPeriod(initial),

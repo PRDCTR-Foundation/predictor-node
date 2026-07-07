@@ -6,22 +6,15 @@ use crate::{
     TokenManagerConfig,
 };
 use alloc::{vec, vec::Vec};
+use frame_support::PalletId;
 use hex_literal::hex;
 use serde_json::Value;
 use sp_core::{ecdsa, sr25519, ByteArray, H160, H256};
 use sp_genesis_builder::PresetId;
+use sp_runtime::traits::AccountIdConversion;
 
 type EthPublicKey = ecdsa::Public;
 use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
-
-/// Account ID of the TokenManager treasury, derived from
-/// `frame_support::PalletId(*b"Treasury").into_account_truncating()`.
-/// Pre-funded in dev/local genesis so pallet-node-manager's reward-period
-/// rollover (which transfers from this account into the reward pot) can
-/// succeed without an out-of-band top-up.
-const TREASURY_ACCOUNT_BYTES: [u8; 32] = hex!(
-    "6d6f646c54726561737572790000000000000000000000000000000000000000"
-);
 
 fn testnet_genesis(
     initial_authorities: Vec<(
@@ -36,7 +29,9 @@ fn testnet_genesis(
     root: AccountId,
 ) -> Value {
     let eth_public_keys = local_ethereum_public_keys();
-    let treasury_account = AccountId::from(TREASURY_ACCOUNT_BYTES);
+    // TokenManager treasury account, pre-funded so pallet-node-manager's
+    // reward-period rollover transfer into the reward pot succeeds.
+    let treasury_account: AccountId = PalletId(*b"Treasury").into_account_truncating();
     let mut balances: Vec<(AccountId, u128)> = endowed_accounts
         .iter()
         .cloned()

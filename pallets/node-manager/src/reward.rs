@@ -76,24 +76,18 @@ impl<T: Config> Pallet<T> {
         Ok(())
     }
 
-    /// Worst-case weight charged per `on_idle` per-node iteration. Set
-    /// conservatively above the sum of a NodeRegistry read, a NodeUptime read,
-    /// one `Currency::transfer` (reward pot -> owner), and the event deposit.
-    /// `worst_case_iteration_weight`.
+    /// Worst-case weight charged per `on_idle` per-node iteration: the
+    /// benchmarked cost of paying one node (`pay_one_node`) plus the loop's
+    /// own per-node overhead - one `NodeUptime` read from the iterator and one
+    /// `NodeUptime` write when the paid entry is later removed.
     pub fn worst_case_iteration_weight() -> Weight {
-        // Equivalent to ~200 ms of weight per iteration - a generous safety
-        // margin over the measured cost on similar runtimes. The block-weight
-        // cap and `MaxBatchSize` are the real upper bounds; this is the
-        // granularity at which `on_idle` decides whether to attempt another
-        // iteration.
-        Weight::from_parts(200_000_000, 4096)
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().writes(2))
+        <T as Config>::WeightInfo::pay_one_node()
+            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads_writes(1, 1))
     }
 
     /// Pay one node out of the given period. Returns the amount paid (or
     /// `Zero` on a soft-failure path that emitted `ErrorPayingReward`).
-    fn pay_one_node(
+    pub(crate) fn pay_one_node(
         period: RewardPeriodIndex,
         pot_info: &RewardPotInfo<BalanceOf<T>>,
         total_weight: &u128,
@@ -148,15 +142,19 @@ impl<T: Config> Pallet<T> {
     /// budget cannot cover one more iteration, `MaxBatchSize` per-block is
     /// hit, or the iterator is exhausted (in which case
     /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`).
-    pub fn drain_outstanding_payouts(remaining_weight: Weight) -> Weight {
+    /// Spends up to `weight_budget` paying outstanding rewards. The caller
+    /// (`on_idle`) decides how much of the block's leftover weight to hand over
+    /// so headroom is left for other consumers; this function faithfully spends
+    /// what it is given and returns the amount actually used.
+    pub fn drain_outstanding_payouts(weight_budget: Weight) -> Weight {
         let per_iter = Self::worst_case_iteration_weight();
         let max_batch = MaxBatchSize::<T>::get();
         let mut used = Weight::zero();
         let mut paid_this_block: u32 = 0;
 
-        loop {
+        for _ in 0..max_batch {
             // (A) Weight check: can we afford another iteration's worst-case?
-            if remaining_weight.saturating_sub(used).any_lt(per_iter) {
+            if weight_budget.saturating_sub(used).any_lt(per_iter) {
                 break
             }
             // (B) Batch cap: prevents storage thrash regardless of weight headroom.
@@ -215,8 +213,8 @@ impl<T: Config> Pallet<T> {
             let mut paid_nodes: Vec<T::AccountId> = Vec::new();
             let mut last_paid: Option<T::AccountId> = None;
             let mut iterator_exhausted = false;
-            loop {
-                if remaining_weight.saturating_sub(used).any_lt(per_iter) {
+           for _ in 0..max_batch {
+                if weight_budget.saturating_sub(used).any_lt(per_iter) {
                     break
                 }
                 if paid_this_block >= max_batch {
@@ -340,13 +338,13 @@ impl<T: Config> Pallet<T> {
     /// `RewardAmountHalvingsApplied`. If the chain has skipped past several
     /// halving boundaries between calls (extended downtime, manual replay)
     /// the catch-up applies in a single tick.
-    pub fn apply_halving_if_due(n: BlockNumberFor<T>) {
+    pub fn apply_halving_if_due(n: BlockNumberFor<T>) -> Weight {
         if !HalvingEnabled::<T>::get() {
-            return
+            return <T as frame_system::Config>::DbWeight::get().reads(1)
         }
         let interval = T::HalvingInterval::get();
         if interval.is_zero() {
-            return
+            return <T as frame_system::Config>::DbWeight::get().reads(1)
         }
 
         let n_u128: u128 = n.saturated_into();
@@ -354,7 +352,7 @@ impl<T: Config> Pallet<T> {
         let expected = (n_u128 / interval_u128).min(u32::MAX as u128) as u32;
         let applied = RewardAmountHalvingsApplied::<T>::get();
         if expected <= applied {
-            return
+            return <T as frame_system::Config>::DbWeight::get().reads(2)
         }
         let pending = expected - applied;
 
@@ -373,5 +371,8 @@ impl<T: Config> Pallet<T> {
             new_amount,
             total_halvings: expected,
         });
+
+        // Worst-case cost of the applied path (benchmarked).
+        <T as Config>::WeightInfo::apply_halving()
     }
 }

@@ -152,7 +152,7 @@ fn top_up_rejects_already_funded_period() {
 
         // Period 0 is now funded; further top_up must fail.
         assert_noop!(
-            NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 0, 1 * AVT),
+            NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 0, 1 * PRD),
             Error::<TestRuntime>::RewardPotAlreadyFunded
         );
     });
@@ -164,7 +164,7 @@ fn top_up_rejects_unknown_period() {
     ext.execute_with(|| {
         // No rollover has happened yet; RewardPot for any index is empty.
         assert_noop!(
-            NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 7, 1 * AVT),
+            NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 7, 1 * PRD),
             Error::<TestRuntime>::RewardPotNotFound
         );
     });
@@ -217,7 +217,7 @@ fn top_up_rejects_non_root_origin() {
             NodeManager::top_up_reward_pot(
                 RuntimeOrigin::signed(signed.clone()),
                 0,
-                1 * AVT,
+                1 * PRD,
             ),
             DispatchError::BadOrigin
         );

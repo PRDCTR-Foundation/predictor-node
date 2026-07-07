@@ -86,7 +86,6 @@ mod proxy_config;
 use proxy_config::ProxyType;
 mod avn_proxy_config;
 use avn_proxy_config::AvnProxyConfig;
-mod node_manager_config;
 mod misc;
 use misc::MinimumPeriod;
 pub(crate) mod genesis_config_helpers;
@@ -919,6 +918,36 @@ impl pallet_pm_combinatorial_tokens::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type PalletId = CombinatorialTokensPalletId;
     type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
+}
+
+parameter_types! {
+    pub const NodeManagerRewardPotId: PalletId = NODE_MANAGER_PALLET_ID;
+    pub const NodeManagerSignedTxLifetime: u32 = 64;
+    /// Halve `NextRewardAmountPerPeriod` once per year.
+    pub const NodeManagerHalvingInterval: BlockNumber = BLOCKS_PER_YEAR;
+    /// Halving stays off until root enables it via `set_halving_enabled`.
+    pub const NodeManagerHalvingEnabledAtGenesis: bool = false;
+    pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
+    /// Reward-period rollover funds the reward pot from the TokenManager treasury.
+    pub NodeManagerTreasurySource: AccountId =
+        pallet_token_manager::Pallet::<Runtime>::compute_treasury_account_id();
+}
+
+impl pallet_node_manager::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type Currency = Balances;
+    type SignerId = pallet_node_manager::sr25519::AuthorityId;
+    type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+    type TimeProvider = Timestamp;
+    type Signature = Signature;
+    type RewardPotId = NodeManagerRewardPotId;
+    type TreasurySource = NodeManagerTreasurySource;
+    type HalvingInterval = NodeManagerHalvingInterval;
+    type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
+    type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
+    type SignedTxLifetime = NodeManagerSignedTxLifetime;
+    type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
 }
 
 impl_fee_types!();

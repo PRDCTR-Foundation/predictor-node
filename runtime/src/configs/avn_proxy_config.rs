@@ -131,9 +131,6 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 market_id: _,
                 block_number: _,
             }) => return Some(proof.clone()),
-            // NodeManager: avn-proxy routes the three signed extrinsics. The
-            // pallet enforces `sender == proof.signer`, which holds when
-            // avn-proxy dispatches the inner call with `origin = proof.signer`.
             RuntimeCall::NodeManager(pallet_node_manager::pallet::Call::signed_register_node {
                 proof,
                 node: _,

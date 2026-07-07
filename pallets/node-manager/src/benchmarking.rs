@@ -387,6 +387,49 @@ benchmarks! {
         assert!(node_info.signing_key == new_signing_key);
         assert_last_event::<T>(Event::SigningKeyUpdated {owner, node}.into());
     }
+
+    // Worst-case cost of paying one node in the `on_idle` drain: owner lookup,
+    // reward transfer from the pot, and the `RewardPaid` event.
+    pay_one_node {
+        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
+        enable_rewards::<T>();
+        fund_reward_pot::<T>();
+
+        let reward_period = <RewardPeriod<T>>::get();
+        let period = reward_period.current;
+        let owner: T::AccountId = account("owner", 0, 0);
+        let node: NodeId<T> = account("node", 1, 1);
+        let _ = register_new_node::<T>(node.clone(), owner.clone());
+        create_heartbeat::<T>(node.clone(), period);
+
+        let uptime_info = <NodeUptime<T>>::get(period, &node).expect("uptime recorded");
+        let total_weight = <TotalUptime<T>>::get(period).total_weight;
+        let reward_amount = <NextRewardAmountPerPeriod<T>>::get();
+        let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
+            reward_amount,
+            reward_period.uptime_threshold,
+            Pallet::<T>::time_now_sec(),
+        );
+    }: {
+        let _ = Pallet::<T>::pay_one_node(period, &pot_info, &total_weight, node.clone(), uptime_info);
+    }
+    verify {
+        assert!(T::Currency::free_balance(&owner) > BalanceOf::<T>::zero());
+    }
+
+    // Worst-case cost of the applied-halving path in `on_initialize`.
+    apply_halving {
+        let interval = T::HalvingInterval::get();
+        <HalvingEnabled<T>>::put(true);
+        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
+        // One interval in makes exactly one halving due.
+        let n: BlockNumberFor<T> = interval;
+    }: {
+        let _ = Pallet::<T>::apply_halving_if_due(n);
+    }
+    verify {
+        assert!(<RewardAmountHalvingsApplied<T>>::get() >= 1);
+    }
 }
 
 impl_benchmark_test_suite!(

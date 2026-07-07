@@ -88,6 +88,10 @@ use sp_std::prelude::*;
 
 const HEARTBEAT_CONTEXT: &'static [u8] = b"NodeManager_heartbeat";
 const MAX_BATCH_SIZE: u32 = 1_000;
+/// Fraction of a block's leftover (`on_idle`) weight the reward drain may
+/// consume, leaving headroom for other `on_idle` consumers so the pallet is
+/// not greedy.
+const ON_IDLE_WEIGHT_SHARE: Perbill = Perbill::from_percent(75);
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
 pub const SIGNED_DEREGISTER_NODE_CONTEXT: &[u8] = b"deregister_node";
@@ -961,16 +965,19 @@ pub mod pallet {
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
             // Halving runs unconditionally before the rollover guard so that a
             // halving + rollover that fall on the same block use the post-
-            // halved amount.
-            Self::apply_halving_if_due(n);
+            // halved amount. Its weight is charged onto every return path
+            // below so a halving-due block is accounted for its worst case.
+            let halving_weight = Self::apply_halving_if_due(n);
 
             if !RewardEnabled::<T>::get() {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
+                    .saturating_add(halving_weight)
             }
 
             let reward_period = RewardPeriod::<T>::get();
             if !reward_period.should_update(n) {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
+                    .saturating_add(halving_weight)
             }
 
             let previous_index = reward_period.current;
@@ -983,6 +990,7 @@ pub mod pallet {
             if next_reward_period_length == 0 || next_heartbeat_period == 0 {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
                     .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
+                    .saturating_add(halving_weight)
             }
 
             let next_reward_amount = NextRewardAmountPerPeriod::<T>::get();
@@ -1050,6 +1058,7 @@ pub mod pallet {
             });
 
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
+                .saturating_add(halving_weight)
         }
 
         /// `on_idle` drain: when block production has remaining weight, walk
@@ -1062,7 +1071,13 @@ pub mod pallet {
             if !RewardEnabled::<T>::get() {
                 return Weight::zero()
             }
-            Self::drain_outstanding_payouts(remaining_weight)
+            // Hand the drain only a share of the block's leftover weight so
+            // other `on_idle` consumers keep headroom.
+            let budget = Weight::from_parts(
+                ON_IDLE_WEIGHT_SHARE.mul_floor(remaining_weight.ref_time()),
+                ON_IDLE_WEIGHT_SHARE.mul_floor(remaining_weight.proof_size()),
+            );
+            Self::drain_outstanding_payouts(budget)
         }
 
         fn offchain_worker(n: BlockNumberFor<T>) {
