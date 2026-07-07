@@ -14,8 +14,11 @@ license = "GPL-3.0"
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 log = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
-scale-info = { workspace = true, features = ["derive", "serde"]}
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
+scale-info = { workspace = true, features = ["derive", "serde"] }
 sp-avn-common = { workspace = true }
 sp-io = { workspace = true }
 sp-runtime = { workspace = true }
@@ -28,34 +31,37 @@ pallet-timestamp = { workspace = true }
 frame-benchmarking = { workspace = true, optional = true }
 hex = { workspace = true }
 [dev-dependencies]
-pallet-balances = { workspace = true, features=["insecure_zero_ed", "default"] }
+pallet-balances = { workspace = true, features = [
+  "insecure_zero_ed",
+  "default",
+] }
 pallet-session = { workspace = true }
 sp-state-machine = { version = "0.43.0", default-features = false }
 parking_lot = { version = "0.12.3" }
 test-case = { workspace = true }
-sp-avn-common = { workspace = true, features=["test-utils"] }
-sp-keystore = { workspace = true, features = ["default"]}
+sp-avn-common = { workspace = true, features = ["test-utils"] }
+sp-keystore = { workspace = true, features = ["default"] }
 
 [features]
 default = ["std"]
 std = [
-	"scale-info/std",
-	"parity-scale-codec/std",
-	"sp-io/std",
-	"frame-support/std",
-	"frame-system/std",
-	"sp-runtime/std",
-	"sp-application-crypto/std",
-	"sp-core/std",
-	"log/std",
-	"sp-std/std",
-	"frame-benchmarking?/std",
-	"pallet-avn/std",
-	"sp-avn-common/std",
+  "scale-info/std",
+  "parity-scale-codec/std",
+  "sp-io/std",
+  "frame-support/std",
+  "frame-system/std",
+  "sp-runtime/std",
+  "sp-application-crypto/std",
+  "sp-core/std",
+  "log/std",
+  "sp-std/std",
+  "frame-benchmarking?/std",
+  "pallet-avn/std",
+  "sp-avn-common/std",
 ]
 runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
 ]
 try-runtime = ["frame-support/try-runtime"]
