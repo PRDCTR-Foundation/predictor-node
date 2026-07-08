@@ -3,8 +3,11 @@
   "id": "predictor_cassandra_public_testnet_v2",
   "chainType": "Live",
   "bootNodes": [
-    "/dns/ohio.testnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx",
-    "/dns/oregon.testnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
+    "/dns/node-1.testnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx",
+    "/dns/node-2.testnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY",
+    "/dns/node-3.testnet.prdctr.io/tcp/30333/p2p/12D3KooW9wJLsmp5ZLv4gkdDmoo2QcG2MZsRGBoYrEkWATrh8Vpu",
+    "/dns/node-4.testnet.prdctr.io/tcp/30333/p2p/12D3KooWCJvvD2i4i3ZXQxqUY5vr7xD781ATWEzdzMUXPjsqh2r4",
+    "/dns/node-5.testnet.prdctr.io/tcp/30333/p2p/12D3KooWR9woUYXi5isb3ES46yZRjvmSwNKtz5XLXmKsSM2dGmDD"
   ],
   "telemetryEndpoints": null,
   "protocolId": "prd-public-cassandra-testnet-v2",
