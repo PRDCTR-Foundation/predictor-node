@@ -292,11 +292,19 @@ docker run --rm -it -p 9944:9944 -p 9933:9933 -p 30333:30333 predictor-node:loca
 - For production or release images, use the published images from `ghcr.io/<owner>/predictor-node:<tag>`.
 
 
-## Key Generation Helper
+## Authors Key Generation Helper
 
-The `scripts/generate-keys.sh` helper generates development/testnet validator key bundles for bootstrapping a Predictor network. It creates a SUDO account, the requested number of Author key bundles, and a `bridgeConfig.authors` JSON object containing the Ethereum and T2 public key details needed when configuring the bridge.
+The `scripts/generate-author-keys.sh` helper generates the requested number of Predictor Author key bundles.
 
-This script is intended for **DEV/TESTNET use only**. The generated output contains private keys and seed phrases and must never be committed.
+For each Author, it generates the required Substrate account and session keys together with an Ethereum key. It then:
+
+- Writes all public keys, account IDs, addresses, and the bridge Author configuration to a JSON file.
+- Prints the corresponding secret phrases, secret seeds, and Ethereum private keys directly to the terminal.
+- Does not include any private keys or seed phrases in the generated JSON file.
+
+The script can be used for development, testnet, or mainnet deployments. For mainnet, validator creation can be distributed between the participating operators so that each operator generates and securely stores only the keys assigned to them.
+
+Secret material should be copied immediately from the terminal into an appropriate secure credential store.
 
 ### Prerequisites
 
@@ -307,5 +315,21 @@ The script requires:
 
 ### Usage
 
-    chmod +x scripts/generate-keys.sh
-    ./scripts/generate-keys.sh 5
+    chmod +x scripts/generate-author-keys.sh
+    ./scripts/generate-author-keys.sh 2
+
+To specify the public JSON output file:
+
+    ./scripts/generate-author-keys.sh 2 authors.json
+
+The generated JSON file contains the public details for each Author and the bridge configuration array:
+
+```
+{
+  "generatedAt": "...",
+  "authors": [],
+  "bridgeConfig": []
+}
+```
+
+Treat the secret material printed to the terminal as highly sensitive. Ensure the terminal session is private, avoid recording or redirecting its output, and clear any relevant terminal history or scrollback after the secrets have been stored securely.
