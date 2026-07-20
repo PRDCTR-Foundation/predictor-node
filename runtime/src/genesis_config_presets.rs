@@ -14,6 +14,9 @@ use sp_genesis_builder::PresetId;
 type EthPublicKey = ecdsa::Public;
 use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
 
+#[cfg(feature = "enable-static-presents")]
+mod public_testnet;
+
 fn testnet_genesis(
     initial_authorities: Vec<(
         AccountId,
@@ -145,6 +148,8 @@ fn development_config_genesis() -> Value {
 /// Provides the JSON representation of predefined genesis config for given `id`.
 pub fn get_preset(id: &PresetId) -> Option<vec::Vec<u8>> {
     let patch = match id.try_into() {
+        #[cfg(feature = "enable-static-presents")]
+        Ok(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET) => public_testnet::genesis(),
         Ok(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET) =>
             staging_testnet_genesis(),
         Ok(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET) => local_testnet_genesis(),
@@ -160,11 +165,24 @@ pub fn get_preset(id: &PresetId) -> Option<vec::Vec<u8>> {
 
 /// List of supported presets.
 pub fn preset_names() -> Vec<PresetId> {
-    vec![
-        PresetId::from(sp_genesis_builder::DEV_RUNTIME_PRESET),
-        PresetId::from(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET),
-        PresetId::from(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET),
-    ]
+    #[cfg(feature = "enable-static-presents")]
+    {
+        vec![
+            PresetId::from(sp_genesis_builder::DEV_RUNTIME_PRESET),
+            PresetId::from(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET),
+            PresetId::from(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET),
+            PresetId::from(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET),
+        ]
+    }
+
+    #[cfg(not(feature = "enable-static-presents"))]
+    {
+        vec![
+            PresetId::from(sp_genesis_builder::DEV_RUNTIME_PRESET),
+            PresetId::from(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET),
+            PresetId::from(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET),
+        ]
+    }
 }
 
 /// Generate the full set of session keys used by the runtime

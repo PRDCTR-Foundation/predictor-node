@@ -2,7 +2,7 @@
 authors = ["Zeitgeist PM <contact@zeitgeist.pm>", "Aventus systems team"]
 edition = { workspace = true }
 name = "prediction-market-primitives"
-version = "0.2.0"
+version.workspace = true
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
@@ -14,8 +14,11 @@ num-traits = { workspace = true }
 orml-currencies = { workspace = true }
 orml-tokens = { workspace = true }
 orml-traits = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
-scale-info = { workspace = true, features = ["derive", "serde"]}
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
+scale-info = { workspace = true, features = ["derive", "serde"] }
 serde = { workspace = true, features = ["alloc", "derive", "rc"] }
 sp-arithmetic = { workspace = true }
 sp-core = { workspace = true }
@@ -33,16 +36,16 @@ default = ["std"]
 mock = []
 runtime-benchmarks = []
 std = [
-    "frame-support/std",
-    "frame-system/std",
-    "orml-currencies/std",
-    "orml-tokens/std",
-    "orml-traits/std",
-    "parity-scale-codec/std",
-    "serde/std",
-    "scale-info/std",
-    "sp-arithmetic/std",
-    "sp-core/std",
-    "sp-runtime/std",
-    "sp-avn-common/std",
+  "frame-support/std",
+  "frame-system/std",
+  "orml-currencies/std",
+  "orml-tokens/std",
+  "orml-traits/std",
+  "parity-scale-codec/std",
+  "serde/std",
+  "scale-info/std",
+  "sp-arithmetic/std",
+  "sp-core/std",
+  "sp-runtime/std",
+  "sp-avn-common/std",
 ]

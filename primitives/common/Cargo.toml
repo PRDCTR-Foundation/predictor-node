@@ -2,11 +2,14 @@
 authors = ["Aventus systems team"]
 edition = { workspace = true }
 name = "common-primitives"
-version = "0.2.0"
+version.workspace = true
 
 [dependencies]
 frame-support = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 sp-core = { workspace = true }
 sp-runtime = { workspace = true }
 
@@ -14,8 +17,8 @@ sp-runtime = { workspace = true }
 [features]
 default = ["std"]
 std = [
-    "frame-support/std",
-    "parity-scale-codec/std",
-    "sp-core/std",
-    "sp-runtime/std",
+  "frame-support/std",
+  "parity-scale-codec/std",
+  "sp-core/std",
+  "sp-runtime/std",
 ]

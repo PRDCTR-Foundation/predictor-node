@@ -3,7 +3,10 @@ frame-benchmarking = { workspace = true, optional = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
 orml-traits = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 scale-info = { workspace = true, features = ["derive"] }
 sp-runtime = { workspace = true }
 sp-core = { workspace = true }
@@ -35,81 +38,76 @@ common-primitives = { workspace = true }
 
 [dev-dependencies]
 test-case = { workspace = true }
-# Remove when pallet-pm-neo-swaps is added to the mock feature to avoid a circular dependency between neo-swaps and hybrid-router.
-# pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
+pallet-pm-hybrid-router = { workspace = true, features = ["mock"] }
 
 [features]
 default = ["std"]
 mock = [
-    "cfg-if",
-    "env_logger/default",
-    "pallet-pm-eth-asset-registry/default",
-    "orml-currencies/default",
-    "orml-tokens/default",
-    "pallet-balances/default",
-    "pallet-insecure-randomness-collective-flip/default",
-    "pallet-timestamp/default",
-    "pallet-treasury/default",
-    "serde/default",
-    "sp-core/default",
-    "sp-io/default",
-    "xcm/default",
-    "prediction-market-primitives/mock",
-    "pallet-pm-combinatorial-tokens/default",
-    "pallet-pm-market-commons/default",
-    "pallet-pm-neo-swaps/default",
-    "pallet-pm-order-book/default",
-    "pallet-prediction-markets/default",
-    "pallet-prediction-markets/mock",
-    "pallet-pm-authorized/default",
-    "pallet-pm-court/default",
-    "pallet-pm-global-disputes/default",
+  "cfg-if",
+  "env_logger/default",
+  "pallet-pm-eth-asset-registry/default",
+  "orml-currencies/default",
+  "orml-tokens/default",
+  "pallet-balances/default",
+  "pallet-insecure-randomness-collective-flip/default",
+  "pallet-timestamp/default",
+  "pallet-treasury/default",
+  "serde/default",
+  "sp-core/default",
+  "sp-io/default",
+  "xcm/default",
+  "prediction-market-primitives/mock",
+  "pallet-pm-combinatorial-tokens/default",
+  "pallet-pm-market-commons/default",
+  "pallet-pm-neo-swaps/default",
+  "pallet-pm-order-book/default",
+  "pallet-prediction-markets/default",
+  "pallet-prediction-markets/mock",
+  "pallet-pm-authorized/default",
+  "pallet-pm-court/default",
+  "pallet-pm-global-disputes/default",
 ]
-parachain = [
-    "pallet-prediction-markets/parachain",
-]
+parachain = ["pallet-prediction-markets/parachain"]
 runtime-benchmarks = [
-    "frame-benchmarking/runtime-benchmarks",
-    "frame-support/runtime-benchmarks",
-    "frame-system/runtime-benchmarks",
-    "xcm-builder/runtime-benchmarks",
-    "pallet-xcm/runtime-benchmarks",
-    "pallet-pm-combinatorial-tokens/runtime-benchmarks",
-    "pallet-prediction-markets/runtime-benchmarks",
-    "pallet-pm-eth-asset-registry?/runtime-benchmarks",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
+  "xcm-builder/runtime-benchmarks",
+  "pallet-xcm/runtime-benchmarks",
+  "pallet-pm-combinatorial-tokens/runtime-benchmarks",
+  "pallet-prediction-markets/runtime-benchmarks",
+  "pallet-pm-eth-asset-registry?/runtime-benchmarks",
 ]
 std = [
-    "frame-benchmarking?/std",
-    "frame-support/std",
-    "frame-system/std",
-    "orml-traits/std",
-    "parity-scale-codec/std",
-    "sp-runtime/std",
-    "sp-core/std",
-    "prediction-market-primitives/std",
-    "pallet-pm-market-commons/std",
-    "common-primitives/std",
-    # Optional deps activated by `runtime-benchmarks`. See neo-swaps for
-    # rationale.
-    "xcm?/std",
-    "xcm-builder?/std",
-    "pallet-xcm?/std",
-    "pallet-pm-eth-asset-registry?/std",
-    "pallet-treasury?/std",
-    "pallet-prediction-markets?/std",
-    "pallet-pm-combinatorial-tokens?/std",
-    "pallet-pm-neo-swaps?/std",
-    "pallet-pm-order-book?/std",
-    "pallet-pm-authorized?/std",
-    "pallet-pm-court?/std",
-    "pallet-pm-global-disputes?/std",
+  "frame-benchmarking?/std",
+  "frame-support/std",
+  "frame-system/std",
+  "orml-traits/std",
+  "parity-scale-codec/std",
+  "sp-runtime/std",
+  "sp-core/std",
+  "prediction-market-primitives/std",
+  "pallet-pm-market-commons/std",
+  "common-primitives/std",
+  # Optional deps activated by `runtime-benchmarks`. See neo-swaps for
+  # rationale.
+  "xcm?/std",
+  "xcm-builder?/std",
+  "pallet-xcm?/std",
+  "pallet-pm-eth-asset-registry?/std",
+  "pallet-treasury?/std",
+  "pallet-prediction-markets?/std",
+  "pallet-pm-combinatorial-tokens?/std",
+  "pallet-pm-neo-swaps?/std",
+  "pallet-pm-order-book?/std",
+  "pallet-pm-authorized?/std",
+  "pallet-pm-court?/std",
+  "pallet-pm-global-disputes?/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true
 edition.workspace = true
 name = "pallet-pm-hybrid-router"
-version = "0.2.0"
+version.workspace = true

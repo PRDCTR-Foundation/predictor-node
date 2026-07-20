@@ -4,7 +4,10 @@ frame-support = { workspace = true }
 frame-system = { workspace = true }
 log = { workspace = true }
 orml-traits = { workspace = true }
-parity-scale-codec = { workspace = true, features = ["derive", "max-encoded-len"] }
+parity-scale-codec = { workspace = true, features = [
+  "derive",
+  "max-encoded-len",
+] }
 scale-info = { workspace = true, features = ["derive"] }
 serde = { workspace = true, optional = true }
 sp-arithmetic = { workspace = true }
@@ -35,75 +38,71 @@ pallet-prediction-markets-runtime-api = { workspace = true, optional = true }
 
 sp-avn-common = { workspace = true }
 pallet-avn = { workspace = true }
-sp-keystore = { workspace = true , optional = true }
+sp-keystore = { workspace = true, optional = true }
 
 [dev-dependencies]
 more-asserts = { workspace = true }
 test-case = { workspace = true }
-# Remove the mock feature to avoid a circular dependency
-# pallet-prediction-markets = { workspace = true, features = ["mock", "default"] }
-sp-keystore = { workspace = true, features = ["default"]}
-sp-avn-common = { workspace = true, features=["test-utils"] }
+pallet-prediction-markets = { workspace = true, features = ["mock", "default"] }
+sp-keystore = { workspace = true, features = ["default"] }
+sp-avn-common = { workspace = true, features = ["test-utils"] }
 
 [features]
 default = ["std"]
 mock = [
-    "cfg-if",
-    "env_logger/default",
-    "pallet-pm-eth-asset-registry/default",
-    "orml-currencies/default",
-    "orml-tokens/default",
-    "pallet-balances/default",
-    "pallet-insecure-randomness-collective-flip/default",
-    "pallet-timestamp/default",
-    "pallet-treasury/default",
-    "serde/default",
-    "sp-api/default",
-    "sp-io/default",
-    "sp-core/default",
-    "sp-keystore/default",
-    "prediction-market-primitives/mock",
-    "pallet-prediction-markets-runtime-api/default",
-    "xcm/default",
-    "env_logger/default",
+  "cfg-if",
+  "env_logger/default",
+  "pallet-pm-eth-asset-registry/default",
+  "orml-currencies/default",
+  "orml-tokens/default",
+  "pallet-balances/default",
+  "pallet-insecure-randomness-collective-flip/default",
+  "pallet-timestamp/default",
+  "pallet-treasury/default",
+  "serde/default",
+  "sp-api/default",
+  "sp-io/default",
+  "sp-core/default",
+  "sp-keystore/default",
+  "prediction-market-primitives/mock",
+  "pallet-prediction-markets-runtime-api/default",
+  "xcm/default",
+  "env_logger/default",
 ]
 parachain = []
 runtime-benchmarks = [
-    "frame-benchmarking/runtime-benchmarks",
-    "frame-support/runtime-benchmarks",
-    "frame-system/runtime-benchmarks",
-    "pallet-pm-eth-asset-registry/runtime-benchmarks",
-    "pallet-timestamp/runtime-benchmarks",
-    "pallet-treasury/runtime-benchmarks",
-    "prediction-market-primitives/mock",
+  "frame-benchmarking/runtime-benchmarks",
+  "frame-support/runtime-benchmarks",
+  "frame-system/runtime-benchmarks",
+  "pallet-pm-eth-asset-registry/runtime-benchmarks",
+  "pallet-timestamp/runtime-benchmarks",
+  "pallet-treasury/runtime-benchmarks",
+  "prediction-market-primitives/mock",
 ]
 std = [
-    "frame-benchmarking?/std",
-    "frame-support/std",
-    "frame-system/std",
-    "pallet-pm-eth-asset-registry/std",
-    "orml-traits/std",
-    "parity-scale-codec/std",
-    'scale-info/std',
-    "serde?/std",
-    "sp-arithmetic/std",
-    "sp-runtime/std",
-    "prediction-market-primitives/std",
-    "common-primitives/std",
-    "pallet-pm-authorized/std",
-    "pallet-pm-court/std",
-    "pallet-pm-market-commons/std",
-    "pallet-pm-global-disputes/std",
-    "pallet-avn/std",
-    "xcm?/std",
+  "frame-benchmarking?/std",
+  "frame-support/std",
+  "frame-system/std",
+  "pallet-pm-eth-asset-registry/std",
+  "orml-traits/std",
+  "parity-scale-codec/std",
+  'scale-info/std',
+  "serde?/std",
+  "sp-arithmetic/std",
+  "sp-runtime/std",
+  "prediction-market-primitives/std",
+  "common-primitives/std",
+  "pallet-pm-authorized/std",
+  "pallet-pm-court/std",
+  "pallet-pm-market-commons/std",
+  "pallet-pm-global-disputes/std",
+  "pallet-avn/std",
+  "xcm?/std",
 ]
-try-runtime = [
-    "frame-support/try-runtime",
-]
+try-runtime = ["frame-support/try-runtime"]
 
 [package]
 authors.workspace = true
 edition.workspace = true
 name = "pallet-prediction-markets"
-version = "0.2.0"
-
+version.workspace = true
