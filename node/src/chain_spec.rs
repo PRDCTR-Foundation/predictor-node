@@ -94,3 +94,30 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
         ChainSpec::from_json_bytes(&include_bytes!("./chain-specs/testnet.json")[..])
     }
 }
+
+pub fn mainnet_config() -> Result<ChainSpec, String> {
+    {
+        let properties = prd_chain_properties();
+
+        Ok(ChainSpec::builder(
+            WASM_BINARY.ok_or_else(|| "Public mainnet wasm not available".to_string())?,
+            None,
+        )
+        .with_name("Predictor Mainnet")
+        .with_id("predictor_mainnet_v1")
+        .with_protocol_id("prd-mainnet-v1")
+        .with_properties(properties)
+        .with_chain_type(ChainType::Live)
+        // TODO update bootnodes to mainnet ones
+        .with_boot_nodes(vec![
+            "/dns/ohio.mainnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/oregon.mainnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+        ])
+        .with_genesis_config_preset_name(common_primitives::presents::MAINNET_RUNTIME_PRESET)
+        .build())
+    }
+}
