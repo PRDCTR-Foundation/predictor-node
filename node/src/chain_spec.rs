@@ -25,9 +25,9 @@ pub fn development_config() -> Result<ChainSpec, String> {
         WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
         None,
     )
-    .with_name("Predictor Development")
-    .with_id("dev")
-    .with_protocol_id("prd-dev")
+    .with_name("PRDCTR Development")
+    .with_id("prdctr-dev")
+    .with_protocol_id("prdctr-dev")
     .with_properties(properties)
     .with_chain_type(ChainType::Development)
     .with_genesis_config_preset_name(sp_genesis_builder::DEV_RUNTIME_PRESET)
@@ -38,9 +38,9 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
     let properties = prd_chain_properties();
 
     Ok(ChainSpec::builder(WASM_BINARY.ok_or_else(|| "Local wasm not available".to_string())?, None)
-        .with_name("Predictor Local Testnet")
-        .with_id("local_testnet")
-        .with_protocol_id("prd-local-testnet")
+        .with_name("PRDCTR Local Testnet")
+        .with_id("prdctr_local_testnet")
+        .with_protocol_id("prdctr-local-testnet")
         .with_properties(properties)
         .with_chain_type(ChainType::Local)
         .with_genesis_config_preset_name(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET)
@@ -54,9 +54,9 @@ pub fn staging_testnet_config() -> Result<ChainSpec, String> {
         WASM_BINARY.ok_or_else(|| "Staging wasm not available".to_string())?,
         None,
     )
-    .with_name("Predictor Staging Testnet")
-    .with_id("predictor_staging_testnet")
-    .with_protocol_id("prd-staging-testnet")
+    .with_name("PRDCTR Staging Testnet")
+    .with_id("prdctr_staging_testnet")
+    .with_protocol_id("prdctr-staging-testnet")
     .with_properties(properties)
     .with_chain_type(ChainType::Live)
     .with_genesis_config_preset_name(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET)
@@ -72,7 +72,7 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
             WASM_BINARY.ok_or_else(|| "Public testnet wasm not available".to_string())?,
             None,
         )
-        .with_name("Predictor Cassandra Public Testnet")
+        .with_name("Cassandra - PRDCTR Public Testnet")
         .with_id("predictor_cassandra_public_testnet_v2")
         .with_protocol_id("prd-public-cassandra-testnet-v2")
         .with_properties(properties)
@@ -112,12 +112,11 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
             WASM_BINARY.ok_or_else(|| "Public mainnet wasm not available".to_string())?,
             None,
         )
-        .with_name("Predictor Mainnet")
-        .with_id("predictor_mainnet_v1")
-        .with_protocol_id("prd-mainnet-v1")
+        .with_name("PRDCTR")
+        .with_id("prdctr_mainnet_v1")
+        .with_protocol_id("prdctr-mainnet-v1")
         .with_properties(properties)
         .with_chain_type(ChainType::Live)
-        // TODO update bootnodes to mainnet ones
         .with_boot_nodes(vec![
             "/dns/node-1.prdctr.io/tcp/30333/p2p/12D3KooWSVi3XCMUDQSJKMCX2zQNXozWem8vygEaQGAzbMkgvUfz"
                 .parse()

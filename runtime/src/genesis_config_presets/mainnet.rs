@@ -134,7 +134,7 @@ pub(super) fn genesis() -> Value {
                 // not yet deployed. bridge_contract:
                 // H160(hex!("83478B43A9809Ecfc86cb063C733ECdee074EF72")),
                 bridge_contract: H160::zero(),
-                name: BoundedVec::truncate_from("PredictorBridge".into()),
+                name: BoundedVec::truncate_from("PRDCTRBridge".into()),
                 version: BoundedVec::truncate_from("1".into()),
                 salt: None,
                 ..Default::default()
