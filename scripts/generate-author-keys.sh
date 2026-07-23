@@ -21,7 +21,7 @@ for command in subkey cast; do
 done
 
 declare -a AUTHOR_JSON
-declare -a AUTHOR_SECRETS
+declare -a AUTHOR_FULL_JSON
 declare -a ETH_ADDRESSES
 declare -a ETH_PUBLIC_KEYS
 declare -a T2_PUBLIC_KEYS
@@ -68,6 +68,7 @@ generate_eth_key() {
 
   ETH_SECRET_PHRASE="$(sed -n 's/^Secret phrase:[[:space:]]*//p' <<< "$output")"
   ETH_PRIVATE_KEY="$(sed -n 's/^[[:space:]]*Secret seed:[[:space:]]*//p' <<< "$output")"
+  ETH_COMPRESSED_PUBLIC_KEY="$(sed -n 's/^[[:space:]]*Public key (hex):[[:space:]]*//p' <<< "$output")"
 
   [[ -n "$ETH_SECRET_PHRASE" && -n "$ETH_PRIVATE_KEY" ]] || {
     echo "Error: failed to parse Ethereum key output" >&2
@@ -95,16 +96,16 @@ substrate_json() {
 EOF
 }
 
-substrate_secret() {
-  local name="$1"
-
+substrate_full_json() {
   cat <<EOF
-$name
-  Scheme: $SCHEME
-  Account: $SS58_ADDRESS
-  Secret phrase: $SECRET_PHRASE
-  Secret seed: $SECRET_SEED
-
+{
+          "scheme": $(json_string "$SCHEME"),
+          "accountId": $(json_string "$ACCOUNT_ID"),
+          "ss58Address": $(json_string "$SS58_ADDRESS"),
+          "publicKey": $(json_string "$PUBLIC_KEY"),
+          "secretPhrase": $(json_string "$SECRET_PHRASE"),
+          "secretSeed": $(json_string "$SECRET_SEED")
+        }
 EOF
 }
 
@@ -113,57 +114,56 @@ eth_json() {
 {
           "scheme": "ecdsa / secp256k1 / ethereum",
           "address": $(json_string "$ETH_ADDRESS"),
+          "compressedPublicKey": $(json_string "$ETH_COMPRESSED_PUBLIC_KEY"),
           "uncompressedPublicKey": $(json_string "$ETH_PUBLIC_KEY")
         }
 EOF
 }
 
-eth_secret() {
+eth_full_json() {
   cat <<EOF
-ethk
-  Scheme: ecdsa / secp256k1 / ethereum
-  Account: $ETH_ADDRESS
-  Secret phrase: $ETH_SECRET_PHRASE
-  Private key: $ETH_PRIVATE_KEY
-
+{
+          "scheme": "ecdsa / secp256k1 / ethereum",
+          "address": $(json_string "$ETH_ADDRESS"),
+          "compressedPublicKey": $(json_string "$ETH_COMPRESSED_PUBLIC_KEY"),
+          "uncompressedPublicKey": $(json_string "$ETH_PUBLIC_KEY"),
+          "secretPhrase": $(json_string "$ETH_SECRET_PHRASE"),
+          "privateKey": $(json_string "$ETH_PRIVATE_KEY")
+        }
 EOF
 }
 
 for ((i = 1; i <= AUTHOR_COUNT; i++)); do
-  secrets=""
-
   generate_substrate_key sr25519
   account_json="$(substrate_json)"
-  secrets+="$(substrate_secret account)"$'\n'
+  account_full_json="$(substrate_full_json)"
 
   generate_substrate_key sr25519
   avnk_json="$(substrate_json)"
+  avnk_full_json="$(substrate_full_json)"
   T2_PUBLIC_KEYS[$i]="$PUBLIC_KEY"
-  secrets+="$(substrate_secret avnk)"$'\n'
 
   generate_substrate_key sr25519
   aura_json="$(substrate_json)"
-  secrets+="$(substrate_secret aura)"$'\n'
+  aura_full_json="$(substrate_full_json)"
 
   generate_substrate_key ed25519
   gran_json="$(substrate_json)"
-  secrets+="$(substrate_secret gran)"$'\n'
+  gran_full_json="$(substrate_full_json)"
 
   generate_substrate_key sr25519
   audi_json="$(substrate_json)"
-  secrets+="$(substrate_secret audi)"$'\n'
+  audi_full_json="$(substrate_full_json)"
 
   generate_substrate_key sr25519
   imon_json="$(substrate_json)"
-  secrets+="$(substrate_secret imon)"$'\n'
+  imon_full_json="$(substrate_full_json)"
 
   generate_eth_key
   ethk_json="$(eth_json)"
+  ethk_full_json="$(eth_full_json)"
   ETH_ADDRESSES[$i]="$ETH_ADDRESS"
   ETH_PUBLIC_KEYS[$i]="$ETH_PUBLIC_KEY"
-  secrets+="$(eth_secret)"$'\n'
-
-  AUTHOR_SECRETS[$i]="$secrets"
 
   AUTHOR_JSON[$i]="$(cat <<EOF
     {
@@ -175,6 +175,20 @@ for ((i = 1; i <= AUTHOR_COUNT; i++)); do
       "audi": $audi_json,
       "imon": $imon_json,
       "ethk": $ethk_json
+    }
+EOF
+)"
+
+  AUTHOR_FULL_JSON[$i]="$(cat <<EOF
+    {
+      "name": "author-$i",
+      "account": $account_full_json,
+      "avnk": $avnk_full_json,
+      "aura": $aura_full_json,
+      "gran": $gran_full_json,
+      "audi": $audi_full_json,
+      "imon": $imon_full_json,
+      "ethk": $ethk_full_json
     }
 EOF
 )"
@@ -212,23 +226,22 @@ EOF
 
 chmod 600 "$OUTPUT_FILE"
 
-echo
-echo "============================================================"
-echo "AUTHOR SECRETS — STORE SECURELY"
-echo "============================================================"
+{
+  echo '{'
+  printf '  "generatedAt": %s,\n' \
+    "$(json_string "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")"
 
-for ((i = 1; i <= AUTHOR_COUNT; i++)); do
-  echo
-  echo "------------------------------------------------------------"
-  echo "author-$i"
-  echo "------------------------------------------------------------"
-  printf '%s' "${AUTHOR_SECRETS[$i]}"
-done
+  echo '  "authors": ['
 
-echo "============================================================"
-echo "END OF AUTHOR SECRETS"
-echo "============================================================"
-echo
+  for ((i = 1; i <= AUTHOR_COUNT; i++)); do
+    printf '%s' "${AUTHOR_FULL_JSON[$i]}"
+    ((i < AUTHOR_COUNT)) && echo ',' || echo
+  done
+
+  echo '  ]'
+  echo '}'
+}
+
 echo "Generated $AUTHOR_COUNT author account(s)." >&2
-echo "Public configuration written to: $OUTPUT_FILE" >&2
-echo "The JSON file contains no private keys or secret phrases." >&2
+echo "Public configuration (no private keys or secret phrases) written to: $OUTPUT_FILE" >&2
+echo "Private key material (secret phrases, seeds, private keys) was printed to stdout as JSON — store it securely." >&2
