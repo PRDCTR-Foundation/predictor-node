@@ -4,7 +4,7 @@ use crate::{
     SummaryConfig, TokenManagerConfig,
 };
 use alloc::{vec, vec::Vec};
-use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
+use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_HOUR};
 use hex_literal::hex;
 use serde_json::Value;
 use sp_avn_common::eth::EthereumNetwork;
@@ -124,7 +124,7 @@ pub(super) fn genesis() -> Value {
                 "000000000000000000000000000000000000000000000000000000000000dead"
             )),
             avt_token_contract: H160(hex!("c84782858B7Bef5d25182Dbac956A6Aa463AeFE5")),
-            lower_schedule_period: 30 * BLOCKS_PER_MINUTE,
+            lower_schedule_period: 12 * BLOCKS_PER_HOUR,
             ..Default::default()
         },
         eth_bridge: EthBridgeConfig {

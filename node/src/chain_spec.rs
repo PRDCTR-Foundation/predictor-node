@@ -78,12 +78,21 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
         .with_properties(properties)
         .with_chain_type(ChainType::Live)
         .with_boot_nodes(vec![
-            "/dns/ohio.testnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx"
+            "/dns/node-1.testnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx"
                 .parse()
-                .map_err(|err| format!("Invalid public testnet bootnode: {err}"))?,
-            "/dns/oregon.testnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-2.testnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
                 .parse()
-                .map_err(|err| format!("Invalid public testnet bootnode: {err}"))?,
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-3.testnet.prdctr.io/tcp/30333/p2p/12D3KooW9wJLsmp5ZLv4gkdDmoo2QcG2MZsRGBoYrEkWATrh8Vpu"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-4.testnet.prdctr.io/tcp/30333/p2p/12D3KooWCJvvD2i4i3ZXQxqUY5vr7xD781ATWEzdzMUXPjsqh2r4"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-5.testnet.prdctr.io/tcp/30333/p2p/12D3KooWR9woUYXi5isb3ES46yZRjvmSwNKtz5XLXmKsSM2dGmDD"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
         ])
         .with_genesis_config_preset_name(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET)
         .build())
@@ -110,10 +119,19 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
         .with_chain_type(ChainType::Live)
         // TODO update bootnodes to mainnet ones
         .with_boot_nodes(vec![
-            "/dns/ohio.mainnet.prdctr.io/tcp/30333/p2p/12D3KooWPDtoyeoH9cWr4aVSTwjEBz1BTQGdeF2y2V8G7sAacKJx"
+            "/dns/node-1.prdctr.io/tcp/30333/p2p/12D3KooWSVi3XCMUDQSJKMCX2zQNXozWem8vygEaQGAzbMkgvUfz"
                 .parse()
                 .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
-            "/dns/oregon.mainnet.prdctr.io/tcp/30333/p2p/12D3KooWC4tyhGRVcrL9S1LyKVMnTbi3enavGCpDzkovkCJtpxxY"
+            "/dns/node-2.prdctr.io/tcp/30333/p2p/12D3KooWFp451dBzqPQ6GvLnGnNoqS5dCSG6cWftFnng4m67tAAw"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-3.prdctr.io/tcp/30333/p2p/12D3KooWMUQWvYMAbTCTrfUPGKHqHymiLBnKsice3YSFKnqAGKVv"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-4.prdctr.io/tcp/30333/p2p/12D3KooWQVBzUqBtbzazekYzbrEqqJWiP8MXEnP2ngNFgcGAbzqq"
+                .parse()
+                .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
+            "/dns/node-5.prdctr.io/tcp/30333/p2p/12D3KooWNe1SQkqqNY5kPNvR2rSvXSdtYn8KWFAzwWBrA3iceTJm"
                 .parse()
                 .map_err(|err| format!("Invalid public mainnet bootnode: {err}"))?,
         ])
