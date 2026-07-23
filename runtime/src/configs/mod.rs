@@ -371,13 +371,6 @@ impl pallet_authors_manager::Config for Runtime {
 parameter_types! {
     pub const AdvanceSlotGracePeriod: BlockNumber = 5;
     pub const MinBlockAge: BlockNumber = 5;
-    // Predictor's single summary instance is the *Ethereum* summary instance
-    // (InstanceId = 1, mirroring avn-parachain's `EthSummary` / `EthereumInstanceId`):
-    // accepted roots must be handed to pallet-eth-bridge and published to the
-    // bridge contract via `publishRoot`. With this set to `false` the pallet
-    // behaves as an *anchor* instance instead (avn-parachain's Instance2) and
-    // silently diverts every accepted root into `AnchorRoots` storage - nothing
-    // is ever sent to Ethereum ("summaries not publishing").
     pub const AutoSubmitSummaries: bool = true;
     pub const SummaryInstanceId: u8 = 1;
     pub const ExternalValidationEnabled: bool = false;
