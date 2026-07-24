@@ -371,7 +371,7 @@ impl pallet_authors_manager::Config for Runtime {
 parameter_types! {
     pub const AdvanceSlotGracePeriod: BlockNumber = 5;
     pub const MinBlockAge: BlockNumber = 5;
-    pub const AutoSubmitSummaries: bool = false;
+    pub const AutoSubmitSummaries: bool = true;
     pub const SummaryInstanceId: u8 = 1;
     pub const ExternalValidationEnabled: bool = false;
 }
