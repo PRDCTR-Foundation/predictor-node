@@ -129,7 +129,7 @@ pub(super) fn genesis() -> Value {
         },
         eth_bridge: EthBridgeConfig {
             instance: sp_avn_common::eth::EthBridgeInstance {
-                network: EthereumNetwork::Mainnet,
+                network: EthereumNetwork::Ethereum,
                 bridge_contract: H160(hex!("7A47CF8FA87Bd6C7733c9B25D24bfdb8CD8E2228")),
                 name: BoundedVec::truncate_from("PRDCTRBridge".into()),
                 version: BoundedVec::truncate_from("1".into()),
