@@ -290,3 +290,46 @@ docker run --rm -it -p 9944:9944 -p 9933:9933 -p 30333:30333 predictor-node:loca
 - The official CI/CD pipelines publish images to GitHub Container Registry (GHCR) tagged by commit SHA and release tag.
 - The Docker image expects the binary to be named `predictor-node` in the build context root.
 - For production or release images, use the published images from `ghcr.io/<owner>/predictor-node:<tag>`.
+
+
+## Authors Key Generation Helper
+
+The `scripts/generate-author-keys.sh` helper generates the requested number of Predictor Author key bundles.
+
+For each Author, it generates the required Substrate account and session keys together with an Ethereum key. It then:
+
+- Writes all public keys, account IDs, addresses, and the bridge Author configuration to a JSON file.
+- Prints the corresponding secret phrases, secret seeds, and Ethereum private keys directly to the terminal.
+- Does not include any private keys or seed phrases in the generated JSON file.
+
+The script can be used for development, testnet, or mainnet deployments. For mainnet, validator creation can be distributed between the participating operators so that each operator generates and securely stores only the keys assigned to them.
+
+Secret material should be copied immediately from the terminal into an appropriate secure credential store.
+
+### Prerequisites
+
+The script requires:
+
+- `subkey` for Substrate account/session key generation
+- `cast` from Foundry for Ethereum address/public key derivation
+
+### Usage
+
+    chmod +x scripts/generate-author-keys.sh
+    ./scripts/generate-author-keys.sh 2
+
+To specify the public JSON output file:
+
+    ./scripts/generate-author-keys.sh 2 authors.json
+
+The generated JSON file contains the public details for each Author and the bridge configuration array:
+
+```
+{
+  "generatedAt": "...",
+  "authors": [],
+  "bridgeConfig": []
+}
+```
+
+Treat the secret material printed to the terminal as highly sensitive. Ensure the terminal session is private, avoid recording or redirecting its output, and clear any relevant terminal history or scrollback after the secrets have been stored securely.
