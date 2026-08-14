@@ -16,6 +16,11 @@
 // along with Predictor. If not, see <https://www.gnu.org/licenses/>.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// The transactional macro expands to a self-conversion on the dispatch result
+// that clippy flags as useless_conversion against macro-generated code - a false
+// positive, not a real conversion.
+#![allow(clippy::useless_conversion)]
+#![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
 extern crate alloc;
@@ -214,7 +219,7 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
             ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
 
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
+            let market_nonce = MarketNonces::<T>::get(&proof.signer, market_id);
             let signed_payload = encode_signed_report_params::<T>(
                 &proof.relayer,
                 &market_nonce,
@@ -316,7 +321,7 @@ pub mod pallet {
             let who = ensure_signed(origin)?;
             ensure!(who == proof.signer, Error::<T>::SenderIsNotSigner);
 
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
+            let market_nonce = MarketNonces::<T>::get(&proof.signer, market_id);
             let signed_payload =
                 encode_signed_redeem_shares_params::<T>(&proof.relayer, &market_nonce, &market_id);
 
@@ -346,7 +351,7 @@ pub mod pallet {
             let sender = ensure_signed(origin)?;
             ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
 
-            let market_nonce = MarketNonces::<T>::get(&proof.signer, &market_id);
+            let market_nonce = MarketNonces::<T>::get(&proof.signer, market_id);
             let signed_payload = encode_signed_buy_complete_set_params::<T>(
                 &proof.relayer,
                 &market_nonce,

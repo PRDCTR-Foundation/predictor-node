@@ -20,9 +20,7 @@ fn create_signed_join_proof(
     );
 
     let signature = SignatureTest::from(who.key_pair().sign(&encoded_payload));
-    let proof = Proof { signer: who.key_pair().public(), relayer, signature };
-
-    proof
+    Proof { signer: who.key_pair().public(), relayer, signature }
 }
 
 struct SignedJoinContext {

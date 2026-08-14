@@ -1,14 +1,12 @@
 // Copyright 2025 Truth Network.
 
-#![cfg(test)]
-
 use crate::{self as pallet_config, *};
 use frame_support::{derive_impl, parameter_types, weights::Weight};
 use frame_system as system;
 pub use prediction_market_primitives::test_helper::TestAccount;
-pub use sp_core::{sr25519, H256};
+pub use sp_core::sr25519;
 pub use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup, Verify},
+    traits::{IdentityLookup, Verify},
     BuildStorage, Perbill,
 };
 
@@ -33,7 +31,7 @@ impl Config for TestRuntime {
 
 parameter_types! {
     pub const BlockHashCount: u64 = 250;
-    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024 as u64, 0);
+    pub const MaximumBlockWeight: Weight = Weight::from_parts(1024_u64, 0);
     pub const MaximumBlockLength: u32 = 2 * 1024;
     pub const AvailableBlockRatio: Perbill = Perbill::from_percent(75);
     pub const ChallengePeriod: u64 = 2;
@@ -73,7 +71,7 @@ impl ExtBuilder {
         // see the logs in tests when using `RUST_LOG=debug cargo test -- --nocapture`
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let _ = pallet_config::GenesisConfig::<TestRuntime> {
+        pallet_config::GenesisConfig::<TestRuntime> {
             admin_account: Some(admin_account()),
             gas_fee_recipient: Some(gas_fee_recipient()),
             base_gas_fee: 10000000000u128,
@@ -84,6 +82,8 @@ impl ExtBuilder {
         Self { storage }
     }
 
+    // Consumes the builder; the `as_` name matches the sibling test mocks.
+    #[allow(clippy::wrong_self_convention)]
     pub fn as_externality(self) -> sp_io::TestExternalities {
         let mut ext = sp_io::TestExternalities::from(self.storage);
         // Events do not get emitted on block 0, so we increment the block here

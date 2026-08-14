@@ -44,7 +44,7 @@ fn create_market_and_deploy_pool_works() {
         let swap_prices = vec![50 * CENT_BASE, 50 * CENT_BASE];
         let swap_fee = CENT_BASE;
         let market_id = 0;
-        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(creator, ());
         assert_ok!(PredictionMarkets::create_market_and_deploy_pool(
             RuntimeOrigin::signed(creator),
             Asset::Prd,

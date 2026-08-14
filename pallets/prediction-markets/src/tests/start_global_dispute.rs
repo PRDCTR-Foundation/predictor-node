@@ -31,7 +31,7 @@ use prediction_market_primitives::types::OutcomeReport;
 fn start_global_dispute_fails_on_wrong_mdm() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

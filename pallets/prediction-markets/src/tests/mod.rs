@@ -67,7 +67,7 @@ const SENTINEL_AMOUNT: u128 = BASE;
 
 fn get_deadlines() -> DeadlinesOf<Runtime> {
     Deadlines {
-        grace_period: 1_u32.into(),
+        grace_period: 1_u32,
         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
         dispute_duration: <Runtime as Config>::MinDisputeDuration::get(),
     }
@@ -86,7 +86,7 @@ fn simple_create_categorical_market(
     period: Range<u32>,
     scoring_rule: ScoringRule,
 ) {
-    WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+    WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
     assert_ok!(PredictionMarkets::create_market(
         RuntimeOrigin::signed(alice()),
         base_asset,
@@ -108,7 +108,7 @@ fn simple_create_scalar_market(
     period: Range<u32>,
     scoring_rule: ScoringRule,
 ) {
-    WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+    WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
     assert_ok!(PredictionMarkets::create_market(
         RuntimeOrigin::signed(alice()),
         base_asset,

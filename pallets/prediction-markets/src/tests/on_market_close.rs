@@ -134,7 +134,7 @@ fn on_market_close_successfully_auto_closes_market_with_blocks() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 33;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -167,7 +167,7 @@ fn on_market_close_successfully_auto_closes_market_with_timestamps() {
     ExtBuilder::default().build().execute_with(|| {
         let end = (2 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -208,7 +208,7 @@ fn on_market_close_successfully_auto_closes_multiple_markets_after_stall() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -260,7 +260,7 @@ fn on_market_close_market_status_manager_exceeds_max_recovery_time_frames_after_
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

@@ -16,6 +16,13 @@
 // along with Predictor. If not, see <https://www.gnu.org/licenses/>.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// The transactional macro expands to a self-conversion on the dispatch result
+// that clippy flags as useless_conversion against macro-generated code - a false
+// positive, not a real conversion.
+#![allow(clippy::useless_conversion)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::extra_unused_type_parameters)]
 
 extern crate alloc;
 
@@ -245,10 +252,7 @@ pub mod pallet {
         pub fn get_encoded_call_param(
             call: &<T as Config>::RuntimeCall,
         ) -> Option<(&Proof<T::Signature, T::AccountId>, Vec<u8>)> {
-            let call = match call.is_sub_type() {
-                Some(call) => call,
-                None => return None,
-            };
+            let call = call.is_sub_type()?;
 
             match call {
                 Call::signed_join {

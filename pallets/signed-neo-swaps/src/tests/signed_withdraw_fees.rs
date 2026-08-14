@@ -35,9 +35,7 @@ impl SignedWithdrawContext {
             encode_signed_withdraw_fees_params::<Runtime>(&relayer, &self.pool_id, &block_number);
 
         let signature = SignatureTest::from(who.key_pair().sign(&encoded_payload));
-        let proof = Proof { signer: who.key_pair().public(), relayer, signature };
-
-        proof
+        Proof { signer: who.key_pair().public(), relayer, signature }
     }
 
     fn test_signed_withdraw(

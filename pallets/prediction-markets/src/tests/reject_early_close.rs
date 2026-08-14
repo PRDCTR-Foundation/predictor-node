@@ -126,7 +126,7 @@ fn reject_early_close_fails_if_state_is_rejected() {
 fn reject_early_close_resets_to_old_market_period() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -171,7 +171,7 @@ fn reject_early_close_resets_to_old_market_period() {
 fn reject_early_close_settles_bonds() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 100;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

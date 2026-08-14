@@ -129,7 +129,7 @@ pub struct AssetManager;
 impl AssetManager {
     pub fn set_balance(asset: AssetId, who: &AccountId, amount: Balance) {
         ASSET_BALANCES.with(|balances| {
-            balances.borrow_mut().insert((asset, who.clone()), amount);
+            balances.borrow_mut().insert((asset, *who), amount);
         });
     }
 }
@@ -158,7 +158,7 @@ impl MultiCurrency<AccountId> for AssetManager {
 
     fn free_balance(currency_id: Self::CurrencyId, who: &AccountId) -> Self::Balance {
         ASSET_BALANCES.with(|balances| {
-            balances.borrow().get(&(currency_id, who.clone())).copied().unwrap_or_default()
+            balances.borrow().get(&(currency_id, *who)).copied().unwrap_or_default()
         })
     }
 
@@ -191,7 +191,7 @@ impl MultiCurrency<AccountId> for AssetManager {
     ) -> DispatchResult {
         ASSET_BALANCES.with(|balances| {
             let mut balances = balances.borrow_mut();
-            let balance = balances.entry((currency_id, who.clone())).or_default();
+            let balance = balances.entry((currency_id, *who)).or_default();
             *balance = balance.saturating_add(amount);
         });
         Ok(())
@@ -205,7 +205,7 @@ impl MultiCurrency<AccountId> for AssetManager {
         Self::ensure_can_withdraw(currency_id, who, amount)?;
         ASSET_BALANCES.with(|balances| {
             let mut balances = balances.borrow_mut();
-            let balance = balances.entry((currency_id, who.clone())).or_default();
+            let balance = balances.entry((currency_id, *who)).or_default();
             *balance = balance.saturating_sub(amount);
         });
         Ok(())

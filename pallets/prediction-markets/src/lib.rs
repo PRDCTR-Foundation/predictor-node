@@ -18,6 +18,10 @@
 
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
+// The transactional macro expands to a self-conversion on the dispatch result
+// that clippy flags as useless_conversion against macro-generated code - a false
+// positive, not a real conversion.
+#![allow(clippy::useless_conversion)]
 #![allow(clippy::too_many_arguments)]
 #![recursion_limit = "256"]
 
@@ -1138,8 +1142,7 @@ mod pallet {
                 log::debug!(
                     "This will never happen, because schedule_early_close ensures that the new \
                      end is always before the old end, otherwise the switch to an old market \
-                     period would lead to a never ending market! Market id: {:?}.",
-                    market_id
+                     period would lead to a never ending market! Market id: {market_id:?}."
                 );
                 debug_assert!(false);
             }
@@ -1218,8 +1221,7 @@ mod pallet {
                             "This will never happen, because schedule_early_close ensures that \
                              the new end is always before the old end,
                     otherwise the switch to an old market period would lead to a never ending \
-                             market! Market id: {:?}.",
-                            market_id
+                             market! Market id: {market_id:?}."
                         );
                         debug_assert!(false);
                     }
@@ -2002,9 +2004,7 @@ mod pallet {
                         Self::deposit_event(Event::BadOnInitialize);
                         log::error!(
                             target: LOG_TARGET,
-                            "Block {:?} was not initialized. Error: {:?}",
-                            now,
-                            err,
+                            "Block {now:?} was not initialized. Error: {err:?}",
                         );
                         TransactionOutcome::Rollback(err.into())
                     },
@@ -2152,12 +2152,11 @@ mod pallet {
         }
 
         pub fn additional_swap_fee_account() -> Result<T::AccountId, Error<T>> {
-            Ok(<AdditionalSwapFeeAccount<T>>::get()
-                .ok_or(Error::<T>::AdditionalSwapFeeAccountNotSet)?)
+            <AdditionalSwapFeeAccount<T>>::get().ok_or(Error::<T>::AdditionalSwapFeeAccountNotSet)
         }
 
         pub fn winnings_fee_account() -> Result<T::AccountId, Error<T>> {
-            Ok(<WinningsFeeAccount<T>>::get().ok_or(Error::<T>::WinningsFeeAccountNotSet)?)
+            <WinningsFeeAccount<T>>::get().ok_or(Error::<T>::WinningsFeeAccountNotSet)
         }
 
         #[require_transactional]
@@ -2262,8 +2261,8 @@ mod pallet {
             amount: BalanceOf<T>,
         ) -> DispatchResult {
             ensure!(amount != BalanceOf::<T>::zero(), Error::<T>::ZeroAmount);
-            let asset = T::AssetRegistry::asset_id(&token)
-                .ok_or_else(|| Error::<T>::UnregisteredForeignAsset)?;
+            let asset =
+                T::AssetRegistry::asset_id(&token).ok_or(Error::<T>::UnregisteredForeignAsset)?;
             ensure!(
                 T::AssetManager::free_balance(asset, who) >= amount,
                 Error::<T>::NotEnoughBalance
@@ -2277,11 +2276,7 @@ mod pallet {
             // lowered
             let amount =
                 adjust_fractional_places::<T>(&asset, amount, AssetFlowDirection::Outgoing);
-            T::TokenInterface::deposit_tokens(
-                token.into(),
-                who.clone(),
-                amount.saturated_into::<u128>(),
-            )?;
+            T::TokenInterface::deposit_tokens(token, who.clone(), amount.saturated_into::<u128>())?;
 
             Self::deposit_event(Event::TokensTransferredOut { token, owner: who.clone(), amount });
 
@@ -2294,8 +2289,8 @@ mod pallet {
             to: &T::AccountId,
             amount: BalanceOf<T>,
         ) -> DispatchResult {
-            let asset = T::AssetRegistry::asset_id(&token)
-                .ok_or_else(|| Error::<T>::UnregisteredForeignAsset)?;
+            let asset =
+                T::AssetRegistry::asset_id(&token).ok_or(Error::<T>::UnregisteredForeignAsset)?;
 
             // All validtions will be done by the asset manager. Events will also be emitted there.
             T::AssetManager::transfer(asset, from, to, amount)?;
@@ -2412,7 +2407,7 @@ mod pallet {
                 let max_payout = payout.min(remaining_bal);
                 let mut actual_payout = max_payout;
 
-                if !<LiquidityProviders<T>>::contains_key(&market_id, who.clone()) {
+                if !<LiquidityProviders<T>>::contains_key(market_id, who.clone()) {
                     // "Who" is not a liquidity provider, so we need to deduct a winning fee
                     let paid_winner_fee = T::WinnerFeeHandler::distribute(
                         market_id,
@@ -2454,7 +2449,7 @@ mod pallet {
         ) -> DispatchResultWithPostInfo {
             let current_block = <frame_system::Pallet<T>>::block_number();
             let market_report = Report { at: current_block, by: who.clone(), outcome };
-            let market = <pallet_pm_market_commons::Pallet<T>>::market(&market_id)?;
+            let market = <pallet_pm_market_commons::Pallet<T>>::market(market_id)?;
             ensure!(market.report.is_none(), Error::<T>::MarketAlreadyReported);
             Self::ensure_market_is_closed(&market)?;
             ensure!(
@@ -3128,8 +3123,7 @@ mod pallet {
             let start = if diff > MAX_RECOVERY_TIME_FRAMES {
                 log::warn!(
                     target: LOG_TARGET,
-                    "Could not recover all time frames since the last time frame {:?}.",
-                    last_time_frame,
+                    "Could not recover all time frames since the last time frame {last_time_frame:?}.",
                 );
                 let limit_time_frame = end.saturating_sub(MAX_RECOVERY_TIME_FRAMES);
                 Self::deposit_event(Event::RecoveryLimitReached {
@@ -3307,7 +3301,7 @@ mod pallet {
             let sender = ensure_signed(origin.clone())?;
             <pallet_pm_market_commons::Pallet<T>>::mutate_market(&market_id, |market| {
                 let oracle_reporting_window_expired =
-                    Self::oracle_reporting_window_expired(market, report.at.clone())?;
+                    Self::oracle_reporting_window_expired(market, report.at)?;
 
                 let sender_is_oracle = sender == market.oracle;
                 let sender_is_outsider = !sender_is_oracle;

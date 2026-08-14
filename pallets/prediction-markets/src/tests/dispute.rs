@@ -74,7 +74,7 @@ fn it_allows_to_dispute_the_outcome_of_a_market() {
 fn dispute_fails_disputed_already() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -116,7 +116,7 @@ fn dispute_fails_disputed_already() {
 fn dispute_fails_if_market_not_reported() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -152,7 +152,7 @@ fn dispute_fails_if_market_not_reported() {
 fn dispute_reserves_dispute_bond() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -199,7 +199,7 @@ fn dispute_reserves_dispute_bond() {
 fn dispute_updates_market() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -247,7 +247,7 @@ fn dispute_updates_market() {
 fn dispute_emits_event() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -317,7 +317,7 @@ mod updating_oracle {
     fn succeeds() {
         ExtBuilder::default().build().execute_with(|| {
             let end = 2;
-            WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+            WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
             assert_ok!(PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
                 Asset::Prd,
@@ -325,9 +325,9 @@ mod updating_oracle {
                 bob(),
                 MarketPeriod::Block(0..end),
                 Deadlines {
-                    grace_period: 1_u32.into(),
+                    grace_period: 1_u32,
                     oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
-                    dispute_duration: 0_u32.into(),
+                    dispute_duration: 0_u32,
                 },
                 gen_metadata(2),
                 MarketCreation::Permissionless,
@@ -367,7 +367,7 @@ mod updating_oracle {
         fn bad_sender() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,
@@ -375,9 +375,9 @@ mod updating_oracle {
                     bob(),
                     MarketPeriod::Block(0..end),
                     Deadlines {
-                        grace_period: 1_u32.into(),
+                        grace_period: 1_u32,
                         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
-                        dispute_duration: 0_u32.into(),
+                        dispute_duration: 0_u32,
                     },
                     gen_metadata(2),
                     MarketCreation::Permissionless,
@@ -407,7 +407,7 @@ mod updating_oracle {
         fn market_is_not_closed() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,
@@ -415,9 +415,9 @@ mod updating_oracle {
                     bob(),
                     MarketPeriod::Block(0..end),
                     Deadlines {
-                        grace_period: 1_u32.into(),
+                        grace_period: 1_u32,
                         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
-                        dispute_duration: 0_u32.into(),
+                        dispute_duration: 0_u32,
                     },
                     gen_metadata(2),
                     MarketCreation::Permissionless,
@@ -444,7 +444,7 @@ mod updating_oracle {
         fn market_can_be_disputed() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,
@@ -452,7 +452,7 @@ mod updating_oracle {
                     bob(),
                     MarketPeriod::Block(0..end),
                     Deadlines {
-                        grace_period: 1_u32.into(),
+                        grace_period: 1_u32,
                         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
                         dispute_duration: <Runtime as Config>::MinDisputeDuration::get(),
                     },
@@ -484,7 +484,7 @@ mod updating_oracle {
         fn oracle_grace_period_not_ended() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,
@@ -492,9 +492,9 @@ mod updating_oracle {
                     bob(),
                     MarketPeriod::Block(0..end),
                     Deadlines {
-                        grace_period: 1_u32.into(),
+                        grace_period: 1_u32,
                         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
-                        dispute_duration: 0_u32.into(),
+                        dispute_duration: 0_u32,
                     },
                     gen_metadata(2),
                     MarketCreation::Permissionless,
@@ -525,7 +525,7 @@ mod updating_oracle {
         fn reporting_window_not_expired() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,
@@ -533,9 +533,9 @@ mod updating_oracle {
                     bob(),
                     MarketPeriod::Block(0..end),
                     Deadlines {
-                        grace_period: 1_u32.into(),
+                        grace_period: 1_u32,
                         oracle_duration: <Runtime as Config>::MinOracleDuration::get(),
-                        dispute_duration: 0_u32.into(),
+                        dispute_duration: 0_u32,
                     },
                     gen_metadata(2),
                     MarketCreation::Permissionless,
@@ -566,7 +566,7 @@ mod updating_oracle {
         fn market_already_reported() {
             ExtBuilder::default().build().execute_with(|| {
                 let end = 2;
-                WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+                WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
                 assert_ok!(PredictionMarkets::create_market(
                     RuntimeOrigin::signed(alice()),
                     Asset::Prd,

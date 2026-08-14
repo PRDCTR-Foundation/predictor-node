@@ -44,7 +44,7 @@ fn testnet_genesis(
             authors: initial_authorities
                 .iter()
                 .map(|x| x.0.clone())
-                .zip(eth_public_keys.iter().map(|pk| pk.clone()))
+                .zip(eth_public_keys.iter().copied())
                 .collect::<Vec<_>>(),
         },
         session: SessionConfig {
@@ -217,7 +217,7 @@ fn local_ethereum_public_keys() -> Vec<EthPublicKey> {
         m/44'/60'/0'/0/3 	0x548e68b384fd8Ac91C88Ad16Cb919b24d7afed52 	0x03b802f4066d418778e8f7f4b1c38b23620ab98f1047304f20a077723e5d51c76b 	0xd52770a47f3ac073d5be73c33d696ff703580e6d0e5a14881cd7afa440f25662
         m/44'/60'/0'/0/4 	0xb9f5946F03c03e3dEB3A8021Bbd2074648fcff20 	0x039b43fbeabee71dd96e9e4be1b0c3f3786de91767d0f4215161c1a996cd03fd5e 	0x38f6727203d81498086412b700dba13d9e09cf98c14aec58c1c5405eed8f36dc
     */
-    return vec![
+    vec![
         ecdsa::Public::from_slice(&hex![
             "0385c59f553aa213cf9ff9e583ee7bd863e8fb6251676686cc58966c71e020c524"
         ])

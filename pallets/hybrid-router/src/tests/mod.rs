@@ -51,7 +51,7 @@ fn create_market(
     let mut metadata = [2u8; 50];
     metadata[0] = 0x15;
     metadata[1] = 0x30;
-    <WhitelistedMarketCreators<Runtime>>::insert(&creator, ());
+    <WhitelistedMarketCreators<Runtime>>::insert(creator, ());
     assert_ok!(PredictionMarkets::create_market(
         RuntimeOrigin::signed(creator),
         base_asset,
@@ -59,10 +59,10 @@ fn create_market(
         eve(),
         MarketPeriod::Block(0..2),
         Deadlines {
-            grace_period: 0_u32.into(),
-            oracle_duration:
-                <Runtime as pallet_prediction_markets::Config>::MinOracleDuration::get().into(),
-            dispute_duration: 0_u32.into(),
+            grace_period: 0_u32,
+            oracle_duration: <Runtime as pallet_prediction_markets::Config>::MinOracleDuration::get(
+            ),
+            dispute_duration: 0_u32,
         },
         MultiHash::Sha3_384(metadata),
         MarketCreation::Permissionless,

@@ -44,7 +44,7 @@ fn it_appeals_a_court_market_to_global_dispute() {
         }
 
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -143,7 +143,7 @@ fn it_appeals_a_court_market_to_global_dispute() {
 #[test]
 fn the_entire_market_lifecycle_works_with_timestamps() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         // Creates a permissionless market.
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
@@ -185,7 +185,7 @@ fn the_entire_market_lifecycle_works_with_timestamps() {
 #[test]
 fn full_scalar_market_lifecycle() {
     let test = |base_asset: AssetOf<Runtime>| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -323,7 +323,7 @@ fn authorized_correctly_resolves_disputed_market() {
     let test = |base_asset: AssetOf<Runtime>| {
         let end = 2;
         let winning_fee = <Runtime as Config>::WinnerFeePercentage::get() * CENT_BASE;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -510,7 +510,7 @@ fn it_resolves_a_disputed_court_market() {
         }
 
         let end = 2;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,
@@ -748,7 +748,7 @@ fn outsider_reports_wrong_outcome() {
 
         let end = 100;
         let alice_balance_before = Balances::free_balance(alice());
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             base_asset,

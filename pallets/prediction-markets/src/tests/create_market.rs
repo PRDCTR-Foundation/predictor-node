@@ -42,7 +42,7 @@ fn fails_if_user_cannot_afford_bonds_advised(
     ExtBuilder::default().build().execute_with(|| {
         let creator = get_account(99);
         assert_ok!(AssetManager::deposit(Asset::Prd, &creator, balance));
-        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(creator, ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(creator),
@@ -66,7 +66,7 @@ fn fails_if_user_cannot_afford_bonds_advised(
 fn fails_on_fee_too_high() {
     ExtBuilder::default().build().execute_with(|| {
         let one_billionth = Perbill::from_rational(1u128, 1_000_000_000u128);
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -93,7 +93,7 @@ fn fails_on_invalid_multihash() {
         metadata[0] = 0x15;
         metadata[1] = 0x29;
         let multihash = MultiHash::Sha3_384(metadata);
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -117,7 +117,7 @@ fn fails_on_invalid_multihash() {
 #[test_case(555..=555; "one element as range")]
 fn create_scalar_market_fails_on_invalid_range(range: RangeInclusive<u128>) {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -145,7 +145,7 @@ fn create_market_fails_on_min_dispute_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MinDisputeDuration::get() - 1,
         };
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -173,7 +173,7 @@ fn create_market_fails_on_min_oracle_duration() {
             oracle_duration: <Runtime as Config>::MinOracleDuration::get() - 1,
             dispute_duration: <Runtime as Config>::MinDisputeDuration::get(),
         };
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -201,7 +201,7 @@ fn create_market_fails_on_max_dispute_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get() + 1,
         };
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -229,7 +229,7 @@ fn create_market_fails_on_max_grace_period() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get(),
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get(),
         };
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -257,7 +257,7 @@ fn create_market_fails_on_max_oracle_duration() {
             oracle_duration: <Runtime as Config>::MaxOracleDuration::get() + 1,
             dispute_duration: <Runtime as Config>::MaxDisputeDuration::get(),
         };
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -346,7 +346,7 @@ fn create_market_with_foreign_assets() {
 #[test]
 fn it_does_not_create_market_with_too_few_categories() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -369,7 +369,7 @@ fn it_does_not_create_market_with_too_few_categories() {
 #[test]
 fn it_does_not_create_market_with_too_many_categories() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -399,7 +399,7 @@ fn create_categorical_market_fails_if_market_period_is_invalid(
     period: MarketPeriod<BlockNumber, Moment>,
 ) {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -424,7 +424,7 @@ fn create_categorical_market_fails_if_end_is_not_far_enough_ahead() {
     ExtBuilder::default().build().execute_with(|| {
         let end_block = 33;
         run_to_block(end_block);
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -473,7 +473,7 @@ fn create_market_succeeds_if_market_duration_is_maximal_in_blocks() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -502,7 +502,7 @@ fn create_market_suceeds_if_market_duration_is_maximal_in_moments() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -530,7 +530,7 @@ fn create_market_fails_if_market_duration_is_too_long_in_blocks() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -563,7 +563,7 @@ fn create_market_fails_if_market_duration_is_too_long_in_moments() {
             end > start,
             "Test failed due to misconfiguration: `MaxMarketLifetime` is too small"
         );
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),
@@ -629,7 +629,7 @@ fn create_market_sets_the_correct_market_parameters_and_reserves_the_correct_amo
         let market_type = MarketType::Categorical(7);
         let dispute_mechanism = Some(MarketDisputeMechanism::Authorized);
         let creator_fee = Perbill::from_parts(1);
-        WhitelistedMarketCreators::<Runtime>::insert(&creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(creator),
             Asset::Prd,
@@ -664,7 +664,7 @@ fn create_market_sets_the_correct_market_parameters_and_reserves_the_correct_amo
 #[test]
 fn create_market_fails_on_trusted_market_with_non_zero_dispute_period() {
     ExtBuilder::default().build().execute_with(|| {
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_noop!(
             PredictionMarkets::create_market(
                 RuntimeOrigin::signed(alice()),

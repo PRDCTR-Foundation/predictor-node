@@ -17,6 +17,10 @@
 
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
+// `#[frame_support::transactional]` expands to a self-conversion on the dispatch
+// result that clippy reports as `useless_conversion` against the macro-generated
+// span; it is a false positive on generated code, not a real conversion.
+#![allow(clippy::useless_conversion)]
 
 extern crate alloc;
 
@@ -625,8 +629,7 @@ mod pallet {
                     None => {
                         log::warn!(
                             target: LOG_TARGET,
-                            "Winner info is not found for market with id {:?}.",
-                            market_id
+                            "Winner info is not found for market with id {market_id:?}."
                         );
                         debug_assert!(false);
                         // unlock these funds

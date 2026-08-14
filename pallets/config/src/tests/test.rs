@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use crate::{
     mock::{
         admin_account, alice, gas_fee_recipient, ExtBuilder, PalletConfig, RuntimeOrigin, System,

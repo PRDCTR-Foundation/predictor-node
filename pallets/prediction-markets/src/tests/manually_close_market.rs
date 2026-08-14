@@ -34,7 +34,7 @@ fn manually_close_market_after_long_stall() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -104,7 +104,7 @@ fn manually_close_market_fails_if_market_not_in_close_time_frame_list() {
 
         let end = (5 * MILLISECS_PER_BLOCK) as u64;
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -146,7 +146,7 @@ fn manually_close_market_fails_if_not_allowed_for_block_based_markets() {
 
         let category_count = 3;
         let end = 5;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

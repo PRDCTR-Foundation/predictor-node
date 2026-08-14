@@ -91,7 +91,7 @@ pub(super) fn genesis() -> Value {
             authors: initial_authorities
                 .iter()
                 .map(|x| x.0.clone())
-                .zip(eth_public_keys.iter().map(|pk| pk.clone()))
+                .zip(eth_public_keys.iter().copied())
                 .collect::<Vec<_>>(),
         },
         session: SessionConfig {

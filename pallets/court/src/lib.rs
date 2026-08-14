@@ -19,6 +19,10 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::type_complexity)]
+// `#[frame_support::transactional]` expands to a self-conversion on the dispatch
+// result that clippy reports as `useless_conversion` against the macro-generated
+// span; it is a false positive on generated code, not a real conversion.
+#![allow(clippy::useless_conversion)]
 
 extern crate alloc;
 
@@ -1070,8 +1074,7 @@ mod pallet {
                 let (imbalance, missing) = T::Currency::slash(ai, slashable);
                 debug_assert!(
                     missing.is_zero(),
-                    "Could not slash all of the amount for juror {:?}.",
-                    ai
+                    "Could not slash all of the amount for juror {ai:?}."
                 );
                 T::Currency::resolve_creating(&reward_pot, imbalance);
             };
@@ -1401,9 +1404,7 @@ mod pallet {
                 log::warn!(
                     target: LOG_TARGET,
                     "Inflation per period is greater than the threshold. Inflation per period: \
-                     {:?}, threshold: {:?}",
-                    inflation_period_mint,
-                    log_threshold
+                     {inflation_period_mint:?}, threshold: {log_threshold:?}"
                 );
                 debug_assert!(false);
             }
@@ -1460,10 +1461,8 @@ mod pallet {
             if total_mint.drop_zero().is_err() {
                 log::debug!(
                     target: LOG_TARGET,
-                    "Total issued tokens were not completely distributed, total: {:?}, leftover: \
-                     {:?}",
-                    inflation_period_mint,
-                    remainder
+                    "Total issued tokens were not completely distributed, total: {inflation_period_mint:?}, leftover: \
+                     {remainder:?}"
                 );
 
                 let _ = T::Currency::burn(remainder);
@@ -2085,8 +2084,7 @@ mod pallet {
                         total_imb.subsume(imb);
                         debug_assert!(
                             missing.is_zero(),
-                            "Could not slash all of the amount for delegator {:?}.",
-                            delegator
+                            "Could not slash all of the amount for delegator {delegator:?}."
                         );
                     }
                     total_imb
@@ -2114,8 +2112,7 @@ mod pallet {
                             total_incentives.subsume(imb);
                             debug_assert!(
                                 missing.is_zero(),
-                                "Could not slash all of the amount for juror {:?}.",
-                                juror
+                                "Could not slash all of the amount for juror {juror:?}."
                             );
 
                             let imb = slash_all_delegators(delegations.as_slice());
