@@ -1,5 +1,5 @@
 {
-  "name": "Cassandra - Predictor Public Testnet",
+  "name": "Cassandra - PRDCTR Public Testnet",
   "id": "predictor_cassandra_public_testnet_v2",
   "chainType": "Live",
   "bootNodes": [

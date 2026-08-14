@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/Predictor-Foundation/predictor-node/compare/v1.1.1...v1.2.0) (2026-07-26)
+
+
+### Features
+
+* Add mainnet chainspec configuration ([#86](https://github.com/Predictor-Foundation/predictor-node/issues/86)) ([f437749](https://github.com/Predictor-Foundation/predictor-node/commit/f4377495620246c84dd7ad96691cd87434327e69))
+
+
+### Bug Fixes
+
+* **runtime:** publish accepted summary roots to the eth bridge ([#84](https://github.com/Predictor-Foundation/predictor-node/issues/84)) ([6024247](https://github.com/Predictor-Foundation/predictor-node/commit/60242479b1337d7b04405b8a5328693d6892ba04))
+
 ## [1.1.1](https://github.com/Predictor-Foundation/predictor-node/compare/v1.1.0...v1.1.1) (2026-07-01)
 
 
