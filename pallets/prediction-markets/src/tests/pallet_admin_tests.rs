@@ -15,7 +15,7 @@ mod whitelist_market_creator {
         let mut ext = ExtBuilder::default().build();
         ext.execute_with(|| {
             let creator = charlie();
-            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(&creator));
+            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(creator));
 
             assert_ok!(PredictionMarkets::whitelist_market_creator(
                 RuntimeOrigin::signed(market_admin()),
@@ -33,7 +33,7 @@ mod whitelist_market_creator {
         let mut ext = ExtBuilder::default().build();
         ext.execute_with(|| {
             let creator = charlie();
-            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(&creator));
+            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(creator));
             assert_noop!(
                 PredictionMarkets::whitelist_market_creator(RawOrigin::None.into(), creator),
                 DispatchError::BadOrigin
@@ -46,7 +46,7 @@ mod whitelist_market_creator {
         let mut ext = ExtBuilder::default().build();
         ext.execute_with(|| {
             let creator = charlie();
-            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(&creator));
+            assert!(!<WhitelistedMarketCreators<Runtime>>::contains_key(creator));
 
             let bad_origin = alice();
             assert_noop!(

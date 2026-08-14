@@ -15,7 +15,7 @@ pub(crate) fn prd_chain_properties() -> sc_chain_spec::Properties {
     properties.insert("tokenDecimals".into(), 10.into());
     // TODO: Determine which address prefix to use. Using default for now
     properties.insert("ss58Format".into(), 42.into());
-    return properties
+    properties
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {

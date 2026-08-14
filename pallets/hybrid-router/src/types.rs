@@ -63,6 +63,12 @@ pub struct TradeEventInfo<T: Config> {
     pub swap_fee_amount: BalanceOf<T>,
 }
 
+impl<T: Config> Default for TradeEventInfo<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Config> TradeEventInfo<T> {
     pub fn new() -> Self {
         Self {

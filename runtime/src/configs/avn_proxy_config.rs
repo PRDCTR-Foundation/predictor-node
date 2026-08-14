@@ -19,13 +19,9 @@ use sp_std::boxed::Box;
     RuntimeDebug,
     TypeInfo,
     MaxEncodedLen,
+    Default,
 )]
 pub struct AvnProxyConfig {}
-impl Default for AvnProxyConfig {
-    fn default() -> Self {
-        AvnProxyConfig {}
-    }
-}
 
 impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
     fn get_proof(call: &RuntimeCall) -> Option<Proof<Signature, AccountId>> {
@@ -36,7 +32,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 to: _,
                 token_id: _,
                 amount: _,
-            }) => return Some(proof.clone()),
+            }) => Some(proof.clone()),
             RuntimeCall::TokenManager(
                 pallet_token_manager::pallet::Call::schedule_signed_lower {
                     proof,
@@ -45,7 +41,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     amount: _,
                     t1_recipient: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_create_market_and_deploy_pool {
                     proof,
@@ -61,14 +57,14 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     spot_prices: _,
                     swap_fee: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_report {
                     proof,
                     market_id: _,
                     outcome: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_transfer_asset {
                     proof,
@@ -76,27 +72,27 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     to: _,
                     amount: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_redeem_shares {
                     proof,
                     market_id: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_withdraw_tokens {
                     proof,
                     token: _,
                     amount: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedPredictionMarkets(
                 pallet_pm_signed_prediction_markets::Call::signed_buy_complete_set {
                     proof,
                     market_id: _,
                     amount: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedHybridRouter(pallet_pm_signed_hybrid_router::Call::signed_buy {
                 proof,
                 market_id: _,
@@ -106,7 +102,7 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                 max_price: _,
                 orders: _,
                 strategy: _,
-            }) => return Some(proof.clone()),
+            }) => Some(proof.clone()),
             RuntimeCall::SignedHybridRouter(
                 pallet_pm_signed_hybrid_router::Call::signed_sell {
                     proof,
@@ -118,21 +114,21 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     orders: _,
                     strategy: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_join {
                 proof,
                 market_id: _,
                 pool_shares_amount: _,
                 max_amounts_in: _,
                 block_number: _,
-            }) => return Some(proof.clone()),
+            }) => Some(proof.clone()),
             RuntimeCall::SignedNeoSwaps(pallet_pm_signed_neo_swaps::Call::signed_exit {
                 proof,
                 market_id: _,
                 pool_shares_amount_out: _,
                 min_amounts_out: _,
                 block_number: _,
-            }) => return Some(proof.clone()),
+            }) => Some(proof.clone()),
             RuntimeCall::SignedNeoSwaps(
                 pallet_pm_signed_neo_swaps::Call::signed_withdraw_fees {
                     proof,
@@ -173,17 +169,15 @@ impl InnerCallValidator for AvnProxyConfig {
     fn signature_is_valid(call: &Box<Self::Call>) -> bool {
         match **call {
             RuntimeCall::TokenManager(..) =>
-                return pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
+                pallet_token_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedPredictionMarkets(..) =>
-                return pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(
-                    call,
-                ),
+                pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedHybridRouter(..) =>
                 return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NodeManager(..) =>
                 return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedNeoSwaps(..) =>
-                return pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
+                pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,
         }
     }

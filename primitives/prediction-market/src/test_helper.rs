@@ -13,11 +13,11 @@ impl TestAccount {
     }
 
     pub fn account_id(&self) -> TestAccountIdPK {
-        return TestAccountIdPK::decode(&mut self.key_pair().public().to_vec().as_slice()).unwrap()
+        TestAccountIdPK::decode(&mut self.key_pair().public().to_vec().as_slice()).unwrap()
     }
 
     pub fn key_pair(&self) -> sr25519::Pair {
-        return sr25519::Pair::from_seed(&self.seed)
+        sr25519::Pair::from_seed(&self.seed)
     }
 }
 
@@ -27,7 +27,7 @@ pub fn get_account_from_seed(seed: [u8; 32]) -> TestAccountIdPK {
 
 pub fn get_account_from_mnemonic(mnemonic: &str) -> TestAccountIdPK {
     let seed = sr25519::Pair::from_phrase(mnemonic, None).unwrap().1;
-    return TestAccount::new(seed).account_id()
+    TestAccount::new(seed).account_id()
 }
 
 pub fn get_account(index: u8) -> TestAccountIdPK {

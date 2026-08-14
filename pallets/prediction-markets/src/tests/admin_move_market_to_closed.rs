@@ -59,7 +59,7 @@ fn admin_move_market_to_closed_successfully_closes_market_and_sets_end_timestamp
         let start = <pallet_pm_market_commons::Pallet<Runtime>>::now();
 
         let end = start + 42 * MILLISECS_PER_BLOCK as MomentOf<Runtime>;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,
@@ -141,7 +141,7 @@ fn admin_move_market_to_closed_fails_if_market_is_not_active(market_status: Mark
 fn admin_move_market_to_closed_correctly_clears_auto_close_blocks() {
     ExtBuilder::default().build().execute_with(|| {
         let category_count = 3;
-        WhitelistedMarketCreators::<Runtime>::insert(&alice(), ());
+        WhitelistedMarketCreators::<Runtime>::insert(alice(), ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(alice()),
             Asset::Prd,

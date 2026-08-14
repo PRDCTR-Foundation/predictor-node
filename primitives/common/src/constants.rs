@@ -20,7 +20,7 @@ pub use crate::types::*;
 use frame_support::PalletId;
 
 // Offchain DB key for registered node
-pub const REGISTERED_NODE_KEY: &'static [u8; 18] = b"is_registered_node";
+pub const REGISTERED_NODE_KEY: &[u8; 18] = b"is_registered_node";
 
 // Chain contant
 pub const TNF_CHAIN_PREFIX: u16 = 42u16;

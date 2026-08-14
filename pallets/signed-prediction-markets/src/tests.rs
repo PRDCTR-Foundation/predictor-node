@@ -40,7 +40,7 @@ fn proof_for(
     relayer: TestAccountIdPK,
     payload: Vec<u8>,
 ) -> Proof<SignatureTest, TestAccountIdPK> {
-    Proof { signer: account(seed), relayer, signature: key_pair(seed).sign(&payload).into() }
+    Proof { signer: account(seed), relayer, signature: key_pair(seed).sign(&payload) }
 }
 
 fn deadlines() -> Deadlines<u64> {

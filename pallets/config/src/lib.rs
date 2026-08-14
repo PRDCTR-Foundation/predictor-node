@@ -65,7 +65,7 @@ pub mod pallet {
         fn build(&self) {
             AdminAccount::<T>::set(self.admin_account.clone());
             GasFeeRecipientAccount::<T>::set(self.gas_fee_recipient.clone());
-            BaseGasFee::<T>::set(self.base_gas_fee.clone());
+            BaseGasFee::<T>::set(self.base_gas_fee);
         }
     }
 
@@ -137,7 +137,7 @@ pub mod pallet {
             ensure!(who == admin, Error::<T>::SenderNotAdmin);
             ensure!(base_fee > 0u128, Error::<T>::BaseGasFeeZero);
 
-            <BaseGasFee<T>>::mutate(|a| *a = base_fee.clone());
+            <BaseGasFee<T>>::mutate(|a| *a = base_fee);
             Self::deposit_event(Event::BaseGasFeeSet { new_base_gas_fee: base_fee });
 
             Ok(())
@@ -161,11 +161,11 @@ pub mod pallet {
 
     impl<T: Config> Pallet<T> {
         pub fn config_admin() -> Result<T::AccountId, Error<T>> {
-            Ok(<AdminAccount<T>>::get().ok_or(Error::<T>::AdminAccountNotSet)?)
+            <AdminAccount<T>>::get().ok_or(Error::<T>::AdminAccountNotSet)
         }
 
         pub fn gas_fee_recipient() -> Result<T::AccountId, Error<T>> {
-            Ok(<GasFeeRecipientAccount<T>>::get().ok_or(Error::<T>::GasFeeRecipientNotSet)?)
+            <GasFeeRecipientAccount<T>>::get().ok_or(Error::<T>::GasFeeRecipientNotSet)
         }
 
         pub fn base_gas_fee() -> u128 {

@@ -28,7 +28,7 @@ fn close_trusted_market_works() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
         let market_creator = alice();
-        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
             Asset::Prd,
@@ -79,7 +79,7 @@ fn fails_if_caller_is_not_market_creator() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
         let market_creator = alice();
-        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
             Asset::Prd,
@@ -110,7 +110,7 @@ fn close_trusted_market_fails_if_not_trusted() {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
         let market_creator = alice();
-        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
             Asset::Prd,
@@ -157,7 +157,7 @@ fn close_trusted_market_fails_if_invalid_market_state(status: MarketStatus) {
     ExtBuilder::default().build().execute_with(|| {
         let end = 10;
         let market_creator = alice();
-        WhitelistedMarketCreators::<Runtime>::insert(&market_creator, ());
+        WhitelistedMarketCreators::<Runtime>::insert(market_creator, ());
         assert_ok!(PredictionMarkets::create_market(
             RuntimeOrigin::signed(market_creator),
             Asset::Prd,
