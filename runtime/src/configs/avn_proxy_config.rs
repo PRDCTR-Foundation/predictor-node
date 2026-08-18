@@ -135,7 +135,29 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     market_id: _,
                     block_number: _,
                 },
-            ) => Some(proof.clone()),
+            ) => return Some(proof.clone()),
+            RuntimeCall::NodeManager(pallet_node_manager::pallet::Call::signed_register_node {
+                proof,
+                node: _,
+                owner: _,
+                signing_key: _,
+                block_number: _,
+            }) => return Some(proof.clone()),
+            RuntimeCall::NodeManager(
+                pallet_node_manager::pallet::Call::signed_deregister_nodes {
+                    proof,
+                    owner: _,
+                    nodes_to_deregister: _,
+                    block_number: _,
+                },
+            ) => return Some(proof.clone()),
+            RuntimeCall::NodeManager(
+                pallet_node_manager::pallet::Call::heartbeat_for_owned_nodes {
+                    proof,
+                    nodes: _,
+                    block_number: _,
+                },
+            ) => return Some(proof.clone()),
             _ => None,
         }
     }
@@ -151,9 +173,9 @@ impl InnerCallValidator for AvnProxyConfig {
             RuntimeCall::SignedPredictionMarkets(..) =>
                 pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedHybridRouter(..) =>
-                pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
-            // RuntimeCall::NodeManager(..) =>
-            //     return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
+                return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
+            RuntimeCall::NodeManager(..) =>
+                return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedNeoSwaps(..) =>
                 pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,

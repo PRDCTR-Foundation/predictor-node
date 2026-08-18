@@ -1,0 +1,342 @@
+// Copyright 2026 Aventus DAO.
+
+#![cfg(test)]
+
+use crate::{tests::mock::*, *};
+use frame_support::{assert_noop, assert_ok};
+use sp_avn_common::Proof;
+use sp_core::Pair;
+
+type SignatureTest = Signature;
+
+struct Context {
+    registrar_key_pair: TestAccount,
+    registrar: AccountId,
+    owner: AccountId,
+    relayer: AccountId,
+    registered_nodes: Vec<NodeId<TestRuntime>>,
+}
+
+impl Context {
+    fn new(num_of_nodes: u8) -> Self {
+        let registrar_key_pair = TestAccount::new([1u8; 32]);
+        let registrar = registrar_key_pair.account_id();
+        let owner = TestAccount::new([209u8; 32]).account_id();
+        let relayer = TestAccount::new([109u8; 32]).account_id();
+        let reward_amount: BalanceOf<TestRuntime> = <NextRewardAmountPerPeriod<TestRuntime>>::get();
+
+        Balances::make_free_balance_be(
+            &NodeManager::compute_reward_account_id(),
+            reward_amount * 2u128,
+        );
+        <NodeRegistrar<TestRuntime>>::set(Some(registrar));
+        let registered_nodes = register_nodes(registrar, owner, num_of_nodes);
+
+        Context { registrar_key_pair, registrar, owner, registered_nodes, relayer }
+    }
+}
+
+fn register_nodes(
+    registrar: AccountId,
+    owner: AccountId,
+    num_of_nodes: u8,
+) -> Vec<NodeId<TestRuntime>> {
+    let mut registered_nodes = vec![];
+    let reward_period = <RewardPeriod<TestRuntime>>::get().current;
+
+    for i in 0..num_of_nodes {
+        registered_nodes.push(register_node_and_send_heartbeat(registrar, owner, reward_period, i));
+    }
+
+    let this_node = TestAccount::new([0_u8; 32]).account_id();
+    let this_node_signing_key = 0;
+
+    set_ocw_node_id(this_node);
+    UintAuthorityId::set_all_keys(vec![UintAuthorityId(this_node_signing_key)]);
+
+    registered_nodes
+}
+
+fn register_node_and_send_heartbeat(
+    registrar: AccountId,
+    owner: AccountId,
+    reward_period: RewardPeriodIndex,
+    id: u8,
+) -> AccountId {
+    let node_id = TestAccount::new([id; 32]).account_id();
+    let signing_key_id = id + 1;
+
+    assert_ok!(NodeManager::register_node(
+        RuntimeOrigin::signed(registrar),
+        node_id,
+        owner,
+        UintAuthorityId(signing_key_id as u64),
+    ));
+
+    incr_heartbeats(reward_period, vec![node_id], 1);
+    node_id
+}
+
+fn incr_heartbeats(reward_period: RewardPeriodIndex, nodes: Vec<NodeId<TestRuntime>>, uptime: u64) {
+    for node in nodes {
+        let _ = <NodeRegistry<TestRuntime>>::get(node).unwrap();
+        let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(uptime.into());
+
+        <NodeUptime<TestRuntime>>::mutate(reward_period, node, |maybe_info| {
+            if let Some(info) = maybe_info.as_mut() {
+                info.count = info.count.saturating_add(uptime);
+                info.last_reported = System::block_number();
+            } else {
+                *maybe_info =
+                    Some(UptimeInfo { count: 1, last_reported: System::block_number(), weight });
+            }
+        });
+
+        <TotalUptime<TestRuntime>>::mutate(reward_period, |total| {
+            total.total_heartbeats = total.total_heartbeats.saturating_add(uptime);
+            total.total_weight = total.total_weight.saturating_add(weight);
+        });
+    }
+}
+
+fn set_ocw_node_id(node_id: AccountId) {
+    let storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
+    storage
+        .mutate(|r: Result<Option<AccountId>, StorageRetrievalError>| match r {
+            Ok(Some(_)) => Ok(node_id),
+            Ok(None) => Ok(node_id),
+            _ => Err(()),
+        })
+        .unwrap();
+}
+
+fn create_signed_deregister_proof(
+    registrar_key_pair: &TestAccount,
+    relayer: &AccountId,
+    owner: &AccountId,
+    nodes_to_deregister: &BoundedVec<NodeId<TestRuntime>, MaxNodesToDeregister>,
+    number_of_nodes_to_deregister: &u32,
+    block_number: &BlockNumberFor<TestRuntime>,
+) -> Proof<SignatureTest, AccountId> {
+    let encoded_payload = encode_signed_deregister_node_params::<TestRuntime>(
+        relayer,
+        owner,
+        nodes_to_deregister,
+        number_of_nodes_to_deregister,
+        block_number,
+    );
+
+    let signature = SignatureTest::from(registrar_key_pair.key_pair().sign(&encoded_payload));
+
+    Proof { signer: registrar_key_pair.key_pair().public(), relayer: *relayer, signature }
+}
+
+#[test]
+fn deregistration_succeeds() {
+    let (mut ext, _, _) = ExtBuilder::build_default()
+        .with_genesis_config()
+        .for_offchain_worker()
+        .as_externality_with_state();
+    ext.execute_with(|| {
+        let node_count = <MaxBatchSize<TestRuntime>>::get();
+        let context = Context::new(node_count as u8);
+        let num_nodes_to_deregister = context.registered_nodes.len();
+
+        // Show that nodes are registered before deregistration
+        for node in &context.registered_nodes {
+            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
+            assert!(<NodeRegistry<TestRuntime>>::contains_key(node));
+        }
+
+        assert_ok!(NodeManager::deregister_nodes(
+            RuntimeOrigin::signed(context.registrar),
+            context.owner,
+            BoundedVec::truncate_from(context.registered_nodes.clone()),
+        ));
+
+        for node in &context.registered_nodes {
+            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
+            assert!(!<NodeRegistry<TestRuntime>>::contains_key(node));
+        }
+        System::assert_last_event(
+            Event::NodeDeregistered {
+                owner: context.owner,
+                node: context.registered_nodes[num_nodes_to_deregister - 1],
+            }
+            .into(),
+        );
+    });
+}
+
+#[test]
+fn signed_deregistration_succeeds() {
+    let (mut ext, _, _) = ExtBuilder::build_default()
+        .with_genesis_config()
+        .for_offchain_worker()
+        .as_externality_with_state();
+    ext.execute_with(|| {
+        let node_count = <MaxBatchSize<TestRuntime>>::get();
+        let context = Context::new(node_count as u8);
+        let num_nodes_to_deregister = context.registered_nodes.len();
+        let block_number = System::block_number();
+
+        // Show that nodes are registered before deregistration
+        for node in &context.registered_nodes {
+            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
+            assert!(<NodeRegistry<TestRuntime>>::contains_key(node));
+        }
+
+        let proof = create_signed_deregister_proof(
+            &context.registrar_key_pair,
+            &context.relayer,
+            &context.owner,
+            &(BoundedVec::truncate_from(context.registered_nodes.clone())),
+            &(num_nodes_to_deregister as u32),
+            &block_number,
+        );
+
+        assert_ok!(NodeManager::signed_deregister_nodes(
+            RuntimeOrigin::signed(context.registrar),
+            proof,
+            context.owner,
+            BoundedVec::truncate_from(context.registered_nodes.clone()),
+            block_number,
+        ));
+
+        for node in &context.registered_nodes {
+            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
+            assert!(!<NodeRegistry<TestRuntime>>::contains_key(node));
+        }
+        System::assert_last_event(
+            Event::NodeDeregistered {
+                owner: context.owner,
+                node: context.registered_nodes[num_nodes_to_deregister - 1],
+            }
+            .into(),
+        );
+    });
+}
+
+#[test]
+fn deregistration_cleans_up_signing_key_index() {
+    let (mut ext, _pool_state, _offchain_state) = ExtBuilder::build_default()
+        .with_genesis_config()
+        .with_authors()
+        .for_offchain_worker()
+        .as_externality_with_state();
+    ext.execute_with(|| {
+        let context = Context::new(1u8);
+        let node = context.registered_nodes[0];
+        let node_info = NodeRegistry::<TestRuntime>::get(node).unwrap();
+
+        assert!(SigningKeyToNodeId::<TestRuntime>::contains_key(&node_info.signing_key));
+
+        assert_ok!(NodeManager::deregister_nodes(
+            RuntimeOrigin::signed(context.registrar),
+            context.owner,
+            BoundedVec::truncate_from(vec![node]),
+        ));
+
+        // Reverse index must be removed
+        assert!(!SigningKeyToNodeId::<TestRuntime>::contains_key(&node_info.signing_key));
+    });
+}
+
+#[test]
+fn signing_key_can_be_reused_after_deregistration() {
+    let (mut ext, _pool_state, _offchain_state) = ExtBuilder::build_default()
+        .with_genesis_config()
+        .with_authors()
+        .for_offchain_worker()
+        .as_externality_with_state();
+    ext.execute_with(|| {
+        // Deregister node A, then register node B with the same signing key
+        let context = Context::new(1u8);
+        let node_a = context.registered_nodes[0];
+        let signing_key = NodeRegistry::<TestRuntime>::get(node_a).unwrap().signing_key;
+
+        assert_ok!(NodeManager::deregister_nodes(
+            RuntimeOrigin::signed(context.registrar),
+            context.owner,
+            BoundedVec::truncate_from(vec![node_a]),
+        ));
+
+        let node_b = TestAccount::new([99u8; 32]).account_id();
+        assert_ok!(NodeManager::register_node(
+            RuntimeOrigin::signed(context.registrar),
+            node_b,
+            context.owner,
+            signing_key,
+        ));
+    });
+}
+
+mod fails_when {
+    use super::*;
+
+    #[test]
+    fn sender_is_not_registrar() {
+        let (mut ext, _, _) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let node_count = <MaxBatchSize<TestRuntime>>::get();
+            let context = Context::new(node_count as u8);
+
+            let bad_origin = RuntimeOrigin::signed(context.owner);
+            assert_noop!(
+                NodeManager::deregister_nodes(
+                    bad_origin,
+                    context.owner,
+                    BoundedVec::truncate_from(context.registered_nodes.clone()),
+                ),
+                Error::<TestRuntime>::OriginNotRegistrar
+            );
+        });
+    }
+
+    #[test]
+    fn node_is_not_registered() {
+        let (mut ext, _, _) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let node_count = <MaxBatchSize<TestRuntime>>::get();
+            let context = Context::new(node_count as u8);
+
+            let bad_node = context.owner;
+            assert_noop!(
+                NodeManager::deregister_nodes(
+                    RuntimeOrigin::signed(context.registrar),
+                    context.owner,
+                    BoundedVec::truncate_from(vec![bad_node, context.registered_nodes[0]]),
+                ),
+                Error::<TestRuntime>::NodeNotRegistered
+            );
+        });
+    }
+
+    #[test]
+    fn owner_is_not_registered() {
+        let (mut ext, _, _) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let node_count = <MaxBatchSize<TestRuntime>>::get();
+            let context = Context::new(node_count as u8);
+
+            let bad_owner = context.registrar;
+            assert_noop!(
+                NodeManager::deregister_nodes(
+                    RuntimeOrigin::signed(context.registrar),
+                    bad_owner,
+                    BoundedVec::truncate_from(context.registered_nodes.clone()),
+                ),
+                Error::<TestRuntime>::NodeNotRegistered
+            );
+        });
+    }
+}

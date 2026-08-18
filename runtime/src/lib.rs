@@ -304,4 +304,7 @@ mod runtime {
 
     #[runtime::pallet_index(92)]
     pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
+
+    #[runtime::pallet_index(93)]
+    pub type NodeManager = pallet_node_manager;
 }

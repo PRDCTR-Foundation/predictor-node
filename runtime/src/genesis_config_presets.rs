@@ -6,10 +6,12 @@ use crate::{
     TokenManagerConfig,
 };
 use alloc::{vec, vec::Vec};
+use frame_support::PalletId;
 use hex_literal::hex;
 use serde_json::Value;
 use sp_core::{ecdsa, sr25519, ByteArray, H160, H256};
 use sp_genesis_builder::PresetId;
+use sp_runtime::traits::AccountIdConversion;
 
 type EthPublicKey = ecdsa::Public;
 use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
@@ -33,14 +35,14 @@ fn testnet_genesis(
     root: AccountId,
 ) -> Value {
     let eth_public_keys = local_ethereum_public_keys();
+    // TokenManager treasury account, pre-funded so pallet-node-manager's
+    // reward-period rollover transfer into the reward pot succeeds.
+    let treasury_account: AccountId = PalletId(*b"Treasury").into_account_truncating();
+    let mut balances: Vec<(AccountId, u128)> =
+        endowed_accounts.iter().cloned().map(|k| (k, 1u128 << 60)).collect();
+    balances.push((treasury_account, 1u128 << 60));
     let config = RuntimeGenesisConfig {
-        balances: BalancesConfig {
-            balances: endowed_accounts
-                .iter()
-                .cloned()
-                .map(|k| (k, 1u128 << 60))
-                .collect::<Vec<_>>(),
-        },
+        balances: BalancesConfig { balances },
         authors_manager: AuthorsManagerConfig {
             authors: initial_authorities
                 .iter()
