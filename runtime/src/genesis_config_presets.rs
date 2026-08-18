@@ -17,6 +17,7 @@ use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
 #[cfg(feature = "enable-static-presents")]
 mod public_testnet;
 
+#[cfg(feature = "enable-static-presents")]
 mod mainnet;
 
 fn testnet_genesis(
@@ -152,6 +153,7 @@ pub fn get_preset(id: &PresetId) -> Option<vec::Vec<u8>> {
     let patch = match id.try_into() {
         #[cfg(feature = "enable-static-presents")]
         Ok(common_primitives::presents::PUBLIC_TESTNET_RUNTIME_PRESET) => public_testnet::genesis(),
+        #[cfg(feature = "enable-static-presents")]
         Ok(common_primitives::presents::MAINNET_RUNTIME_PRESET) => mainnet::genesis(),
         Ok(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET) =>
             staging_testnet_genesis(),
@@ -185,7 +187,6 @@ pub fn preset_names() -> Vec<PresetId> {
             PresetId::from(sp_genesis_builder::DEV_RUNTIME_PRESET),
             PresetId::from(sp_genesis_builder::LOCAL_TESTNET_RUNTIME_PRESET),
             PresetId::from(common_primitives::presents::STAGING_TESTNET_RUNTIME_PRESET),
-            PresetId::from(common_primitives::presents::MAINNET_RUNTIME_PRESET),
         ]
     }
 }
