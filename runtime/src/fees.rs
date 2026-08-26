@@ -41,6 +41,29 @@ macro_rules! impl_fee_types {
                 debug_assert!(res.is_ok());
             }
         }
+
+        use frame_support::traits::fungible::{
+            Balanced as NativeBalanced, Credit as NativeCredit,
+        };
+
+        pub struct DealWithFees;
+
+        /// Routes native transaction fees and tips to the treasury instead of burning them.
+        ///
+        /// `FungibleAdapter::withdraw_fee` returns the fee as a `Credit` (an unresolved
+        /// fungible imbalance). If it is dropped without being resolved into an account,
+        /// `pallet_balances` reduces `TotalIssuance` to keep the books balanced, i.e. the fee
+        /// is burned. Resolving it into the treasury account here keeps total circulation
+        /// constant instead.
+        impl OnUnbalanced<NativeCredit<AccountId, Balances>> for DealWithFees {
+            fn on_unbalanced(fees_and_tips: NativeCredit<AccountId, Balances>) {
+                let recipient = PalletConfig::gas_fee_recipient()
+                    .unwrap_or_else(|_| TokenManager::compute_treasury_account_id());
+                let res =
+                    <Balances as NativeBalanced<AccountId>>::resolve(&recipient, fees_and_tips);
+                debug_assert!(res.is_ok());
+            }
+        }
     };
 }
 
