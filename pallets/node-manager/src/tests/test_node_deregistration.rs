@@ -4,25 +4,17 @@
 
 use crate::{tests::mock::*, *};
 use frame_support::{assert_noop, assert_ok};
-use sp_avn_common::Proof;
-use sp_core::Pair;
-
-type SignatureTest = Signature;
 
 struct Context {
-    registrar_key_pair: TestAccount,
     registrar: AccountId,
     owner: AccountId,
-    relayer: AccountId,
     registered_nodes: Vec<NodeId<TestRuntime>>,
 }
 
 impl Context {
     fn new(num_of_nodes: u8) -> Self {
-        let registrar_key_pair = TestAccount::new([1u8; 32]);
-        let registrar = registrar_key_pair.account_id();
+        let registrar = TestAccount::new([1u8; 32]).account_id();
         let owner = TestAccount::new([209u8; 32]).account_id();
-        let relayer = TestAccount::new([109u8; 32]).account_id();
         let reward_amount: BalanceOf<TestRuntime> = <NextRewardAmountPerPeriod<TestRuntime>>::get();
 
         Balances::make_free_balance_be(
@@ -32,7 +24,7 @@ impl Context {
         <NodeRegistrar<TestRuntime>>::set(Some(registrar));
         let registered_nodes = register_nodes(registrar, owner, num_of_nodes);
 
-        Context { registrar_key_pair, registrar, owner, registered_nodes, relayer }
+        Context { registrar, owner, registered_nodes }
     }
 }
 
@@ -110,27 +102,6 @@ fn set_ocw_node_id(node_id: AccountId) {
         .unwrap();
 }
 
-fn create_signed_deregister_proof(
-    registrar_key_pair: &TestAccount,
-    relayer: &AccountId,
-    owner: &AccountId,
-    nodes_to_deregister: &BoundedVec<NodeId<TestRuntime>, MaxNodesToDeregister>,
-    number_of_nodes_to_deregister: &u32,
-    block_number: &BlockNumberFor<TestRuntime>,
-) -> Proof<SignatureTest, AccountId> {
-    let encoded_payload = encode_signed_deregister_node_params::<TestRuntime>(
-        relayer,
-        owner,
-        nodes_to_deregister,
-        number_of_nodes_to_deregister,
-        block_number,
-    );
-
-    let signature = SignatureTest::from(registrar_key_pair.key_pair().sign(&encoded_payload));
-
-    Proof { signer: registrar_key_pair.key_pair().public(), relayer: *relayer, signature }
-}
-
 #[test]
 fn deregistration_succeeds() {
     let (mut ext, _, _) = ExtBuilder::build_default()
@@ -152,55 +123,6 @@ fn deregistration_succeeds() {
             RuntimeOrigin::signed(context.registrar),
             context.owner,
             BoundedVec::truncate_from(context.registered_nodes.clone()),
-        ));
-
-        for node in &context.registered_nodes {
-            assert!(!<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
-            assert!(!<NodeRegistry<TestRuntime>>::contains_key(node));
-        }
-        System::assert_last_event(
-            Event::NodeDeregistered {
-                owner: context.owner,
-                node: context.registered_nodes[num_nodes_to_deregister - 1],
-            }
-            .into(),
-        );
-    });
-}
-
-#[test]
-fn signed_deregistration_succeeds() {
-    let (mut ext, _, _) = ExtBuilder::build_default()
-        .with_genesis_config()
-        .for_offchain_worker()
-        .as_externality_with_state();
-    ext.execute_with(|| {
-        let node_count = <MaxBatchSize<TestRuntime>>::get();
-        let context = Context::new(node_count as u8);
-        let num_nodes_to_deregister = context.registered_nodes.len();
-        let block_number = System::block_number();
-
-        // Show that nodes are registered before deregistration
-        for node in &context.registered_nodes {
-            assert!(<OwnedNodes<TestRuntime>>::contains_key(context.owner, node));
-            assert!(<NodeRegistry<TestRuntime>>::contains_key(node));
-        }
-
-        let proof = create_signed_deregister_proof(
-            &context.registrar_key_pair,
-            &context.relayer,
-            &context.owner,
-            &(BoundedVec::truncate_from(context.registered_nodes.clone())),
-            &(num_nodes_to_deregister as u32),
-            &block_number,
-        );
-
-        assert_ok!(NodeManager::signed_deregister_nodes(
-            RuntimeOrigin::signed(context.registrar),
-            proof,
-            context.owner,
-            BoundedVec::truncate_from(context.registered_nodes.clone()),
-            block_number,
         ));
 
         for node in &context.registered_nodes {

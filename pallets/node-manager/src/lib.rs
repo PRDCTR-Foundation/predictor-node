@@ -66,8 +66,6 @@ const MAX_BATCH_SIZE: u32 = 1_000;
 /// not greedy.
 const ON_IDLE_WEIGHT_SHARE: Perbill = Perbill::from_percent(75);
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
-pub const SIGNED_REGISTER_NODE_CONTEXT: &[u8] = b"register_node";
-pub const SIGNED_DEREGISTER_NODE_CONTEXT: &[u8] = b"deregister_node";
 pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
 
@@ -784,47 +782,6 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Register a new node via a relayer-proxied (avn-proxy) signed transaction.
-        #[pallet::call_index(4)]
-        #[pallet::weight(<T as Config>::WeightInfo::signed_register_node())]
-        pub fn signed_register_node(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            node: NodeId<T>,
-            owner: T::AccountId,
-            signing_key: T::SignerId,
-            block_number: BlockNumberFor<T>,
-        ) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
-            ensure!(registrar == sender, Error::<T>::OriginNotRegistrar);
-            ensure!(
-                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
-                    frame_system::Pallet::<T>::block_number(),
-                Error::<T>::SignedTransactionExpired
-            );
-
-            // Create and verify the signed payload
-            let signed_payload = encode_signed_register_node_params::<T>(
-                &proof.relayer,
-                &node,
-                &owner,
-                &signing_key,
-                &block_number,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
-                Error::<T>::UnauthorizedSignedTransaction
-            );
-
-            Self::do_register_node(node, owner, signing_key)?;
-
-            Ok(())
-        }
-
         /// Deregister one or more of `owner`'s nodes. Registrar-only.
         #[pallet::call_index(5)]
         #[pallet::weight(<T as Config>::WeightInfo::deregister_nodes(nodes_to_deregister.len() as u32))]
@@ -837,47 +794,6 @@ pub mod pallet {
 
             let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
             ensure!(registrar == sender, Error::<T>::OriginNotRegistrar);
-
-            Self::do_deregister_nodes(&owner, &nodes_to_deregister)?;
-
-            Ok(())
-        }
-
-        /// Deregister one or more of `owner`'s nodes via a relayer-proxied
-        /// (avn-proxy) signed transaction.
-        #[pallet::call_index(6)]
-        #[pallet::weight(<T as Config>::WeightInfo::signed_deregister_nodes(nodes_to_deregister.len() as u32))]
-        pub fn signed_deregister_nodes(
-            origin: OriginFor<T>,
-            proof: Proof<T::Signature, T::AccountId>,
-            owner: T::AccountId,
-            nodes_to_deregister: BoundedVec<NodeId<T>, MaxNodesToDeregister>,
-            block_number: BlockNumberFor<T>,
-        ) -> DispatchResult {
-            let sender = ensure_signed(origin)?;
-            ensure!(sender == proof.signer, Error::<T>::SenderIsNotSigner);
-
-            let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
-            ensure!(registrar == sender, Error::<T>::OriginNotRegistrar);
-            ensure!(
-                block_number.saturating_add(T::SignedTxLifetime::get().into()) >
-                    frame_system::Pallet::<T>::block_number(),
-                Error::<T>::SignedTransactionExpired
-            );
-
-            // Create and verify the signed payload
-            let signed_payload = encode_signed_deregister_node_params::<T>(
-                &proof.relayer,
-                &owner,
-                &nodes_to_deregister,
-                &(nodes_to_deregister.len() as u32),
-                &block_number,
-            );
-
-            ensure!(
-                verify_signature::<T::Signature, T::AccountId>(&proof, &signed_payload).is_ok(),
-                Error::<T>::UnauthorizedSignedTransaction
-            );
 
             Self::do_deregister_nodes(&owner, &nodes_to_deregister)?;
 
@@ -972,10 +888,9 @@ pub mod pallet {
         }
 
         /// Aggregate heartbeat: a single prover node signs a batch of node
-        /// ids it owns. Mirrors `signed_register_node`'s avn-proxy shape:
-        /// `proof.signer` is the prover's NodeId (==AccountId), sender must
-        /// equal proof.signer. The pallet validates every node in `nodes`
-        /// is registered to the prover's owner; on any failure the whole
+        /// ids it owns. `proof.signer` is the prover's NodeId
+        /// (==AccountId), sender must equal proof.signer. The pallet validates every node in
+        /// `nodes` is registered to the prover's owner; on any failure the whole
         /// call rolls back (all-or-nothing). ("Prover" rather than "anchor"
         /// is used here to avoid conflating with the chain's separate
         /// anchoring mechanism.)
@@ -1496,39 +1411,6 @@ pub mod pallet {
             let call = call.is_sub_type()?;
 
             match call {
-                Call::signed_register_node {
-                    ref proof,
-                    ref node,
-                    ref owner,
-                    ref signing_key,
-                    ref block_number,
-                } => {
-                    let encoded_data = encode_signed_register_node_params::<T>(
-                        &proof.relayer,
-                        node,
-                        owner,
-                        signing_key,
-                        block_number,
-                    );
-
-                    Some((proof, encoded_data))
-                },
-                Call::signed_deregister_nodes {
-                    ref proof,
-                    ref owner,
-                    ref nodes_to_deregister,
-                    ref block_number,
-                } => {
-                    let encoded_data = encode_signed_deregister_node_params::<T>(
-                        &proof.relayer,
-                        owner,
-                        nodes_to_deregister,
-                        &(nodes_to_deregister.len() as u32),
-                        block_number,
-                    );
-
-                    Some((proof, encoded_data))
-                },
                 Call::heartbeat_for_owned_nodes { ref proof, ref nodes, ref block_number } => {
                     let encoded_data = encode_aggregate_heartbeat_params::<T>(
                         &proof.relayer,
@@ -1600,16 +1482,6 @@ pub mod pallet {
     }
 }
 
-pub fn encode_signed_register_node_params<T: Config>(
-    relayer: &T::AccountId,
-    node: &NodeId<T>,
-    owner: &T::AccountId,
-    signing_key: &T::SignerId,
-    block_number: &BlockNumberFor<T>,
-) -> Vec<u8> {
-    (SIGNED_REGISTER_NODE_CONTEXT, relayer.clone(), node, owner, signing_key, block_number).encode()
-}
-
 pub fn encode_aggregate_heartbeat_params<T: Config>(
     relayer: &T::AccountId,
     nodes: &BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat>,
@@ -1617,22 +1489,4 @@ pub fn encode_aggregate_heartbeat_params<T: Config>(
     block_number: &BlockNumberFor<T>,
 ) -> Vec<u8> {
     (AGGREGATE_HEARTBEAT_CONTEXT, relayer.clone(), nodes, number_of_nodes, block_number).encode()
-}
-
-pub fn encode_signed_deregister_node_params<T: Config>(
-    relayer: &T::AccountId,
-    owner: &T::AccountId,
-    nodes_to_deregister: &BoundedVec<NodeId<T>, MaxNodesToDeregister>,
-    number_of_nodes_to_deregister: &u32,
-    block_number: &BlockNumberFor<T>,
-) -> Vec<u8> {
-    (
-        SIGNED_DEREGISTER_NODE_CONTEXT,
-        relayer.clone(),
-        owner,
-        nodes_to_deregister,
-        number_of_nodes_to_deregister,
-        block_number,
-    )
-        .encode()
 }

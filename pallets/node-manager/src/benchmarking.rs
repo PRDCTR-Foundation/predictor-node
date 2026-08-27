@@ -6,29 +6,6 @@
 use super::*;
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite};
 use frame_system::{EventRecord, RawOrigin};
-use sp_avn_common::Proof;
-
-// Inlined from sp_avn_common::benchmarking on the avn-parachain main branch.
-// The helper isn't on the published feat/create-stable-2409-branch this
-// workspace consumes; once it lands upstream, replace this with a
-// `use sp_avn_common::benchmarking::convert_sr25519_signature;`.
-fn convert_sr25519_signature<Signature>(signature: sp_core::sr25519::Signature) -> Signature
-where
-    Signature: parity_scale_codec::Decode + parity_scale_codec::Encode + 'static,
-{
-    use core::any::TypeId;
-    use parity_scale_codec::Encode;
-    use sp_runtime::MultiSignature;
-
-    if TypeId::of::<Signature>() == TypeId::of::<MultiSignature>() {
-        let multi_sig = MultiSignature::from(signature);
-        Signature::decode(&mut &multi_sig.encode()[..]).expect("MultiSignature decodes")
-    } else if TypeId::of::<Signature>() == TypeId::of::<sp_core::sr25519::Signature>() {
-        Signature::decode(&mut &signature.encode()[..]).expect("sr25519 signature decodes")
-    } else {
-        Signature::decode(&mut &signature.encode()[..]).expect("signature bytes decode")
-    }
-}
 
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
     let events = frame_system::Pallet::<T>::events();
@@ -94,18 +71,6 @@ fn create_nodes_and_heartbeat<T: Config>(
         registered_nodes.push(node);
     }
     registered_nodes
-}
-
-fn get_proof<T: Config>(
-    relayer: &T::AccountId,
-    signer: &T::AccountId,
-    signature: sp_core::sr25519::Signature,
-) -> Proof<T::Signature, T::AccountId> {
-    return Proof {
-        signer: signer.clone(),
-        relayer: relayer.clone(),
-        signature: convert_sr25519_signature::<T::Signature>(signature),
-    }
 }
 
 fn enable_rewards<T: Config>()
@@ -262,36 +227,6 @@ benchmarks! {
         assert_last_event::<T>(Event::HeartbeatReceived {reward_period_index, node}.into());
     }
 
-    signed_register_node {
-        enable_rewards::<T>();
-        let registrar_key = crate::sr25519::app_sr25519::Public::generate_pair(None);
-        let registrar: T::AccountId =
-            T::AccountId::decode(&mut Encode::encode(&registrar_key).as_slice()).expect("valid account id");
-        set_registrar::<T>(registrar.clone());
-
-        let relayer: T::AccountId = account("relayer", 11, 11);
-        let owner: T::AccountId = account("owner", 1, 1);
-        let node: NodeId<T> = account("node", 2, 2);
-        let signing_key: T::SignerId = account("signing_key", 3, 3);
-        let now = frame_system::Pallet::<T>::block_number();
-
-        let signed_payload = encode_signed_register_node_params::<T>(
-            &relayer.clone(),
-            &node,
-            &owner,
-            &signing_key,
-            &now.clone(),
-        );
-
-        let signature = registrar_key.sign(&signed_payload).ok_or("Error signing proof")?;
-        let proof = get_proof::<T>(&relayer.clone(), &registrar, signature.into());
-    }: signed_register_node(RawOrigin::Signed(registrar.clone()), proof.clone(), node.clone(), owner.clone(), signing_key.clone(), now)
-    verify {
-        assert!(<OwnedNodes<T>>::contains_key(owner.clone(), node.clone()));
-        assert!(<NodeRegistry<T>>::contains_key(node.clone()));
-        assert_last_event::<T>(Event::NodeRegistered{owner, node}.into());
-    }
-
     deregister_nodes {
         let b in 1 .. MAX_NODES_TO_DEREGISTER;
         let registrar: T::AccountId = account("registrar", 0, 0);
@@ -314,51 +249,6 @@ benchmarks! {
         RawOrigin::Signed(registrar.clone()),
         owner.clone(),
         BoundedVec::truncate_from(nodes_to_deregister.clone()))
-    verify {
-        for node in &nodes_to_deregister {
-            assert!(!<OwnedNodes<T>>::contains_key(owner.clone(), node));
-            assert!(!<NodeRegistry<T>>::contains_key(node));
-        }
-        assert_last_event::<T>(Event::NodeDeregistered{
-            owner,
-            node: nodes_to_deregister[nodes_to_deregister.len() - 1].clone()}.into());
-    }
-
-    signed_deregister_nodes {
-        let b in 1 .. MAX_NODES_TO_DEREGISTER;
-        let registrar_key = crate::sr25519::app_sr25519::Public::generate_pair(None);
-        let registrar: T::AccountId =
-            T::AccountId::decode(&mut Encode::encode(&registrar_key).as_slice()).expect("valid account id");
-
-        set_registrar::<T>(registrar.clone());
-        enable_rewards::<T>();
-        fund_reward_pot::<T>();
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let reward_period_index = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-
-        let nodes_to_deregister = create_nodes_and_heartbeat::<T>(owner.clone(), reward_period_index, b);
-
-        // Show that at least some of the nodes are registered
-        assert!(<OwnedNodes<T>>::contains_key(owner.clone(), nodes_to_deregister[0].clone()));
-        assert!(<NodeRegistry<T>>::contains_key(nodes_to_deregister[0].clone()));
-
-        let relayer: T::AccountId = account("relayer", 11, 11);
-        let now = frame_system::Pallet::<T>::block_number();
-
-        let bounded_nodes_to_deregister = BoundedVec::truncate_from(nodes_to_deregister.clone());
-        let signed_payload = encode_signed_deregister_node_params::<T>(
-            &relayer.clone(),
-            &owner,
-            &bounded_nodes_to_deregister,
-            &(nodes_to_deregister.len() as u32),
-            &now.clone(),
-        );
-
-        let signature = registrar_key.sign(&signed_payload).ok_or("Error signing proof")?;
-        let proof = get_proof::<T>(&relayer.clone(), &registrar, signature.into());
-    }: signed_deregister_nodes(RawOrigin::Signed(registrar.clone()), proof, owner.clone(), bounded_nodes_to_deregister, now)
     verify {
         for node in &nodes_to_deregister {
             assert!(!<OwnedNodes<T>>::contains_key(owner.clone(), node));
