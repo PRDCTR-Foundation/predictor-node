@@ -42,9 +42,7 @@ macro_rules! impl_fee_types {
             }
         }
 
-        use frame_support::traits::fungible::{
-            Balanced as NativeBalanced, Credit as NativeCredit,
-        };
+        use frame_support::traits::fungible::{Balanced as NativeBalanced, Credit as NativeCredit};
 
         pub struct DealWithFees;
 
