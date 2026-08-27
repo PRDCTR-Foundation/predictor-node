@@ -1,8 +1,6 @@
 //! # Node manager benchmarks
 // Copyright 2026 Aventus DAO.
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite};
 use frame_system::{EventRecord, RawOrigin};
@@ -11,7 +9,7 @@ fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
     let events = frame_system::Pallet::<T>::events();
     let system_event: <T as frame_system::Config>::RuntimeEvent = generic_event.into();
     // compare to the last event record
-    let EventRecord { event, .. } = &events[events.len().saturating_sub(1 as usize)];
+    let EventRecord { event, .. } = &events[events.len().saturating_sub(1_usize)];
     assert_eq!(event, &system_event);
 }
 
@@ -32,7 +30,7 @@ fn create_heartbeat<T: Config>(node: NodeId<T>, reward_period_index: RewardPerio
     let uptime = 1u64;
     let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(uptime.into());
 
-    <NodeUptime<T>>::mutate(&reward_period_index, &node, |maybe_info| {
+    <NodeUptime<T>>::mutate(reward_period_index, &node, |maybe_info| {
         if let Some(info) = maybe_info.as_mut() {
             info.count = info.count.saturating_add(uptime);
             info.last_reported = frame_system::Pallet::<T>::block_number();
@@ -46,7 +44,7 @@ fn create_heartbeat<T: Config>(node: NodeId<T>, reward_period_index: RewardPerio
         }
     });
 
-    <TotalUptime<T>>::mutate(&reward_period_index, |total| {
+    <TotalUptime<T>>::mutate(reward_period_index, |total| {
         total.total_heartbeats = total.total_heartbeats.saturating_add(1u64);
         total.total_weight = total.total_weight.saturating_add(weight);
     });
@@ -73,9 +71,9 @@ fn create_nodes_and_heartbeat<T: Config>(
     registered_nodes
 }
 
-fn enable_rewards<T: Config>()
+fn enable_rewards<T>()
 where
-    T: pallet_timestamp::Config<Moment = u64>,
+    T: Config + pallet_timestamp::Config<Moment = u64>,
 {
     <RewardEnabled<T>>::set(true);
     pallet_timestamp::Pallet::<T>::set_timestamp(10 * 12_000);
@@ -253,10 +251,16 @@ benchmarks! {
         for node in &nodes_to_deregister {
             assert!(!<OwnedNodes<T>>::contains_key(owner.clone(), node));
             assert!(!<NodeRegistry<T>>::contains_key(node));
+            assert!(!<NodeUptime<T>>::contains_key(reward_period_index, node));
         }
-        assert_last_event::<T>(Event::NodeDeregistered{
+        // `create_nodes_and_heartbeat` gives every node exactly one heartbeat,
+        // so the whole period's uptime is discarded with the batch.
+        assert_eq!(<TotalUptime<T>>::get(reward_period_index).total_weight, 0);
+        assert_last_event::<T>(Event::NodeUptimeDiscarded{
+            reward_period_index,
             owner,
-            node: nodes_to_deregister[nodes_to_deregister.len() - 1].clone()}.into());
+            heartbeats: b as u64,
+            weight: HEARTBEAT_BASE_WEIGHT.saturating_mul(b as u128)}.into());
     }
 
     update_signing_key {

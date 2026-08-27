@@ -135,14 +135,14 @@ impl ProvableProxy<RuntimeCall, Signature, AccountId> for AvnProxyConfig {
                     market_id: _,
                     block_number: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             RuntimeCall::NodeManager(
                 pallet_node_manager::pallet::Call::heartbeat_for_owned_nodes {
                     proof,
                     nodes: _,
                     block_number: _,
                 },
-            ) => return Some(proof.clone()),
+            ) => Some(proof.clone()),
             _ => None,
         }
     }
@@ -158,9 +158,9 @@ impl InnerCallValidator for AvnProxyConfig {
             RuntimeCall::SignedPredictionMarkets(..) =>
                 pallet_pm_signed_prediction_markets::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedHybridRouter(..) =>
-                return pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
+                pallet_pm_signed_hybrid_router::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::NodeManager(..) =>
-                return pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
+                pallet_node_manager::Pallet::<Runtime>::signature_is_valid(call),
             RuntimeCall::SignedNeoSwaps(..) =>
                 pallet_pm_signed_neo_swaps::Pallet::<Runtime>::signature_is_valid(call),
             _ => false,

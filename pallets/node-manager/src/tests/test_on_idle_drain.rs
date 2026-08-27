@@ -575,3 +575,80 @@ fn drain_charges_weight_and_bounds_empty_abandoned_period_completions() {
         );
     });
 }
+
+#[test]
+fn deregistered_node_share_is_redistributed_not_stranded() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+        let n1 = register_node(registrar, 101, 1, 11);
+        let n2 = register_node(registrar, 102, 2, 12);
+        let leaver = register_node(registrar, 103, 3, 13);
+
+        // All three earn equal uptime, then one deregisters before the period
+        // rolls. Its share must go to the survivors rather than being paid to
+        // nobody and left sitting in the pot.
+        //
+        // One heartbeat each: `fast_periods` yields an uptime_threshold of 1,
+        // and going above it would trip the defensive cap in
+        // `calculate_node_weight` (which `validate_heartbeats` makes
+        // unreachable on-chain) and make the expected split inexact.
+        roll_forward(200);
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        for node in [n1, n2, leaver] {
+            record_uptime(period, &node, 1);
+        }
+        assert_ok!(NodeManager::deregister_nodes(
+            RawOrigin::Signed(registrar).into(),
+            TestAccount::new([103u8; 32]).account_id(),
+            BoundedVec::truncate_from(vec![leaver]),
+        ));
+        roll_forward(20);
+
+        let funded = RewardPot::<TestRuntime>::get(period).unwrap().total_reward;
+        let reclaimed =
+            RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
+        let pot_before = NodeManager::reward_pot_balance();
+
+        System::reset_events();
+        NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+
+        assert_eq!(
+            OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
+            period.saturating_add(1),
+            "period should complete",
+        );
+
+        // The deregistered node is never visited, so no soft-failure fires.
+        assert!(
+            !System::events().iter().any(|r| matches!(
+                r.event,
+                RuntimeEvent::NodeManager(Event::ErrorPayingReward { .. })
+            )),
+            "a deregistered node should not surface as a failed payout",
+        );
+
+        // Two survivors with equal uptime split the whole funded reward.
+        let owner1 = TestAccount::new([101u8; 32]).account_id();
+        let owner2 = TestAccount::new([102u8; 32]).account_id();
+        let paid1 = Balances::free_balance(owner1);
+        let paid2 = Balances::free_balance(owner2);
+        assert_eq!(paid1, paid2, "equal uptime should pay equally");
+        assert_eq!(
+            paid1.saturating_add(paid2),
+            funded,
+            "the full period reward should be distributed, with nothing stranded",
+        );
+        assert_eq!(
+            Balances::free_balance(TestAccount::new([103u8; 32]).account_id()),
+            0,
+            "the deregistered node's owner should not be paid",
+        );
+        assert_eq!(
+            pot_before.saturating_sub(NodeManager::reward_pot_balance()),
+            funded + reclaimed
+        );
+    });
+}

@@ -388,6 +388,18 @@ pub mod pallet {
         MinUptimeThresholdSet { threshold: Perbill },
         /// Node deregistered
         NodeDeregistered { owner: T::AccountId, node: NodeId<T> },
+        /// Uptime accrued in the current reward period was discarded when a
+        /// batch of the owner's nodes deregistered, and `TotalUptime` for that
+        /// period was reduced by the same amounts. Emitted once per
+        /// `deregister_nodes` call, and only when something was actually
+        /// discarded, so an off-chain reconstruction of the period's payout
+        /// denominator from `HeartbeatReceived` can stay in step.
+        NodeUptimeDiscarded {
+            reward_period_index: RewardPeriodIndex,
+            owner: T::AccountId,
+            heartbeats: u64,
+            weight: u128,
+        },
         /// Signing key updated
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
         /// Reward pot funded for a period (treasury transfer succeeded)
@@ -1305,10 +1317,27 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Deregister `nodes`, discarding any uptime they accrued in the
+        /// *current* reward period.
+        ///
+        /// Only the current period is cleaned. Every period below it is either
+        /// being drained or queued to be, and `drain_outstanding_payouts` uses
+        /// `TotalUptime[period].total_weight` as the payout denominator,
+        /// re-reading it once per `on_idle` pass. Shrinking that denominator
+        /// part-way through a multi-block drain would pay every node drained
+        /// after the change a larger share than those drained before it, so the
+        /// shares would sum above the period's funded reward and overspill onto
+        /// the next period's funds. The current period is provably not being
+        /// drained (the drain stops at `OldestUnpaidRewardPeriodIndex >=
+        /// current`), so adjusting it here cannot race a payout.
         fn do_deregister_nodes(
             owner: &T::AccountId,
             nodes: &BoundedVec<NodeId<T>, MaxNodesToDeregister>,
         ) -> DispatchResult {
+            let current_period = RewardPeriod::<T>::get().current;
+            let mut discarded_heartbeats: u64 = 0;
+            let mut discarded_weight: u128 = 0;
+
             for node in nodes {
                 ensure!(<OwnedNodes<T>>::contains_key(owner, node), Error::<T>::NodeNotRegistered);
 
@@ -1320,11 +1349,41 @@ pub mod pallet {
                 <TotalRegisteredNodes<T>>::mutate(|n| *n = n.saturating_sub(1));
                 let _ = info;
 
+                // Dropping the node's row keeps `TotalUptime` equal to the sum
+                // of the period's surviving per-node weights, so the remaining
+                // nodes split the whole pot instead of leaving this node's
+                // share stranded. It also stops a re-registration of the same
+                // NodeId inside this period from inheriting the uptime, which
+                // would either credit the new owner for work it never did or
+                // lock it out via `HeartbeatThresholdReached`.
+                if let Some(uptime) = <NodeUptime<T>>::take(current_period, node) {
+                    discarded_heartbeats = discarded_heartbeats.saturating_add(uptime.count);
+                    discarded_weight = discarded_weight.saturating_add(uptime.weight);
+                }
+
                 Self::deposit_event(Event::NodeDeregistered {
                     owner: owner.clone(),
                     node: node.clone(),
                 });
             }
+
+            // `TotalUptime` is keyed by period, not by node, so the whole batch
+            // costs one read and one write rather than one per node.
+            if discarded_heartbeats > 0 || discarded_weight > 0 {
+                <TotalUptime<T>>::mutate(current_period, |total| {
+                    total.total_heartbeats =
+                        total.total_heartbeats.saturating_sub(discarded_heartbeats);
+                    total.total_weight = total.total_weight.saturating_sub(discarded_weight);
+                });
+
+                Self::deposit_event(Event::NodeUptimeDiscarded {
+                    reward_period_index: current_period,
+                    owner: owner.clone(),
+                    heartbeats: discarded_heartbeats,
+                    weight: discarded_weight,
+                });
+            }
+
             Ok(())
         }
 
