@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.2.0...v1.2.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* use latest version of AvN libraries ([#89](https://github.com/PRDCTR-Foundation/predictor-node/issues/89)) ([7f55fa7](https://github.com/PRDCTR-Foundation/predictor-node/commit/7f55fa724b89a71d4a1076dc77f9c470a04ad6fc))
+
 ## [1.2.0](https://github.com/Predictor-Foundation/predictor-node/compare/v1.1.1...v1.2.0) (2026-07-26)
 
 

@@ -2118,7 +2118,7 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 [[package]]
 name = "cli-commands"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "clap",
  "external-service",
@@ -2132,7 +2132,7 @@ dependencies = [
 [[package]]
 name = "client-extrinsic-utils"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "anyhow",
  "log",
@@ -2192,7 +2192,7 @@ checksum = "2382f75942f4b3be3690fe4f86365e9c853c1587d6ee58212cebf6e2a9ccd101"
 
 [[package]]
 name = "common-primitives"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "frame-support",
  "parity-scale-codec",
@@ -3339,7 +3339,7 @@ dependencies = [
 [[package]]
 name = "external-service"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "alloy",
  "alloy-consensus",
@@ -6674,12 +6674,12 @@ checksum = "b93853da6d84c2e3c7d730d6473e8817692dd89be387eb01b94d7f108ecb5b8c"
 
 [[package]]
 name = "node-macros"
-version = "1.2.0"
+version = "1.2.1"
 
 [[package]]
 name = "node-primitives"
 version = "2.0.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "sp-core",
  "sp-runtime",
@@ -7200,7 +7200,7 @@ dependencies = [
 [[package]]
 name = "pallet-authors-manager"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7240,7 +7240,7 @@ dependencies = [
 [[package]]
 name = "pallet-avn"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7263,7 +7263,7 @@ dependencies = [
 [[package]]
 name = "pallet-avn-proxy"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7355,7 +7355,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-config"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7413,7 +7413,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "ethabi",
  "frame-benchmarking",
@@ -7442,7 +7442,7 @@ dependencies = [
 [[package]]
 name = "pallet-eth-bridge-runtime-api"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "frame-support",
  "pallet-avn",
@@ -7647,7 +7647,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-authorized"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7666,7 +7666,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-combinatorial-tokens"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.5.0",
@@ -7695,7 +7695,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-combinatorial-tokens-fuzz"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -7710,7 +7710,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-court"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arrayvec",
  "common-primitives",
@@ -7738,7 +7738,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-eth-asset-registry"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -7757,7 +7757,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-global-disputes"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7780,7 +7780,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-hybrid-router"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -7820,7 +7820,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-market-commons"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7840,7 +7840,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-neo-swaps"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -7888,7 +7888,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-neo-swaps-fuzz"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -7903,7 +7903,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-order-book"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7928,7 +7928,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-order-book-fuzz"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arbitrary",
  "frame-system",
@@ -7939,7 +7939,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-signed-hybrid-router"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -7959,7 +7959,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-signed-neo-swaps"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "env_logger 0.11.10",
@@ -7995,7 +7995,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-pm-signed-prediction-markets"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "frame-benchmarking",
@@ -8022,7 +8022,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prediction-markets"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "cfg-if",
  "common-primitives",
@@ -8064,7 +8064,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prediction-markets-fuzz"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arbitrary",
  "frame-support",
@@ -8076,7 +8076,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prediction-markets-runtime-api"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "parity-scale-codec",
  "prediction-market-primitives",
@@ -8207,7 +8207,7 @@ dependencies = [
 [[package]]
 name = "pallet-summary"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -8253,7 +8253,7 @@ dependencies = [
 [[package]]
 name = "pallet-token-manager"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -9059,7 +9059,7 @@ dependencies = [
 
 [[package]]
 name = "prediction-market-primitives"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "arbitrary",
  "common-primitives",
@@ -9085,7 +9085,7 @@ dependencies = [
 
 [[package]]
 name = "predictor-node"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "clap",
  "cli-commands",
@@ -9138,7 +9138,7 @@ dependencies = [
 
 [[package]]
 name = "predictor-runtime"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "common-primitives",
  "frame-benchmarking",
@@ -12312,7 +12312,7 @@ dependencies = [
 [[package]]
 name = "sp-avn-common"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -13004,7 +13004,7 @@ dependencies = [
 [[package]]
 name = "sp-watchtower"
 version = "8.5.0"
-source = "git+https://github.com/Predictor-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#df5911a7684b79e4dbd1614014bffa123f47b741"
+source = "git+https://github.com/PRDCTR-Foundation/avn-parachain?branch=feat%2Fcreate-stable-2409-branch#5cc9f4305942158950e58f755f0b2ec0e39bfe54"
 dependencies = [
  "derive_more 0.99.18",
  "hex",

@@ -106,9 +106,11 @@ pub fn public_testnet_config() -> Result<ChainSpec, String> {
 
 pub fn mainnet_config() -> Result<ChainSpec, String> {
     {
-        let properties = prd_chain_properties();
+        #[cfg(feature = "enable-static-presents")]
+        {
+            let properties = prd_chain_properties();
 
-        Ok(ChainSpec::builder(
+            Ok(ChainSpec::builder(
             WASM_BINARY.ok_or_else(|| "Public mainnet wasm not available".to_string())?,
             None,
         )
@@ -136,5 +138,10 @@ pub fn mainnet_config() -> Result<ChainSpec, String> {
         ])
         .with_genesis_config_preset_name(common_primitives::presents::MAINNET_RUNTIME_PRESET)
         .build())
+        }
+        #[cfg(not(feature = "enable-static-presents"))]
+        {
+            ChainSpec::from_json_bytes(&include_bytes!("./chain-specs/mainnet.json")[..])
+        }
     }
 }
