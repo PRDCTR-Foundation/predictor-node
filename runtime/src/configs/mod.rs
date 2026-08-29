@@ -72,10 +72,11 @@ use super::{
     opaque::SessionKeys, AccountId, AssetManager, AssetRegistry, Aura, Authorized, AuthorsManager,
     Avn, Balance, Balances, Block, BlockNumber, CombinatorialTokens, Court, EthBridge,
     GlobalDisputes, Hash, Historical, ImOnline, MarketCommons, NeoSwaps, Nonce, Offences,
-    Orderbook, OriginCaller, PalletInfo, PredictionMarkets, Preimage, RandomnessCollectiveFlip,
-    Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin,
-    RuntimeTask, Scheduler, Signature, Summary, System, Timestamp, TokenManager, Tokens,
-    UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES, NATIVE_EXISTENTIAL_DEPOSIT, VERSION,
+    Orderbook, OriginCaller, PalletConfig, PalletInfo, PredictionMarkets, Preimage,
+    RandomnessCollectiveFlip, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+    RuntimeHoldReason, RuntimeOrigin, RuntimeTask, Scheduler, Signature, Summary, System,
+    Timestamp, TokenManager, Tokens, UncheckedExtrinsic, DEFAULT_EXISTENTIAL_DEPOSIT, MINUTES,
+    NATIVE_EXISTENTIAL_DEPOSIT, VERSION,
 };
 use crate::configs::misc::{MajorityQuorum, Treasury};
 use orml_traits::{parameter_type_with_key, LockIdentifier};
@@ -193,7 +194,7 @@ parameter_types! {
 // avn-transaction-payment pallet
 impl pallet_transaction_payment::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type OnChargeTransaction = FungibleAdapter<Balances, ()>;
+    type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees>;
     type OperationalFeeMultiplier = ConstU8<5>;
     type WeightToFee = IdentityFee<Balance>;
     type LengthToFee = IdentityFee<Balance>;
