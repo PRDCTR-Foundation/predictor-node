@@ -1,4 +1,8 @@
-// Copyright 2026 Aventus DAO Ltd
+// Copyright 2026 Aventus DAO Ltd.
+// SPDX-License-Identifier: GPL-3.0
+//
+// Aventus Node Manager, from https://github.com/AventusDAO/avn-parachain
+// Modified for PRDCTR on 2026-08-27.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 

@@ -1,4 +1,8 @@
-// Copyright 2026 Aventus DAO.
+// Copyright 2026 Aventus DAO Ltd.
+// SPDX-License-Identifier: GPL-3.0
+//
+// Aventus Node Manager, from https://github.com/AventusDAO/avn-parachain
+// Added for PRDCTR on 2026-08-27.
 
 //! `SeedGenesisOnUpgrade` - the migration that makes a forkless introduction of
 //! the pallet behave like a genesis start.
