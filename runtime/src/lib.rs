@@ -304,4 +304,9 @@ mod runtime {
 
     #[runtime::pallet_index(92)]
     pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
+
+    // Feature flags are not supported within runtime macro till version 33.0.1
+    // To enable the pallet, uncomment the two lines below and build with `--features node-manager`.
+    // #[runtime::pallet_index(93)]
+    // pub type NodeManager = pallet_node_manager;
 }

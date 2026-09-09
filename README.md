@@ -333,3 +333,10 @@ The generated JSON file contains the public details for each Author and the brid
 ```
 
 Treat the secret material printed to the terminal as highly sensitive. Ensure the terminal session is private, avoid recording or redirecting its output, and clear any relevant terminal history or scrollback after the secrets have been stored securely.
+
+## License
+
+GPL-3.0, full text in [`LICENSE`](LICENSE).
+
+[`pallets/node-manager`](pallets/node-manager) is the Aventus Node Manager, Copyright 2026 Aventus DAO Ltd, from [AventusDAO/avn-parachain](https://github.com/AventusDAO/avn-parachain).
+It is modified for PRDCTR and stays GPL-3.0; each file records its own modification date.

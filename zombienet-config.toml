@@ -1,6 +1,6 @@
 [relaychain]
 default_command = "./target/release/predictor-node"
-default_args = ["--validator", "-lruntime=debug"]
+default_args = ["--validator", "-lruntime=debug", "--state-pruning=archive", "--blocks-pruning=archive"]
 
 # Generate the raw spec on-the-fly into zombienet's temp dir. `--raw` output
 # bypasses zombienet's plain→raw pass, which otherwise rewrites `session.keys`
