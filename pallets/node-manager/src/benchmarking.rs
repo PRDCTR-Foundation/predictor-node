@@ -347,6 +347,15 @@ benchmarks! {
         assert!(<ForfeitureDestination<T>>::get() == Some(destination));
     }
 
+    set_admin_config_halving_enabled {
+        let current_flag = <HalvingEnabled<T>>::get();
+        let new_flag = !current_flag;
+        let config = AdminConfig::HalvingEnabled(new_flag);
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert!(<HalvingEnabled<T>>::get() == new_flag);
+    }
+
     withdraw_rewards {
         enable_rewards::<T>();
         fund_reward_pot::<T>();
