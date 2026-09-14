@@ -55,10 +55,7 @@ fn fast_periods() {
         RawOrigin::Root.into(),
         AdminConfig::NextHeartbeatPeriod(5),
     ));
-    assert_ok!(NodeManager::set_admin_config(
-        RawOrigin::Root.into(),
-        AdminConfig::NextRewardAmountPerPeriod(1_000 * PRD),
-    ));
+    assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), 1_000 * PRD));
     assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), AdminConfig::BatchSize(64),));
 }
 

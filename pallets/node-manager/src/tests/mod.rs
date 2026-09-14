@@ -13,6 +13,7 @@ pub(crate) mod mock;
 mod test_admin;
 mod test_delegated_heartbeat;
 mod test_heartbeat;
+mod test_next_reward_amount;
 mod test_node_deregistration;
 mod test_node_registration;
 mod test_on_idle_drain;

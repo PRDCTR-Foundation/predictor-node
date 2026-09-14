@@ -179,12 +179,11 @@ impl<
 }
 
 #[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
-pub enum AdminConfig<AccountId, Balance> {
+pub enum AdminConfig<AccountId> {
     NodeRegistrar(AccountId),
     NextRewardPeriodLength(u32),
     BatchSize(u32),
     NextHeartbeatPeriod(u32),
-    NextRewardAmountPerPeriod(Balance),
     RewardEnabled(bool),
     MinUptimeThreshold(Perbill),
     LockSchedule(LockScheduleInfo),

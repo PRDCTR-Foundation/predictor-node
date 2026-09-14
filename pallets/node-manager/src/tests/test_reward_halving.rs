@@ -35,10 +35,7 @@ fn halving_fires_exactly_at_the_boundary() {
     ext.execute_with(|| {
         // Start with a known non-zero reward amount via admin.
         let initial = 1_000_000 * PRD;
-        assert_ok!(NodeManager::set_admin_config(
-            RawOrigin::Root.into(),
-            AdminConfig::NextRewardAmountPerPeriod(initial),
-        ));
+        assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), initial));
         enable_halving();
 
         // One block before the first boundary: no halving yet.
@@ -58,10 +55,7 @@ fn halving_is_idempotent_within_the_same_interval() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         let initial = 1_024 * PRD;
-        assert_ok!(NodeManager::set_admin_config(
-            RawOrigin::Root.into(),
-            AdminConfig::NextRewardAmountPerPeriod(initial),
-        ));
+        assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), initial));
         enable_halving();
 
         // Cross the first boundary.
@@ -81,10 +75,7 @@ fn halving_catches_up_across_multiple_boundaries() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         let initial = 1_024 * PRD;
-        assert_ok!(NodeManager::set_admin_config(
-            RawOrigin::Root.into(),
-            AdminConfig::NextRewardAmountPerPeriod(initial),
-        ));
+        assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), initial));
         // Halving stays disabled while we cross 3 boundaries.
         roll_to(3 * HALVING_INTERVAL + 7);
         assert_eq!(NextRewardAmountPerPeriod::<TestRuntime>::get(), initial);
@@ -103,10 +94,7 @@ fn halving_does_not_fire_when_disabled() {
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         let initial = 1_024 * PRD;
-        assert_ok!(NodeManager::set_admin_config(
-            RawOrigin::Root.into(),
-            AdminConfig::NextRewardAmountPerPeriod(initial),
-        ));
+        assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), initial));
         // HalvingEnabledAtGenesis is false in the mock; explicit set is a no-op
         // but documents intent.
         assert_ok!(NodeManager::set_admin_config(
@@ -126,10 +114,7 @@ fn halving_floors_at_one_base_unit() {
     ext.execute_with(|| {
         // Tiny initial amount so a handful of halvings reaches the floor.
         let initial: u128 = 4;
-        assert_ok!(NodeManager::set_admin_config(
-            RawOrigin::Root.into(),
-            AdminConfig::NextRewardAmountPerPeriod(initial),
-        ));
+        assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), initial));
         enable_halving();
 
         // Four pending halvings applied in one catch-up tick: 4 → 2 → 1,

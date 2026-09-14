@@ -47,7 +47,7 @@ pub trait WeightInfo {
 	fn set_admin_config_reward_period() -> Weight;
 	fn set_admin_config_reward_batch_size() -> Weight;
 	fn set_admin_config_reward_heartbeat() -> Weight;
-	fn set_admin_config_reward_amount() -> Weight;
+	fn set_next_reward_amount() -> Weight;
 	fn set_admin_config_reward_enabled() -> Weight;
 	fn set_admin_config_min_threshold() -> Weight;
 	fn on_initialise_with_new_reward_period() -> Weight;
@@ -161,7 +161,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `NodeManager::NextRewardAmountPerPeriod` (r:0 w:1)
 	/// Proof: `NodeManager::NextRewardAmountPerPeriod` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
-	fn set_admin_config_reward_amount() -> Weight {
+	fn set_next_reward_amount() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -442,7 +442,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `NodeManager::NextRewardAmountPerPeriod` (r:0 w:1)
 	/// Proof: `NodeManager::NextRewardAmountPerPeriod` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
-	fn set_admin_config_reward_amount() -> Weight {
+	fn set_next_reward_amount() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

@@ -642,7 +642,6 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_reward_period())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_batch_size())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_heartbeat())
-            .max(<T as Config>::WeightInfo::set_admin_config_reward_amount())
             .max(<T as Config>::WeightInfo::set_admin_config_reward_enabled())
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
             .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
@@ -655,7 +654,7 @@ pub mod pallet {
         #[allow(clippy::useless_conversion)]
         pub fn set_admin_config(
             origin: OriginFor<T>,
-            config: AdminConfig<T::AccountId, BalanceOf<T>>,
+            config: AdminConfig<T::AccountId>,
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
 
@@ -705,15 +704,6 @@ pub mod pallet {
                     });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_reward_heartbeat()).into())
                 },
-                AdminConfig::NextRewardAmountPerPeriod(amount) => {
-                    ensure!(
-                        amount > BalanceOf::<T>::zero(),
-                        Error::<T>::NextRewardAmountPerPeriodZero
-                    );
-                    <NextRewardAmountPerPeriod<T>>::put(amount);
-                    Self::deposit_event(Event::NextRewardAmountPerPeriodSet { new_amount: amount });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_reward_amount()).into())
-                },
                 AdminConfig::RewardEnabled(enabled) => {
                     <RewardEnabled<T>>::put(enabled);
                     Self::deposit_event(Event::RewardEnabledSet { enabled });
@@ -750,6 +740,25 @@ pub mod pallet {
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_halving_enabled()).into())
                 },
             }
+        }
+
+        /// Registrar or root: set the reward amount for the next reward
+        /// period.
+        #[pallet::call_index(2)]
+        #[pallet::weight(<T as Config>::WeightInfo::set_next_reward_amount())]
+        pub fn set_next_reward_amount(
+            origin: OriginFor<T>,
+            amount: BalanceOf<T>,
+        ) -> DispatchResult {
+            if let Some(who) = ensure_signed_or_root(origin)? {
+                let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
+                ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
+            }
+            ensure!(amount > BalanceOf::<T>::zero(), Error::<T>::NextRewardAmountPerPeriodZero);
+
+            <NextRewardAmountPerPeriod<T>>::put(amount);
+            Self::deposit_event(Event::NextRewardAmountPerPeriodSet { new_amount: amount });
+            Ok(())
         }
 
         /// Offchain call: Submit heartbeat to show node is still alive
@@ -805,7 +814,7 @@ pub mod pallet {
         }
 
         /// Deregister one or more of `owner`'s nodes. Registrar-only.
-        #[pallet::call_index(5)]
+        #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn deregister_nodes(
             origin: OriginFor<T>,
@@ -823,7 +832,7 @@ pub mod pallet {
         }
 
         /// Update signing key for a registered node
-        #[pallet::call_index(7)]
+        #[pallet::call_index(5)]
         #[pallet::weight(<T as Config>::WeightInfo::update_signing_key())]
         pub fn update_signing_key(
             origin: OriginFor<T>,
@@ -867,7 +876,7 @@ pub mod pallet {
         /// transfer); a legitimately-zero funded period is rejected.
         /// Pulls `amount` from `TreasurySource` into the reward pot account
         /// and bumps `OutstandingRewardToPay`.
-        #[pallet::call_index(8)]
+        #[pallet::call_index(6)]
         #[pallet::weight(<T as Config>::WeightInfo::top_up_reward_pot())]
         pub fn top_up_reward_pot(
             origin: OriginFor<T>,
@@ -909,7 +918,7 @@ pub mod pallet {
         /// `HeartbeatReceived` per node. Duplicate entries in `nodes` are
         /// silently deduped via a BTreeSet so callers don't accidentally
         /// double-count.
-        #[pallet::call_index(12)]
+        #[pallet::call_index(7)]
         #[pallet::weight(<T as Config>::WeightInfo::heartbeat_for_owned_nodes(nodes.len() as u32))]
         pub fn heartbeat_for_owned_nodes(
             origin: OriginFor<T>,
@@ -1020,7 +1029,7 @@ pub mod pallet {
         ///
         /// Fails while the global lock window is unconfigured: rewards
         /// accrued before the window is set stay locked until root sets it.
-        #[pallet::call_index(13)]
+        #[pallet::call_index(8)]
         #[pallet::weight(<T as Config>::WeightInfo::withdraw_rewards())]
         pub fn withdraw_rewards(
             origin: OriginFor<T>,

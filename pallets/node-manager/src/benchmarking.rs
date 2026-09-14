@@ -144,12 +144,11 @@ benchmarks! {
         assert!(<NextHeartbeatPeriod<T>>::get() == new_heartbeat);
     }
 
-    set_admin_config_reward_amount {
+    set_next_reward_amount {
         let current_amount = <NextRewardAmountPerPeriod<T>>::get();
         let new_amount = current_amount + 1u32.into();
-        let config = AdminConfig::NextRewardAmountPerPeriod(new_amount);
 
-    }: set_admin_config(RawOrigin::Root, config.clone())
+    }: set_next_reward_amount(RawOrigin::Root, new_amount)
     verify {
         assert!(<NextRewardAmountPerPeriod<T>>::get() == new_amount);
     }
