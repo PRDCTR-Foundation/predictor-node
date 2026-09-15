@@ -489,6 +489,33 @@ impl<T: Config> Pallet<T> {
         T::TimeProvider::now().as_secs()
     }
 
+    /// Credit `node` with a full reward period's uptime for the *current*
+    /// period, as if it had already reported `uptime_threshold` heartbeats -
+    /// the number required to earn a full share of the period's reward.
+    /// Used during a reserved node migration.
+    pub(crate) fn credit_full_period_uptime(node: &NodeId<T>) -> u32 {
+        let reward_period = RewardPeriod::<T>::get();
+        let threshold = reward_period.uptime_threshold;
+        if threshold.is_zero() {
+            return 0
+        }
+
+        let now = frame_system::Pallet::<T>::block_number();
+        let weight = HEARTBEAT_BASE_WEIGHT.saturating_mul(u128::from(threshold));
+
+        NodeUptime::<T>::insert(
+            reward_period.current,
+            node,
+            UptimeInfo::new(threshold.into(), weight, now),
+        );
+        TotalUptime::<T>::mutate(reward_period.current, |total| {
+            total.total_heartbeats = total.total_heartbeats.saturating_add(threshold.into());
+            total.total_weight = total.total_weight.saturating_add(weight);
+        });
+
+        threshold
+    }
+
     /// Apply any pending halvings to `NextRewardAmountPerPeriod`. Idempotent
     /// within a block: the operation is counter-based, comparing the number
     /// of halvings the current block-height implies against the running

@@ -178,8 +178,38 @@ impl<
     }
 }
 
+/// A node reserved for migration.
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
+pub struct ReservedNodeInfo<SignerId, AccountId> {
+    /// The owner the node must register with
+    pub owner: AccountId,
+    /// The signing key the node must register with
+    pub signing_key: SignerId,
+}
+
+impl<
+        AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo,
+        SignerId: Clone + FullCodec + MaxEncodedLen + TypeInfo,
+    > ReservedNodeInfo<SignerId, AccountId>
+{
+    pub fn new(owner: AccountId, signing_key: SignerId) -> Self {
+        ReservedNodeInfo { owner, signing_key }
+    }
+}
+
+/// One entry of an `AdminConfig::ReserveNodes` batch.
+#[derive(Encode, Decode, Clone, PartialEq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct ReservedNodeEntry<AccountId, SignerId> {
+    /// The node ID to reserve
+    pub node: AccountId,
+    /// The owner the node must register with
+    pub owner: AccountId,
+    /// The signing key the node must register with
+    pub signing_key: SignerId,
+}
+
 #[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
-pub enum AdminConfig<AccountId> {
+pub enum AdminConfig<AccountId, SignerId> {
     NodeRegistrar(AccountId),
     NextRewardPeriodLength(u32),
     BatchSize(u32),
@@ -189,6 +219,7 @@ pub enum AdminConfig<AccountId> {
     LockSchedule(LockScheduleInfo),
     ForfeitureDestination(AccountId),
     HalvingEnabled(bool),
+    ReserveNodes(BoundedVec<ReservedNodeEntry<AccountId, SignerId>, MaxReservedNodesPerCall>),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
