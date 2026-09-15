@@ -232,7 +232,7 @@ pub mod pallet {
 
     /// Whether automatic reward-amount halving is enabled. Defaults to
     /// `HalvingEnabledAtGenesis` at genesis; flipped at runtime via the
-    /// root-only `set_halving_enabled` extrinsic.
+    /// root-only `set_admin_config(AdminConfig::HalvingEnabled(..))` call.
     #[pallet::storage]
     pub type HalvingEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
@@ -582,7 +582,7 @@ pub mod pallet {
         #[pallet::constant]
         type HalvingInterval: Get<BlockNumberFor<Self>>;
         /// Whether `HalvingEnabled` defaults to `true` at genesis. Runtime
-        /// flips it via `set_halving_enabled`.
+        /// flips it via `set_admin_config(AdminConfig::HalvingEnabled(..))`.
         #[pallet::constant]
         type HalvingEnabledAtGenesis: Get<bool>;
         /// Maximum number of nodes covered by a single
@@ -647,6 +647,7 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
             .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
             .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
+            .max(<T as Config>::WeightInfo::set_admin_config_halving_enabled())
         )]
         // The `.into()` calls on the `Ok(Some(weight).into())` arms are required for the
         // `DispatchResultWithPostInfo` return type; clippy misattributes them as useless through
@@ -742,6 +743,11 @@ pub mod pallet {
                     Self::deposit_event(Event::ForfeitureDestinationSet { destination });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
                         .into())
+                },
+                AdminConfig::HalvingEnabled(enabled) => {
+                    HalvingEnabled::<T>::put(enabled);
+                    Self::deposit_event(Event::HalvingEnabledSet { enabled });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_halving_enabled()).into())
                 },
             }
         }
@@ -887,19 +893,6 @@ pub mod pallet {
             });
 
             Self::deposit_event(Event::RewardPotFunded { period, amount });
-            Ok(())
-        }
-
-        /// Root: toggle automatic reward-amount halving. When enabled the
-        /// pallet halves `NextRewardAmountPerPeriod` at every `HalvingInterval`
-        /// block boundary (idempotent per block, catch-up across multiple
-        /// boundaries if disabled and re-enabled later).
-        #[pallet::call_index(9)]
-        #[pallet::weight(<T as Config>::WeightInfo::set_halving_enabled())]
-        pub fn set_halving_enabled(origin: OriginFor<T>, enabled: bool) -> DispatchResult {
-            ensure_root(origin)?;
-            HalvingEnabled::<T>::put(enabled);
-            Self::deposit_event(Event::HalvingEnabledSet { enabled });
             Ok(())
         }
 

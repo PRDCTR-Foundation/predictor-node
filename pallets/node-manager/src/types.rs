@@ -189,6 +189,7 @@ pub enum AdminConfig<AccountId, Balance> {
     MinUptimeThreshold(Perbill),
     LockSchedule(LockScheduleInfo),
     ForfeitureDestination(AccountId),
+    HalvingEnabled(bool),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]

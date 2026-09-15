@@ -941,7 +941,8 @@ parameter_types! {
     pub const NodeManagerSignedTxLifetime: u32 = 64;
     /// Halve `NextRewardAmountPerPeriod` once per year.
     pub const NodeManagerHalvingInterval: BlockNumber = BLOCKS_PER_YEAR;
-    /// Halving stays off until root enables it via `set_halving_enabled`.
+    /// Halving stays off until root enables it via
+    /// `set_admin_config(AdminConfig::HalvingEnabled(true))`.
     pub const NodeManagerHalvingEnabledAtGenesis: bool = false;
     pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
     /// Network-wide registered-node cap, fixed at 30,000 by the PRDCTR

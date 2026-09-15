@@ -23,7 +23,10 @@ fn roll_to(target: u64) {
 }
 
 fn enable_halving() {
-    assert_ok!(NodeManager::set_halving_enabled(RawOrigin::Root.into(), true));
+    assert_ok!(NodeManager::set_admin_config(
+        RawOrigin::Root.into(),
+        AdminConfig::HalvingEnabled(true),
+    ));
 }
 
 #[test]
@@ -106,7 +109,10 @@ fn halving_does_not_fire_when_disabled() {
         ));
         // HalvingEnabledAtGenesis is false in the mock; explicit set is a no-op
         // but documents intent.
-        assert_ok!(NodeManager::set_halving_enabled(RawOrigin::Root.into(), false));
+        assert_ok!(NodeManager::set_admin_config(
+            RawOrigin::Root.into(),
+            AdminConfig::HalvingEnabled(false),
+        ));
 
         roll_to(2 * HALVING_INTERVAL + 5);
         assert_eq!(NextRewardAmountPerPeriod::<TestRuntime>::get(), initial);
@@ -146,7 +152,10 @@ fn set_halving_enabled_rejects_non_root() {
     ext.execute_with(|| {
         let caller = TestAccount::new([7u8; 32]).account_id();
         assert_noop!(
-            NodeManager::set_halving_enabled(RuntimeOrigin::signed(caller), true,),
+            NodeManager::set_admin_config(
+                RuntimeOrigin::signed(caller),
+                AdminConfig::HalvingEnabled(true),
+            ),
             DispatchError::BadOrigin
         );
     });
@@ -159,7 +168,10 @@ fn set_halving_enabled_emits_event() {
         enable_halving();
         System::assert_last_event(Event::HalvingEnabledSet { enabled: true }.into());
 
-        assert_ok!(NodeManager::set_halving_enabled(RawOrigin::Root.into(), false));
+        assert_ok!(NodeManager::set_admin_config(
+            RawOrigin::Root.into(),
+            AdminConfig::HalvingEnabled(false),
+        ));
         System::assert_last_event(Event::HalvingEnabledSet { enabled: false }.into());
     });
 }
