@@ -72,6 +72,7 @@ const ON_IDLE_WEIGHT_SHARE: Perbill = Perbill::from_percent(75);
 pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
+pub const MAX_RESERVED_NODES_PER_CALL: u32 = 64;
 
 /// Offchain-worker storage key under which the local node's registered AccountId is persisted.
 pub const REGISTERED_NODE_KEY: &[u8; 26] = b"ocw_pallet_registered_node";
@@ -95,10 +96,13 @@ pub(crate) type BalanceOf<T> =
 pub(crate) type NodeId<T> = <T as frame_system::Config>::AccountId;
 /// Max nodes per deregistration call
 pub type MaxNodesToDeregister = ConstU32<MAX_NODES_TO_DEREGISTER>;
+/// Max entries per `AdminConfig::ReserveNodes` call
+pub type MaxReservedNodesPerCall = ConstU32<MAX_RESERVED_NODES_PER_CALL>;
 
 #[frame_support::pallet]
 pub mod pallet {
     use sp_avn_common::{verify_signature, InnerCallValidator, Proof};
+    use sp_std::collections::btree_set::BTreeSet;
 
     use super::*;
 
@@ -121,9 +125,24 @@ pub mod pallet {
     pub type SigningKeyToNodeId<T: Config> =
         StorageMap<_, Blake2_128Concat, T::SignerId, NodeId<T>, OptionQuery>;
 
+    /// Nodes reserved for migration, keyed by node ID. Consumed (removed)
+    /// the first time the node registers with a matching owner and signing key
+    #[pallet::storage]
+    pub type ReservedNodes<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        NodeId<T>,
+        ReservedNodeInfo<T::SignerId, T::AccountId>,
+        OptionQuery,
+    >;
+
     /// Total registered nodes
     #[pallet::storage]
     pub type TotalRegisteredNodes<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+    /// Count of currently-pending `ReservedNodes` entries
+    #[pallet::storage]
+    pub type TotalReservedNodes<T: Config> = StorageValue<_, u32, ValueQuery>;
 
     /// Owner to node mapping
     #[pallet::storage]
@@ -348,6 +367,10 @@ pub mod pallet {
     pub enum Event<T: Config> {
         /// Node registered
         NodeRegistered { owner: T::AccountId, node: NodeId<T> },
+        /// `count` (node, owner, signing_key) entries reserved for migration
+        NodesReserved { count: u32 },
+        /// `node` was registered against a matching `ReservedNodes` entry
+        NodeMigrated { owner: T::AccountId, node: NodeId<T>, credited_heartbeats: u32 },
         /// Reward period length set
         RewardPeriodLengthSet {
             period_index: u64,
@@ -540,6 +563,8 @@ pub mod pallet {
         InvalidLockSchedule,
         /// The network-wide registered-node cap has been reached
         MaxNodesReached,
+        /// Migration of `node` failed due to a mismatch with the `ReservedNodes` entry
+        ReservedNodeMismatch,
     }
 
     #[pallet::config]
@@ -617,9 +642,12 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Register a new node
+        /// Register a new node. If the node is in `ReservedNodes`, it is migrated instead.
         #[pallet::call_index(0)]
-        #[pallet::weight(<T as Config>::WeightInfo::register_node())]
+        #[pallet::weight(
+            <T as Config>::WeightInfo::register_node()
+                .max(<T as Config>::WeightInfo::register_reserved_node())
+        )]
         pub fn register_node(
             origin: OriginFor<T>,
             node: NodeId<T>,
@@ -647,6 +675,9 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
             .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
             .max(<T as Config>::WeightInfo::set_admin_config_halving_enabled())
+            .max(<T as Config>::WeightInfo::set_admin_config_reserve_nodes(
+                MAX_RESERVED_NODES_PER_CALL,
+            ))
         )]
         // The `.into()` calls on the `Ok(Some(weight).into())` arms are required for the
         // `DispatchResultWithPostInfo` return type; clippy misattributes them as useless through
@@ -654,7 +685,7 @@ pub mod pallet {
         #[allow(clippy::useless_conversion)]
         pub fn set_admin_config(
             origin: OriginFor<T>,
-            config: AdminConfig<T::AccountId>,
+            config: AdminConfig<T::AccountId, T::SignerId>,
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
 
@@ -738,6 +769,29 @@ pub mod pallet {
                     HalvingEnabled::<T>::put(enabled);
                     Self::deposit_event(Event::HalvingEnabledSet { enabled });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_halving_enabled()).into())
+                },
+                AdminConfig::ReserveNodes(entries) => {
+                    let submitted = entries.len() as u32;
+
+                    let mut seen: BTreeSet<T::AccountId> = BTreeSet::new();
+                    let (new_entries, _already_pending): (Vec<_>, Vec<_>) =
+                        entries.iter().partition(|e| {
+                            !ReservedNodes::<T>::contains_key(&e.node) &&
+                                seen.insert(e.node.clone())
+                        });
+                    let new_reservations = new_entries.len() as u32;
+
+                    for entry in entries.into_iter() {
+                        ReservedNodes::<T>::insert(
+                            &entry.node,
+                            ReservedNodeInfo::new(entry.owner, entry.signing_key),
+                        );
+                    }
+                    TotalReservedNodes::<T>::mutate(|n| *n = n.saturating_add(new_reservations));
+
+                    Self::deposit_event(Event::NodesReserved { count: submitted });
+                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_reserve_nodes(submitted))
+                        .into())
                 },
             }
         }
@@ -967,7 +1021,6 @@ pub mod pallet {
             // same block across distinct outer nonces is barred instead by the
             // spacing check below (`now < last_reported + heartbeat_period`),
             // not by this in-call set.
-            use sp_std::collections::btree_set::BTreeSet;
             let mut unique: BTreeSet<NodeId<T>> = BTreeSet::new();
             for node in nodes.iter() {
                 let info = NodeRegistry::<T>::get(node).ok_or(Error::<T>::NodeNotOwnedByProver)?;
@@ -1413,8 +1466,21 @@ pub mod pallet {
                 !SigningKeyToNodeId::<T>::contains_key(&signing_key),
                 Error::<T>::SigningKeyAlreadyInUse
             );
+
+            let reservation = ReservedNodes::<T>::take(&node);
+            if let Some(ref reserved) = reservation {
+                // Reject mismatching reservations
+                ensure!(
+                    reserved.owner == owner && reserved.signing_key == signing_key,
+                    Error::<T>::ReservedNodeMismatch
+                );
+                TotalReservedNodes::<T>::mutate(|n| *n = n.saturating_sub(1));
+            }
+
+            // Ensure there is capacity for a new node if it is not reserved
             ensure!(
-                TotalRegisteredNodes::<T>::get() < T::MaxRegisteredNodes::get(),
+                TotalRegisteredNodes::<T>::get().saturating_add(TotalReservedNodes::<T>::get()) <
+                    T::MaxRegisteredNodes::get(),
                 Error::<T>::MaxNodesReached
             );
 
@@ -1438,7 +1504,13 @@ pub mod pallet {
                 ),
             );
 
-            Self::deposit_event(Event::NodeRegistered { owner, node });
+            Self::deposit_event(Event::NodeRegistered { owner: owner.clone(), node: node.clone() });
+
+            // Migration: consume the reservation
+            if reservation.is_some() {
+                let credited_heartbeats = Self::credit_full_period_uptime(&node);
+                Self::deposit_event(Event::NodeMigrated { owner, node, credited_heartbeats });
+            }
 
             Ok(())
         }

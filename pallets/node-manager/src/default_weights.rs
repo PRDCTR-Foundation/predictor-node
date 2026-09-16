@@ -43,6 +43,7 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet_node_manager.
 pub trait WeightInfo {
 	fn register_node() -> Weight;
+	fn register_reserved_node() -> Weight;
 	fn set_admin_config_registrar() -> Weight;
 	fn set_admin_config_reward_period() -> Weight;
 	fn set_admin_config_reward_batch_size() -> Weight;
@@ -62,6 +63,7 @@ pub trait WeightInfo {
 	fn set_admin_config_lock_schedule() -> Weight;
 	fn set_admin_config_forfeiture_destination() -> Weight;
 	fn set_admin_config_halving_enabled() -> Weight;
+	fn set_admin_config_reserve_nodes(b: u32, ) -> Weight;
 	fn withdraw_rewards() -> Weight;
 }
 
@@ -92,8 +94,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Estimated: `3656`
 		// Minimum execution time: 67_881_000 picoseconds.
 		Weight::from_parts(84_332_000, 3656)
-			.saturating_add(T::DbWeight::get().reads(8_u64))
+			.saturating_add(T::DbWeight::get().reads(9_u64))
 			.saturating_add(T::DbWeight::get().writes(6_u64))
+	}
+	fn register_reserved_node() -> Weight {
+		Weight::from_parts(104_332_000, 3656)
+			.saturating_add(T::DbWeight::get().reads(11_u64))
+			.saturating_add(T::DbWeight::get().writes(10_u64))
 	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:0)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
@@ -336,6 +343,13 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(15_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
+	fn set_admin_config_reserve_nodes(b: u32, ) -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(Weight::from_parts(7_000_000, 0).saturating_mul(b.into()))
+			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(b.into())))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(b.into())))
+	}
 	// Reads: LockedRewards, LockSchedule, Timestamp, ForfeitureDestination,
 	// 3 account balances (pot, owner, forfeiture destination). Writes: up to
 	// two `Currency::transfer`s out of the pot, LockedRewards,
@@ -373,8 +387,13 @@ impl WeightInfo for () {
 		//  Estimated: `3656`
 		// Minimum execution time: 67_881_000 picoseconds.
 		Weight::from_parts(84_332_000, 3656)
-			.saturating_add(RocksDbWeight::get().reads(8_u64))
+			.saturating_add(RocksDbWeight::get().reads(9_u64))
 			.saturating_add(RocksDbWeight::get().writes(6_u64))
+	}
+	fn register_reserved_node() -> Weight {
+		Weight::from_parts(104_332_000, 3656)
+			.saturating_add(RocksDbWeight::get().reads(11_u64))
+			.saturating_add(RocksDbWeight::get().writes(10_u64))
 	}
 	/// Storage: `NodeManager::NodeRegistrar` (r:1 w:0)
 	/// Proof: `NodeManager::NodeRegistrar` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
@@ -604,6 +623,13 @@ impl WeightInfo for () {
 	fn set_admin_config_halving_enabled() -> Weight {
 		Weight::from_parts(15_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	fn set_admin_config_reserve_nodes(b: u32, ) -> Weight {
+		Weight::from_parts(15_000_000, 0)
+			.saturating_add(Weight::from_parts(7_000_000, 0).saturating_mul(b.into()))
+			.saturating_add(RocksDbWeight::get().reads((1_u64).saturating_mul(b.into())))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(b.into())))
 	}
 	fn withdraw_rewards() -> Weight {
 		Weight::from_parts(80_000_000, 6196)

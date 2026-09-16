@@ -103,6 +103,24 @@ benchmarks! {
         assert_last_event::<T>(Event::NodeRegistered {owner, node}.into());
     }
 
+    register_reserved_node {
+        let registrar: T::AccountId = account("registrar", 0, 0);
+        set_registrar::<T>(registrar.clone());
+
+        let owner: T::AccountId = account("owner", 1, 1);
+        let node: NodeId<T> = account("node", 2, 2);
+        let signing_key: T::SignerId = account("signing_key", 3, 3);
+        <ReservedNodes<T>>::insert(&node, ReservedNodeInfo::new(owner.clone(), signing_key.clone()));
+        <TotalReservedNodes<T>>::put(1u32);
+
+    }: register_node(RawOrigin::Signed(registrar.clone()), node.clone(), owner.clone(), signing_key.clone())
+    verify {
+        assert!(!<ReservedNodes<T>>::contains_key(&node));
+        assert!(<TotalReservedNodes<T>>::get().is_zero());
+        let reward_period = <RewardPeriod<T>>::get();
+        assert!(<NodeUptime<T>>::contains_key(reward_period.current, &node));
+    }
+
     set_admin_config_registrar {
         let registrar: T::AccountId = account("registrar", 0, 0);
         set_registrar::<T>(registrar.clone());
@@ -353,6 +371,25 @@ benchmarks! {
     }: set_admin_config(RawOrigin::Root, config.clone())
     verify {
         assert!(<HalvingEnabled<T>>::get() == new_flag);
+    }
+
+    set_admin_config_reserve_nodes {
+        let b in 1 .. MAX_RESERVED_NODES_PER_CALL;
+
+        let mut entries = Vec::new();
+        for i in 0..b {
+            entries.push(ReservedNodeEntry {
+                node: account("reserved_node", i, i),
+                owner: account("reserved_owner", i, i),
+                signing_key: account("reserved_key", i, i),
+            });
+        }
+        let config = AdminConfig::ReserveNodes(BoundedVec::truncate_from(entries));
+
+    }: set_admin_config(RawOrigin::Root, config.clone())
+    verify {
+        assert_eq!(<ReservedNodes<T>>::iter().count(), b as usize);
+        assert_eq!(<TotalReservedNodes<T>>::get(), b);
     }
 
     withdraw_rewards {
