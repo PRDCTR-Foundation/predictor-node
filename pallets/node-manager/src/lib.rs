@@ -243,18 +243,6 @@ pub mod pallet {
     #[pallet::storage]
     pub type NextNodeSerialNumber<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-    /// Cumulative count of reward-amount halvings applied since genesis.
-    /// Updated by `apply_halving_if_due` at most once per `HalvingInterval`
-    /// boundary. Idempotent within the same block.
-    #[pallet::storage]
-    pub type RewardAmountHalvingsApplied<T: Config> = StorageValue<_, u32, ValueQuery>;
-
-    /// Whether automatic reward-amount halving is enabled. Defaults to
-    /// `HalvingEnabledAtGenesis` at genesis; flipped at runtime via the
-    /// root-only `set_admin_config(AdminConfig::HalvingEnabled(..))` call.
-    #[pallet::storage]
-    pub type HalvingEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
-
     /// Rewards earned by an owner while the global lock window is active.
     /// The funds themselves stay in the reward-pot account; this map records
     /// each owner's claim, realised via `withdraw_rewards`.
@@ -346,7 +334,6 @@ pub mod pallet {
 
             <RewardPeriod<T>>::put(reward_period);
             OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
-            HalvingEnabled::<T>::put(T::HalvingEnabledAtGenesis::get());
 
             assert!(self.lock_initial_penalty_percent <= 100, "lock penalty must be a percentage");
             if let Some(start) = self.lock_schedule_start {
@@ -437,17 +424,6 @@ pub mod pallet {
             requested_amount: BalanceOf<T>,
             reason: DispatchError,
         },
-        /// Halving applied to `NextRewardAmountPerPeriod`. `total_halvings` is
-        /// the cumulative count since genesis; `new_amount` is the post-halving
-        /// value (post all pending halvings if more than one boundary was
-        /// crossed between calls).
-        RewardHalvingApplied {
-            period_index: RewardPeriodIndex,
-            new_amount: BalanceOf<T>,
-            total_halvings: u32,
-        },
-        /// `HalvingEnabled` toggled by root
-        HalvingEnabledSet { enabled: bool },
         /// A reward accrued into `LockedRewards` instead of free balance
         /// (the global lock window is active or not yet configured).
         RewardLocked {
@@ -600,16 +576,6 @@ pub mod pallet {
         type RewardPotId: Get<PalletId>;
         /// Source account from which the reward pot is funded at each period rollover
         type TreasurySource: Get<Self::AccountId>;
-        /// Number of blocks between halving applications. Setting this to
-        /// `BLOCKS_PER_YEAR` (predictor's annual cadence) is the production
-        /// default. Setting it small in tests makes halving observable on a
-        /// budget.
-        #[pallet::constant]
-        type HalvingInterval: Get<BlockNumberFor<Self>>;
-        /// Whether `HalvingEnabled` defaults to `true` at genesis. Runtime
-        /// flips it via `set_admin_config(AdminConfig::HalvingEnabled(..))`.
-        #[pallet::constant]
-        type HalvingEnabledAtGenesis: Get<bool>;
         /// Maximum number of nodes covered by a single
         /// `heartbeat_for_owned_nodes` call. Bounds extrinsic weight and
         /// validation work.
@@ -674,7 +640,6 @@ pub mod pallet {
             .max(<T as Config>::WeightInfo::set_admin_config_min_threshold())
             .max(<T as Config>::WeightInfo::set_admin_config_lock_schedule())
             .max(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
-            .max(<T as Config>::WeightInfo::set_admin_config_halving_enabled())
             .max(<T as Config>::WeightInfo::set_admin_config_reserve_nodes(
                 MAX_RESERVED_NODES_PER_CALL,
             ))
@@ -764,11 +729,6 @@ pub mod pallet {
                     Self::deposit_event(Event::ForfeitureDestinationSet { destination });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_forfeiture_destination())
                         .into())
-                },
-                AdminConfig::HalvingEnabled(enabled) => {
-                    HalvingEnabled::<T>::put(enabled);
-                    Self::deposit_event(Event::HalvingEnabledSet { enabled });
-                    Ok(Some(<T as Config>::WeightInfo::set_admin_config_halving_enabled()).into())
                 },
                 AdminConfig::ReserveNodes(entries) => {
                     let submitted = entries.len() as u32;
@@ -1144,21 +1104,13 @@ pub mod pallet {
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         // Keep this logic light and bounded
         fn on_initialize(n: BlockNumberFor<T>) -> Weight {
-            // Halving runs unconditionally before the rollover guard so that a
-            // halving + rollover that fall on the same block use the post-
-            // halved amount. Its weight is charged onto every return path
-            // below so a halving-due block is accounted for its worst case.
-            let halving_weight = Self::apply_halving_if_due(n);
-
             if !RewardEnabled::<T>::get() {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
-                    .saturating_add(halving_weight)
             }
 
             let reward_period = RewardPeriod::<T>::get();
             if !reward_period.should_update(n) {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
-                    .saturating_add(halving_weight)
             }
 
             let previous_index = reward_period.current;
@@ -1171,7 +1123,6 @@ pub mod pallet {
             if next_reward_period_length == 0 || next_heartbeat_period == 0 {
                 return <T as Config>::WeightInfo::on_initialise_no_reward_period()
                     .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
-                    .saturating_add(halving_weight)
             }
 
             let next_reward_amount = NextRewardAmountPerPeriod::<T>::get();
@@ -1249,7 +1200,6 @@ pub mod pallet {
             });
 
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
-                .saturating_add(halving_weight)
         }
 
         /// `on_idle` drain: when block production has remaining weight, walk

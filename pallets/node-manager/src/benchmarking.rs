@@ -335,19 +335,6 @@ benchmarks! {
         assert!(T::Currency::free_balance(&owner) > BalanceOf::<T>::zero());
     }
 
-    // Worst-case cost of the applied-halving path in `on_initialize`.
-    apply_halving {
-        let interval = T::HalvingInterval::get();
-        <HalvingEnabled<T>>::put(true);
-        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
-        // One interval in makes exactly one halving due.
-        let n: BlockNumberFor<T> = interval;
-    }: {
-        let _ = Pallet::<T>::apply_halving_if_due(n);
-    }
-    verify {
-        assert!(<RewardAmountHalvingsApplied<T>>::get() >= 1);
-    }
     set_admin_config_lock_schedule {
         let schedule = LockScheduleInfo::new(1_000_000u64, 52u32);
         let config = AdminConfig::LockSchedule(schedule);
@@ -362,15 +349,6 @@ benchmarks! {
     }: set_admin_config(RawOrigin::Root, config.clone())
     verify {
         assert!(<ForfeitureDestination<T>>::get() == Some(destination));
-    }
-
-    set_admin_config_halving_enabled {
-        let current_flag = <HalvingEnabled<T>>::get();
-        let new_flag = !current_flag;
-        let config = AdminConfig::HalvingEnabled(new_flag);
-    }: set_admin_config(RawOrigin::Root, config.clone())
-    verify {
-        assert!(<HalvingEnabled<T>>::get() == new_flag);
     }
 
     set_admin_config_reserve_nodes {

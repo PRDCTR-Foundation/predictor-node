@@ -218,7 +218,6 @@ pub enum AdminConfig<AccountId, SignerId> {
     MinUptimeThreshold(Perbill),
     LockSchedule(LockScheduleInfo),
     ForfeitureDestination(AccountId),
-    HalvingEnabled(bool),
     ReserveNodes(BoundedVec<ReservedNodeEntry<AccountId, SignerId>, MaxReservedNodesPerCall>),
 }
 
