@@ -70,10 +70,6 @@ frame_support::construct_runtime!(
 parameter_types! {
     pub const RewardPotId: PalletId = PalletId(*b"avtnodes");
     pub TreasurySource: AccountId = treasury_account();
-    /// Small interval so tests can observe halving on a tight budget.
-    pub const HalvingInterval: u64 = 1_000;
-    /// Defaults to OFF; tests flip via set_admin_config(HalvingEnabled).
-    pub const HalvingEnabledAtGenesis: bool = false;
     pub const MaxNodesPerAggregateHeartbeat: u32 = 1024;
     /// Production value (30k per the hard-fork proposal). Cap tests set
     /// `TotalRegisteredNodes` storage directly instead of mass-registering.
@@ -105,8 +101,6 @@ impl Config for TestRuntime {
     type Signature = Signature;
     type RewardPotId = RewardPotId;
     type TreasurySource = TreasurySource;
-    type HalvingInterval = HalvingInterval;
-    type HalvingEnabledAtGenesis = HalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = MaxRegisteredNodes;
     type MaxFailedFundingRecoveryPeriods = MaxFailedFundingRecoveryPeriods;

@@ -939,11 +939,6 @@ impl pallet_pm_combinatorial_tokens::Config for Runtime {
 parameter_types! {
     pub const NodeManagerRewardPotId: PalletId = NODE_MANAGER_PALLET_ID;
     pub const NodeManagerSignedTxLifetime: u32 = 64;
-    /// Halve `NextRewardAmountPerPeriod` once per year.
-    pub const NodeManagerHalvingInterval: BlockNumber = BLOCKS_PER_YEAR;
-    /// Halving stays off until root enables it via
-    /// `set_admin_config(AdminConfig::HalvingEnabled(true))`.
-    pub const NodeManagerHalvingEnabledAtGenesis: bool = false;
     pub const NodeManagerMaxNodesPerAggregateHeartbeat: u32 = 1024;
     /// Network-wide registered-node cap, fixed at 30,000 by the PRDCTR
     /// hard-fork proposal. Deregistration frees capacity under the cap.
@@ -968,8 +963,6 @@ impl pallet_node_manager::Config for Runtime {
     type Signature = Signature;
     type RewardPotId = NodeManagerRewardPotId;
     type TreasurySource = NodeManagerTreasurySource;
-    type HalvingInterval = NodeManagerHalvingInterval;
-    type HalvingEnabledAtGenesis = NodeManagerHalvingEnabledAtGenesis;
     type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = NodeManagerMaxRegisteredNodes;
     type MaxFailedFundingRecoveryPeriods = NodeManagerMaxFailedFundingRecoveryPeriods;

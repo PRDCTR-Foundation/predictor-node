@@ -53,8 +53,8 @@
 //! posture; only the upgrade path needs a concrete anchor to get there.
 
 use crate::{
-    pallet::Config, HalvingEnabled, LockSchedule, LockScheduleInfo, MaxBatchSize,
-    MinUptimeThreshold, NextHeartbeatPeriod, NextRewardAmountPerPeriod, NextRewardPeriodLength,
+    pallet::Config, LockSchedule, LockScheduleInfo, MaxBatchSize, MinUptimeThreshold,
+    NextHeartbeatPeriod, NextRewardAmountPerPeriod, NextRewardPeriodLength,
     OutstandingRewardToPay, Pallet, RewardPeriod, RewardPeriodInfo,
 };
 use frame_support::{
@@ -127,7 +127,6 @@ impl<T: Config> SeedGenesisOnUpgrade<T> {
         NextRewardAmountPerPeriod::<T>::set(Zero::zero());
         MinUptimeThreshold::<T>::set(Some(default_threshold));
         OutstandingRewardToPay::<T>::set(Zero::zero());
-        HalvingEnabled::<T>::set(T::HalvingEnabledAtGenesis::get());
 
         let uptime_threshold =
             Pallet::<T>::calculate_uptime_threshold(REWARD_PERIOD, HEARTBEAT_PERIOD);

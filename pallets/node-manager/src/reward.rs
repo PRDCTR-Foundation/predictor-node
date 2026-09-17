@@ -5,7 +5,7 @@
 // Modified for PRDCTR on 2026-07-07.
 
 use crate::*;
-use sp_runtime::{traits::CheckedDiv, ArithmeticError, SaturatedConversion};
+use sp_runtime::{ArithmeticError, SaturatedConversion};
 
 impl<T: Config> Pallet<T> {
     // Nodes should not be able to submit over the min uptime required.
@@ -514,58 +514,5 @@ impl<T: Config> Pallet<T> {
         });
 
         threshold
-    }
-
-    /// Apply any pending halvings to `NextRewardAmountPerPeriod`. Idempotent
-    /// within a block: the operation is counter-based, comparing the number
-    /// of halvings the current block-height implies against the running
-    /// `RewardAmountHalvingsApplied`. If the chain has skipped past several
-    /// halving boundaries between calls (extended downtime, manual replay)
-    /// the catch-up applies in a single tick.
-    pub fn apply_halving_if_due(n: BlockNumberFor<T>) -> Weight {
-        if !HalvingEnabled::<T>::get() {
-            return <T as frame_system::Config>::DbWeight::get().reads(1)
-        }
-        let interval = T::HalvingInterval::get();
-        if interval.is_zero() {
-            return <T as frame_system::Config>::DbWeight::get().reads(1)
-        }
-
-        let n_u128: u128 = n.saturated_into();
-        let interval_u128: u128 = interval.saturated_into();
-        let expected = (n_u128 / interval_u128).min(u32::MAX as u128) as u32;
-        let applied = RewardAmountHalvingsApplied::<T>::get();
-        if expected <= applied {
-            return <T as frame_system::Config>::DbWeight::get().reads(2)
-        }
-        let pending = expected - applied;
-
-        let two = BalanceOf::<T>::from(2u32);
-        NextRewardAmountPerPeriod::<T>::mutate(|amt| {
-            for _ in 0..pending {
-                // Floor at one base unit: the reward must asymptotically
-                // approach zero without ever reaching it (Truth paper /
-                // Andrey's halving directive). A zero amount stays zero -
-                // the floor only protects a non-zero reward from vanishing.
-                let halved = amt.checked_div(&two).unwrap_or_else(BalanceOf::<T>::zero);
-                if halved.is_zero() && !amt.is_zero() {
-                    *amt = BalanceOf::<T>::from(1u32);
-                    break
-                }
-                *amt = halved;
-            }
-        });
-        RewardAmountHalvingsApplied::<T>::put(expected);
-
-        let new_amount = NextRewardAmountPerPeriod::<T>::get();
-        let period_index = RewardPeriod::<T>::get().current;
-        Self::deposit_event(Event::RewardHalvingApplied {
-            period_index,
-            new_amount,
-            total_halvings: expected,
-        });
-
-        // Worst-case cost of the applied path (benchmarked).
-        <T as Config>::WeightInfo::apply_halving()
     }
 }
