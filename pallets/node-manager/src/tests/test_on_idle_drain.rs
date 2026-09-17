@@ -48,7 +48,10 @@ fn record_uptime(period: RewardPeriodIndex, node: &AccountId, count: u64) {
 
 /// Configure the chain for fast-rolling reward periods so a single
 /// `roll_forward` triggers `on_initialize` rollover and seeds the period
-/// snapshot we want to drain.
+/// snapshot we want to drain. Reward amounts are no longer set up front -
+/// each period is topped up then funded via `top_up_reward_pot` +
+/// `set_reward_amount` only once it has actually closed (see
+/// `setup_unpaid_period_with_nodes`).
 fn fast_periods() {
     assert_ok!(NodeManager::set_admin_config(
         RawOrigin::Root.into(),
@@ -58,7 +61,6 @@ fn fast_periods() {
         RawOrigin::Root.into(),
         AdminConfig::NextHeartbeatPeriod(5),
     ));
-    assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), 1_000 * PRD));
     // Generous batch cap so the per-test scenarios don't accidentally hit it.
     assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), AdminConfig::BatchSize(64),));
 }
@@ -71,17 +73,19 @@ fn set_batch_size(n: u32) {
 }
 
 /// With `with_genesis_config()` the chain starts on period 0 with
-/// `length=200` and `reward_amount=20 PRD`. `fast_periods` sets the NEXT
-/// period to `length=20, amount=1000 PRD`. This helper crosses the first
-/// rollover so the chain is in period 1 (the new config), records uptime
-/// for caller-supplied nodes, then crosses the second rollover so period 1
-/// is snapshot-funded and ready to be drained.
+/// `length=200`. `fast_periods` sets the NEXT period to `length=20`. This
+/// helper crosses the first rollover so the chain is in period 1 (the new
+/// config), funds period 0 trivially (no uptime recorded for it, so the
+/// drain reclaims and completes it immediately rather than blocking on an
+/// unfunded period), records uptime for caller-supplied nodes, then crosses
+/// the second rollover and funds period 1 so it's ready to be drained.
 ///
-/// Returns the period index that's now the oldest unpaid (period 0 is also
-/// snapshotted but with total_weight=0 so the drain will skip it).
+/// Returns the period index that's now the oldest unpaid.
 fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> RewardPeriodIndex {
     // Cross period 0 boundary (length=200 from genesis).
     roll_forward(200);
+    assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+    assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
     // We're now in period 1 (the post-rollover config).
     let period_to_pay = RewardPeriod::<TestRuntime>::get().current;
     for (node, count) in nodes_with_uptime {
@@ -89,6 +93,8 @@ fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> Rew
     }
     // Cross period 1 boundary (length=20 from fast_periods).
     roll_forward(20);
+    assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+    assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period_to_pay, 1_000 * PRD));
     period_to_pay
 }
 
@@ -231,7 +237,11 @@ fn drain_advances_past_empty_period() {
         // No nodes, no uptime - both snapshotted periods will have
         // total_uptime.total_weight == 0 (even after they get funded).
         roll_forward(200);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
         roll_forward(20);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 1, PRD));
         let oldest_before = OldestUnpaidRewardPeriodIndex::<TestRuntime>::get();
 
         let budget = per_iter().saturating_mul(10);
@@ -252,8 +262,12 @@ fn drain_reclaims_undistributed_reward_for_empty_period() {
         fast_periods();
         // No nodes => every funded period has zero uptime, so its reward is
         // undistributable and must be returned to the treasury, not stranded.
-        roll_forward(200); // fund period 0 (genesis amount), enter period 1
-        roll_forward(20); // fund period 1 (fast_periods amount), enter period 2
+        roll_forward(200); // enter period 1
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 20 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, 20 * PRD)); // fund period 0
+        roll_forward(20); // enter period 2
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 1, 1_000 * PRD)); // fund period 1
 
         let p0 = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
         let p1 = RewardPot::<TestRuntime>::get(1).map(|p| p.total_reward).unwrap_or_default();
@@ -597,6 +611,8 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
         // `calculate_node_weight` (which `validate_heartbeats` makes
         // unreachable on-chain) and make the expected split inexact.
         roll_forward(200);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
         let period = RewardPeriod::<TestRuntime>::get().current;
         for node in [n1, n2, leaver] {
             record_uptime(period, &node, 1);
@@ -607,6 +623,8 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
             BoundedVec::truncate_from(vec![leaver]),
         ));
         roll_forward(20);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
 
         let funded = RewardPot::<TestRuntime>::get(period).unwrap().total_reward;
         let reclaimed =

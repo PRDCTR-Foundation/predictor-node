@@ -515,4 +515,61 @@ impl<T: Config> Pallet<T> {
 
         threshold
     }
+
+    /// Root: move `amount` from `T::TreasurySource` into the reward pot
+    /// account's balance. Not tied to any period - it just makes funds
+    /// available for a later `set_reward_amount` to allocate.
+    pub(crate) fn do_top_up_reward_pot(amount: BalanceOf<T>) -> DispatchResult {
+        ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+
+        let treasury = T::TreasurySource::get();
+        let pot = Self::compute_reward_account_id();
+        T::Currency::transfer(&treasury, &pot, amount, ExistenceRequirement::KeepAlive)
+            .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
+
+        Self::deposit_event(Event::RewardPotToppedUp { amount });
+        Ok(())
+    }
+
+    /// Record `amount` as `period`'s reward-distribution total, unblocking
+    /// the `on_idle` drain to start paying it out. `period` must have ended
+    /// (`on_initialize` always records it as awaiting an amount,
+    /// `funding_failed: true`, the moment it closes) but not already have
+    /// one - once calculations have started for a period its amount is
+    /// final, so a period with no `RewardPot` entry at all (hasn't ended
+    /// yet, or was already fully paid out and cleaned up) or one that's
+    /// already set (`funding_failed == false`) is rejected.
+    ///
+    /// The pot must already hold enough balance to cover `amount` on top of
+    /// everything already promised elsewhere (`OutstandingRewardToPay`,
+    /// `TotalLockedRewards`) - no currency moves here, funds must already be
+    /// sitting in the pot via `top_up_reward_pot`. If the pot can't cover it
+    /// yet, the call is rejected outright (nothing is recorded) rather than
+    /// left half-applied; top up the pot and call this again.
+    pub(crate) fn do_set_reward_amount(
+        period: RewardPeriodIndex,
+        amount: BalanceOf<T>,
+    ) -> DispatchResult {
+        ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+
+        let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
+        ensure!(pot_info.funding_failed, Error::<T>::RewardPotAlreadyFunded);
+
+        let already_committed =
+            OutstandingRewardToPay::<T>::get().saturating_add(TotalLockedRewards::<T>::get());
+        ensure!(
+            Self::reward_pot_balance() >= already_committed.saturating_add(amount),
+            Error::<T>::InsufficientPotBalance
+        );
+
+        pot_info.total_reward = amount;
+        pot_info.funding_failed = false;
+        RewardPot::<T>::insert(period, pot_info);
+        OutstandingRewardToPay::<T>::mutate(|outstanding| {
+            *outstanding = outstanding.saturating_add(amount);
+        });
+
+        Self::deposit_event(Event::RewardAmountSet { period, amount });
+        Ok(())
+    }
 }

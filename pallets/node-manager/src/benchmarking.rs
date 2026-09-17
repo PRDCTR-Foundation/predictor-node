@@ -56,7 +56,7 @@ fn create_heartbeat<T: Config>(node: NodeId<T>, reward_period_index: RewardPerio
 }
 
 fn fund_reward_pot<T: Config>() {
-    let reward_amount = NextRewardAmountPerPeriod::<T>::get() * 2000u32.into();
+    let reward_amount: BalanceOf<T> = 2_000_000_000u32.into();
     let reward_pot_address = Pallet::<T>::compute_reward_account_id();
     T::Currency::make_free_balance_be(&reward_pot_address, reward_amount);
 }
@@ -162,13 +162,28 @@ benchmarks! {
         assert!(<NextHeartbeatPeriod<T>>::get() == new_heartbeat);
     }
 
-    set_next_reward_amount {
-        let current_amount = <NextRewardAmountPerPeriod<T>>::get();
-        let new_amount = current_amount + 1u32.into();
+    // Worst case: a period awaiting funding (as `on_initialize` always
+    // leaves the one it just closed) gets funded from the treasury.
+    set_reward_amount {
+        let reward_period = <RewardPeriod<T>>::get();
+        let period_index = reward_period.current;
+        let new_amount: BalanceOf<T> = 1_000_000u32.into();
+        fund_reward_pot::<T>();
+        <RewardPot<T>>::insert(
+            period_index,
+            RewardPotInfo::<BalanceOf<T>>::new(
+                BalanceOf::<T>::zero(),
+                reward_period.uptime_threshold,
+                Pallet::<T>::time_now_sec(),
+                true,
+            ),
+        );
 
-    }: set_next_reward_amount(RawOrigin::Root, new_amount)
+    }: set_reward_amount(RawOrigin::Root, period_index, new_amount)
     verify {
-        assert!(<NextRewardAmountPerPeriod<T>>::get() == new_amount);
+        let pot_info = <RewardPot<T>>::get(period_index).expect("pot must exist");
+        assert_eq!(pot_info.total_reward, new_amount);
+        assert!(!pot_info.funding_failed);
     }
 
     set_admin_config_reward_enabled {
@@ -202,8 +217,7 @@ benchmarks! {
         assert_last_event::<T>(Event::NewRewardPeriodStarted {
             reward_period_index: new_reward_period_index,
             reward_period_length: reward_period.length,
-            uptime_threshold: new_reward_period.uptime_threshold,
-            previous_period_reward: reward_period.reward_amount}.into());
+            uptime_threshold: new_reward_period.uptime_threshold}.into());
     }
 
     on_initialise_no_reward_period {
@@ -304,7 +318,6 @@ benchmarks! {
     // Worst-case cost of paying one node in the `on_idle` drain: owner lookup,
     // reward transfer from the pot, and the `RewardPaid` event.
     pay_one_node {
-        <NextRewardAmountPerPeriod<T>>::put(BalanceOf::<T>::from(1_000_000u32));
         enable_rewards::<T>();
         fund_reward_pot::<T>();
         // Expired lock window (zero penalty) so the pay path takes the direct
@@ -321,7 +334,7 @@ benchmarks! {
 
         let uptime_info = <NodeUptime<T>>::get(period, &node).expect("uptime recorded");
         let total_weight = <TotalUptime<T>>::get(period).total_weight;
-        let reward_amount = <NextRewardAmountPerPeriod<T>>::get();
+        let reward_amount: BalanceOf<T> = 1_000_000u32.into();
         let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
             reward_amount,
             reward_period.uptime_threshold,

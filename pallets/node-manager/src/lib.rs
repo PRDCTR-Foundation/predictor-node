@@ -43,6 +43,7 @@ pub mod types;
 use crate::types::*;
 pub mod default_weights;
 pub use default_weights::WeightInfo;
+pub mod migrations;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
@@ -177,10 +178,6 @@ pub mod pallet {
     #[pallet::storage]
     pub type NextRewardPeriodLength<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-    /// Reward amount for the next reward period
-    #[pallet::storage]
-    pub type NextRewardAmountPerPeriod<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
-
     /// Reward snapshots by period
     #[pallet::storage]
     pub(super) type RewardPot<T: Config> = StorageMap<
@@ -199,7 +196,7 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn current_reward_period)]
     pub(super) type RewardPeriod<T: Config> =
-        StorageValue<_, RewardPeriodInfo<BlockNumberFor<T>, BalanceOf<T>>, ValueQuery>;
+        StorageValue<_, RewardPeriodInfo<BlockNumberFor<T>>, ValueQuery>;
 
     /// Oldest unpaid reward period
     #[pallet::storage]
@@ -274,7 +271,6 @@ pub mod pallet {
         pub max_batch_size: u32,
         pub reward_period: u32,
         pub heartbeat_period: u32,
-        pub reward_amount_per_period: BalanceOf<T>,
         /// Unix-seconds anchor of the global reward-lock window. `None`
         /// leaves the schedule unset (payouts lock, withdrawals blocked,
         /// until root configures it).
@@ -292,7 +288,6 @@ pub mod pallet {
                 max_batch_size: 1,
                 reward_period: 2,
                 heartbeat_period: 1,
-                reward_amount_per_period: Default::default(),
                 lock_schedule_start: None,
                 lock_initial_penalty_percent: 52,
                 forfeiture_destination: None,
@@ -315,22 +310,19 @@ pub mod pallet {
             let default_threshold = Pallet::<T>::get_default_threshold();
 
             NextRewardPeriodLength::<T>::set(self.reward_period);
-            NextRewardAmountPerPeriod::<T>::set(self.reward_amount_per_period);
             MaxBatchSize::<T>::set(self.max_batch_size);
             NextHeartbeatPeriod::<T>::set(self.heartbeat_period);
             MinUptimeThreshold::<T>::set(Some(default_threshold));
 
             let uptime_threshold =
                 Pallet::<T>::calculate_uptime_threshold(self.reward_period, self.heartbeat_period);
-            let reward_period: RewardPeriodInfo<BlockNumberFor<T>, BalanceOf<T>> =
-                RewardPeriodInfo::new(
-                    0u64,
-                    0u32.into(),
-                    self.reward_period,
-                    self.heartbeat_period,
-                    uptime_threshold,
-                    self.reward_amount_per_period,
-                );
+            let reward_period: RewardPeriodInfo<BlockNumberFor<T>> = RewardPeriodInfo::new(
+                0u64,
+                0u32.into(),
+                self.reward_period,
+                self.heartbeat_period,
+                uptime_threshold,
+            );
 
             <RewardPeriod<T>>::put(reward_period);
             OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
@@ -364,12 +356,11 @@ pub mod pallet {
             old_reward_period_length: u32,
             new_reward_period_length: u32,
         },
-        /// New reward period started
+        /// New reward period started.
         NewRewardPeriodStarted {
             reward_period_index: RewardPeriodIndex,
             reward_period_length: u32,
             uptime_threshold: u32,
-            previous_period_reward: BalanceOf<T>,
         },
         /// Reward payout completed
         RewardPayoutCompleted { reward_period_index: RewardPeriodIndex },
@@ -394,8 +385,6 @@ pub mod pallet {
         NextHeartbeatPeriodSet { new_heartbeat_period: u32 },
         /// Heartbeat received
         HeartbeatReceived { reward_period_index: RewardPeriodIndex, node: NodeId<T> },
-        /// Reward amount per period set
-        NextRewardAmountPerPeriodSet { new_amount: BalanceOf<T> },
         /// Reward payment toggled
         RewardEnabledSet { enabled: bool },
         /// Min uptime threshold set
@@ -416,14 +405,10 @@ pub mod pallet {
         },
         /// Signing key updated
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
-        /// Reward pot funded for a period (treasury transfer succeeded)
-        RewardPotFunded { period: RewardPeriodIndex, amount: BalanceOf<T> },
-        /// Reward pot funding failed at rollover; period is recoverable via top_up_reward_pot
-        RewardPotFundingFailed {
-            period: RewardPeriodIndex,
-            requested_amount: BalanceOf<T>,
-            reason: DispatchError,
-        },
+        /// Treasury funds moved into the reward pot's balance
+        RewardPotToppedUp { amount: BalanceOf<T> },
+        /// `period`'s reward-distribution total recorded
+        RewardAmountSet { period: RewardPeriodIndex, amount: BalanceOf<T> },
         /// A reward accrued into `LockedRewards` instead of free balance
         /// (the global lock window is active or not yet configured).
         RewardLocked {
@@ -519,12 +504,12 @@ pub mod pallet {
         BalanceUnderflow,
         /// Reward pot snapshot not found
         RewardPotNotFound,
-        /// Reward amount per period must be greater than zero
-        NextRewardAmountPerPeriodZero,
         /// Reward pot already funded for the given period
         RewardPotAlreadyFunded,
         /// Treasury could not supply the requested amount
         TreasuryUnderfunded,
+        /// The reward pot's current balance is insufficient
+        InsufficientPotBalance,
         /// `proof.signer` does not resolve to a registered node
         ProverNotRegistered,
         /// A node in the batch is not registered or not owned by the prover
@@ -756,23 +741,20 @@ pub mod pallet {
             }
         }
 
-        /// Registrar or root: set the reward amount for the next reward
-        /// period.
+        /// Registrar or root: set the reward amount for a reward period.
         #[pallet::call_index(2)]
-        #[pallet::weight(<T as Config>::WeightInfo::set_next_reward_amount())]
-        pub fn set_next_reward_amount(
+        #[pallet::weight(<T as Config>::WeightInfo::set_reward_amount())]
+        pub fn set_reward_amount(
             origin: OriginFor<T>,
+            period_index: RewardPeriodIndex,
             amount: BalanceOf<T>,
         ) -> DispatchResult {
             if let Some(who) = ensure_signed_or_root(origin)? {
                 let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
                 ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
             }
-            ensure!(amount > BalanceOf::<T>::zero(), Error::<T>::NextRewardAmountPerPeriodZero);
 
-            <NextRewardAmountPerPeriod<T>>::put(amount);
-            Self::deposit_event(Event::NextRewardAmountPerPeriodSet { new_amount: amount });
-            Ok(())
+            Self::do_set_reward_amount(period_index, amount)
         }
 
         /// Offchain call: Submit heartbeat to show node is still alive
@@ -884,39 +866,15 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Root: top up the reward pot for a period whose rollover funding
-        /// failed. The period's `RewardPotInfo` must exist with
-        /// `funding_failed == true` (i.e. produced by a failed rollover
-        /// transfer); a legitimately-zero funded period is rejected.
-        /// Pulls `amount` from `TreasurySource` into the reward pot account
-        /// and bumps `OutstandingRewardToPay`.
+        /// Root: move `amount` from `T::TreasurySource` into the reward
+        /// pot's balance. Not tied to any period - it just makes funds
+        /// available for a later `set_reward_amount` to allocate. See
+        /// `Pallet::do_top_up_reward_pot`.
         #[pallet::call_index(6)]
         #[pallet::weight(<T as Config>::WeightInfo::top_up_reward_pot())]
-        pub fn top_up_reward_pot(
-            origin: OriginFor<T>,
-            period: RewardPeriodIndex,
-            amount: BalanceOf<T>,
-        ) -> DispatchResult {
+        pub fn top_up_reward_pot(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResult {
             ensure_root(origin)?;
-            ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
-
-            let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
-            ensure!(pot_info.funding_failed, Error::<T>::RewardPotAlreadyFunded);
-
-            let treasury = T::TreasurySource::get();
-            let pot = Self::compute_reward_account_id();
-            T::Currency::transfer(&treasury, &pot, amount, ExistenceRequirement::KeepAlive)
-                .map_err(|_| Error::<T>::TreasuryUnderfunded)?;
-
-            pot_info.total_reward = amount;
-            pot_info.funding_failed = false;
-            RewardPot::<T>::insert(period, pot_info);
-            OutstandingRewardToPay::<T>::mutate(|outstanding| {
-                *outstanding = outstanding.saturating_add(amount);
-            });
-
-            Self::deposit_event(Event::RewardPotFunded { period, amount });
-            Ok(())
+            Self::do_top_up_reward_pot(amount)
         }
 
         /// Aggregate heartbeat: a single prover node signs a batch of node
@@ -1115,7 +1073,6 @@ pub mod pallet {
 
             let previous_index = reward_period.current;
             let previous_uptime_threshold = reward_period.uptime_threshold;
-            let reward_amount = reward_period.reward_amount;
 
             // We want to avoid unnecessary reads, so we perform this check and exit early
             let next_reward_period_length = NextRewardPeriodLength::<T>::get();
@@ -1125,7 +1082,6 @@ pub mod pallet {
                     .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(2))
             }
 
-            let next_reward_amount = NextRewardAmountPerPeriod::<T>::get();
             let next_uptime_threshold =
                 Self::calculate_uptime_threshold(next_reward_period_length, next_heartbeat_period);
 
@@ -1134,61 +1090,18 @@ pub mod pallet {
                 next_reward_period_length,
                 next_heartbeat_period,
                 next_uptime_threshold,
-                next_reward_amount,
             );
             RewardPeriod::<T>::put(next_reward_period);
 
-            // Fund the previous period's reward pot synchronously from the
-            // treasury source. The pot account is recorded either way so the
-            // period is recoverable via `top_up_reward_pot` if the transfer
-            // fails (treasury underfunded, ED violation, etc.). If the period
-            // turns out to have no distributable uptime, the funds are
-            // reclaimed back to the treasury when the drain skips it (see
-            // `drain_outstanding_payouts`), so they are never stranded.
-            let treasury = T::TreasurySource::get();
-            let pot = Self::compute_reward_account_id();
-            let (funded_amount, funding_failed) = match T::Currency::transfer(
-                &treasury,
-                &pot,
-                reward_amount,
-                ExistenceRequirement::KeepAlive,
-            ) {
-                Ok(()) => {
-                    OutstandingRewardToPay::<T>::mutate(|outstanding| {
-                        *outstanding = outstanding.saturating_add(reward_amount);
-                    });
-                    Self::deposit_event(Event::RewardPotFunded {
-                        period: previous_index,
-                        amount: reward_amount,
-                    });
-                    (reward_amount, false)
-                },
-                Err(reason) => {
-                    Self::deposit_event(Event::RewardPotFundingFailed {
-                        period: previous_index,
-                        requested_amount: reward_amount,
-                        reason,
-                    });
-                    // A genuine funding failure only happens when a non-zero
-                    // reward could not be transferred. A zero `reward_amount`
-                    // transfers trivially via the `Ok` arm, so reaching here
-                    // with a non-zero requested amount marks the period as
-                    // awaiting recovery.
-                    (BalanceOf::<T>::zero(), !reward_amount.is_zero())
-                },
-            };
-
-            // Always record the period snapshot. On funding failure the entry
-            // carries `total_reward = 0` and `funding_failed = true`, so the
-            // drain leaves it recoverable and `top_up_reward_pot` can later
-            // replace it with the actual funded amount.
+            // The period that just closed (`previous_index`) starts out
+            // unfunded. `set_reward_amount` must be called to set the payout
             <RewardPot<T>>::insert(
                 previous_index,
                 RewardPotInfo::<BalanceOf<T>>::new(
-                    funded_amount,
+                    BalanceOf::<T>::zero(),
                     previous_uptime_threshold,
                     Self::time_now_sec(),
-                    funding_failed,
+                    true,
                 ),
             );
 
@@ -1196,7 +1109,6 @@ pub mod pallet {
                 reward_period_index: next_reward_period.current,
                 reward_period_length: next_reward_period.length,
                 uptime_threshold: next_reward_period.uptime_threshold,
-                previous_period_reward: reward_amount,
             });
 
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
