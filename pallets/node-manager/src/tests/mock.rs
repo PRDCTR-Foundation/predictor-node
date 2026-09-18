@@ -89,7 +89,7 @@ pub fn treasury_account() -> AccountId {
 }
 
 /// Default treasury balance available in mock genesis (covers thousands of
-/// rollovers at the default reward_amount_per_period).
+/// period fundings via `set_reward_amount`/`top_up_reward_pot`).
 pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * PRD;
 
 impl Config for TestRuntime {
@@ -255,7 +255,6 @@ impl ExtBuilder {
             reward_period: 200u32,
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
-            reward_amount_per_period: 20 * PRD,
             ..Default::default()
         }
         .assimilate_storage(&mut self.storage);

@@ -19,7 +19,7 @@ impl Context {
     fn new(num_of_nodes: u8) -> Self {
         let registrar = TestAccount::new([1u8; 32]).account_id();
         let owner = TestAccount::new([209u8; 32]).account_id();
-        let reward_amount: BalanceOf<TestRuntime> = <NextRewardAmountPerPeriod<TestRuntime>>::get();
+        let reward_amount: BalanceOf<TestRuntime> = 20 * PRD;
 
         Balances::make_free_balance_be(
             &NodeManager::compute_reward_account_id(),

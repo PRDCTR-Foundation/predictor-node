@@ -14,8 +14,10 @@ pub type RewardPeriodIndex = u64;
 pub const SECONDS_PER_WEEK: Duration = 7 * 24 * 60 * 60;
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-/// The current era index and transition information
-pub struct RewardPeriodInfo<BlockNumber, Balance> {
+/// The current era index and transition information. Carries no reward
+/// amount - a period's amount is only ever decided after it ends, via
+/// `set_reward_amount`/`top_up_reward_pot` funding its `RewardPot` entry.
+pub struct RewardPeriodInfo<BlockNumber> {
     /// Current era index
     pub current: RewardPeriodIndex,
     /// The first block of the current era
@@ -26,8 +28,6 @@ pub struct RewardPeriodInfo<BlockNumber, Balance> {
     pub heartbeat_period: u32,
     /// The minimum number of uptime reports required to earn full reward
     pub uptime_threshold: u32,
-    // Total reward amount for the period
-    pub reward_amount: Balance,
 }
 
 impl<
@@ -37,8 +37,7 @@ impl<
             + From<u32>
             + PartialOrd
             + Saturating,
-        Balance: Copy,
-    > RewardPeriodInfo<B, Balance>
+    > RewardPeriodInfo<B>
 {
     pub fn new(
         current: RewardPeriodIndex,
@@ -46,16 +45,8 @@ impl<
         length: u32,
         heartbeat_period: u32,
         uptime_threshold: u32,
-        reward_amount: Balance,
     ) -> Self {
-        RewardPeriodInfo {
-            current,
-            first,
-            length,
-            heartbeat_period,
-            uptime_threshold,
-            reward_amount,
-        }
+        RewardPeriodInfo { current, first, length, heartbeat_period, uptime_threshold }
     }
 
     /// Check if the reward period should be updated
@@ -70,11 +61,10 @@ impl<
         length: u32,
         heartbeat_period: u32,
         uptime_threshold: u32,
-        reward_amount: Balance,
     ) -> Self {
         let current = self.current.saturating_add(1u64);
         let first = now;
-        Self { current, first, length, heartbeat_period, uptime_threshold, reward_amount }
+        Self { current, first, length, heartbeat_period, uptime_threshold }
     }
 }
 
@@ -85,11 +75,10 @@ impl<
             + From<u32>
             + PartialOrd
             + Saturating,
-        Balance: Default + Copy,
-    > Default for RewardPeriodInfo<B, Balance>
+    > Default for RewardPeriodInfo<B>
 {
-    fn default() -> RewardPeriodInfo<B, Balance> {
-        RewardPeriodInfo::new(0u64, 0u32.into(), 20u32, 10u32, u32::MAX, Default::default())
+    fn default() -> RewardPeriodInfo<B> {
+        RewardPeriodInfo::new(0u64, 0u32.into(), 20u32, 10u32, u32::MAX)
     }
 }
 
