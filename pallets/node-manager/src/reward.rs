@@ -15,7 +15,6 @@ impl<T: Config> Pallet<T> {
         uptime_info: UptimeInfo<BlockNumberFor<T>>,
         _node_info: &NodeInfo<T::SignerId, T::AccountId>,
         uptime_threshold: u32,
-        _reward_period_end_time: Duration,
     ) -> u128 {
         let actual_uptime = uptime_info.count;
         let weight = uptime_info.weight;
@@ -146,13 +145,8 @@ impl<T: Config> Pallet<T> {
                 return Err(())
             },
         };
-        let weight = Self::calculate_node_weight(
-            &node,
-            uptime_info,
-            &node_info,
-            pot_info.uptime_threshold,
-            pot_info.reward_end_time,
-        );
+        let weight =
+            Self::calculate_node_weight(&node, uptime_info, &node_info, pot_info.uptime_threshold);
         let (amount, percentage) =
             match Self::calculate_reward(weight, total_weight, &pot_info.total_reward) {
                 Ok(x) => x,
@@ -212,34 +206,17 @@ impl<T: Config> Pallet<T> {
                     continue
                 },
             };
-            if pot_info.funding_failed {
-                // The rollover treasury transfer for this period failed, so it
-                // is recorded with `total_reward == 0` and awaits recovery via
-                // `top_up_reward_pot`. While the period is still within the
-                // bounded recovery window, leave the snapshot in place and do
-                // NOT advance the cursor past it as if paid - otherwise the
-                // documented recovery would be impossible. Stop the drain here
-                // (rather than spinning on an unadvanceable period); it resumes
-                // automatically once a top-up funds the period.
-                //
-                // Once the period's age exceeds the window, abandon it: a
-                // recovery may never arrive, and an indefinite head-of-line
-                // block would freeze the entire payout stream behind one
-                // unfunded period. Nothing was ever funded for it
-                // (`total_reward == 0`), so there is nothing to reclaim - just
-                // complete it so the cursor advances and later periods pay out.
+            if !pot_info.funded {
+                // No amount has been set yet, so nothing is paid and the cursor stays put; the
+                // drain resumes once `set_reward_amount` funds the period. An unfunded period
+                // older than `MaxFailedFundingRecoveryPeriods` is abandoned instead, so it
+                // cannot block later periods forever.
                 let age = current.saturating_sub(period);
                 if age <= T::MaxFailedFundingRecoveryPeriods::get() {
                     break
                 }
-                // Abandon: nodes may have recorded heartbeats into
-                // `NodeUptime[period]` before the rollover transfer failed, so
-                // clear those entries in weight-bounded batches (a one-shot
-                // `clear_prefix` could blow the per-block weight budget at the
-                // 30k-node cap) and only complete the period once they are
-                // fully drained - honouring the complete-only-when-empty
-                // invariant. Nothing was funded (`total_reward == 0`), so the
-                // entries are removed without any payment.
+                // Abandon: clear the period's `NodeUptime` entries in weight-bounded batches
+                // and complete the period once they are drained. Nothing is paid.
                 match Self::drain_period_in_batches(
                     period,
                     remaining_weight,
@@ -258,19 +235,20 @@ impl<T: Config> Pallet<T> {
                     },
                 }
             }
+            // No rewards are paid while the amount can still be updated.
+            if pot_info.update_window_open(Self::time_now_sec()) {
+                break
+            }
             if pot_info.total_reward.is_zero() {
-                // Legitimately zero-reward period (funded successfully with a
-                // zero amount): nothing to distribute and nothing to reclaim.
+                // Funded with a zero amount: nothing to distribute or reclaim.
                 Self::complete_reward_payout(period);
                 used = used.saturating_add(per_iter);
                 continue
             }
             let total_uptime = TotalUptime::<T>::get(period);
             if total_uptime.total_weight == 0u128 {
-                // No reportable uptime this period - nothing to distribute. The
-                // pot was funded for this period at rollover, so reclaim those
-                // funds back to the treasury instead of stranding them in the
-                // pot, then advance.
+                // No reportable uptime: nothing to distribute. Return the period's
+                // amount to the treasury instead of stranding it in the pot, then advance.
                 Self::reclaim_undistributed_reward(period, pot_info.total_reward);
                 Self::complete_reward_payout(period);
                 used = used.saturating_add(per_iter);
@@ -319,8 +297,8 @@ impl<T: Config> Pallet<T> {
     /// Advances the cursor via `complete_reward_payout` only once every entry
     /// has been drained (across as many `on_idle` calls as needed); otherwise
     /// records a fresh `LastPaidPointer` so the next call resumes where this one
-    /// stopped. Shared by the normal pay path and the failed-funding
-    /// abandonment path so both honour the complete-only-when-empty invariant.
+    /// stopped. Shared by the normal pay path and the unfunded-period abandonment
+    /// path so both complete a period only once it is empty.
     /// Returns `Ok(true)` when the period is fully drained, `Ok(false)` when
     /// stopped early on the weight/batch budget, and `Err(())` on a
     /// pointer-resolution failure (the caller should complete the period).
@@ -368,12 +346,11 @@ impl<T: Config> Pallet<T> {
 
         Self::remove_paid_nodes(period, &drained_nodes);
         if iterator_exhausted {
-            // Completing a period with no drained entries (e.g. an empty
-            // failed-funding abandonment) still does real storage work but
-            // charged no `per_iter` in the loop above; charge one so the outer
-            // loop's weight/batch guards bound how many empty periods complete
-            // per block. The outer loop only enters here with at least one
-            // `per_iter` of budget left, so progress is still guaranteed.
+            // Completing a period with no drained entries (e.g. an empty abandoned
+            // period) still does storage work but charged no `per_iter` above; charge
+            // one so the outer loop's guards bound how many empty periods complete per
+            // block. The outer loop only enters here with at least one `per_iter` of
+            // budget left, so progress is still guaranteed.
             if drained_nodes.is_empty() {
                 *used = used.saturating_add(per_iter);
             }
@@ -395,24 +372,19 @@ impl<T: Config> Pallet<T> {
         }
     }
 
-    /// Return a non-distributable period's funded reward from the pot to the
-    /// treasury source. Called when the drain skips a period that was funded at
-    /// rollover but has no reportable uptime, so the funds are recycled instead
-    /// of being orphaned in the pot. Best-effort: if the transfer fails the
-    /// funds remain in the pot and `OutstandingRewardToPay` is still cleared by
-    /// `complete_reward_payout`, leaving the pot's surplus reclaimable by a
-    /// later top-up/admin action rather than blocking the drain.
+    /// Return a funded period's reward from the pot to the treasury when the
+    /// period has no reportable uptime. Best-effort: if the transfer fails the
+    /// funds stay in the pot, `OutstandingRewardToPay` is still cleared by
+    /// `complete_reward_payout`, and the drain is not blocked.
     pub fn reclaim_undistributed_reward(period_index: RewardPeriodIndex, amount: BalanceOf<T>) {
         if amount.is_zero() {
             return
         }
         let pot = Self::compute_reward_account_id();
         let treasury = T::TreasurySource::get();
-        // `AllowDeath`: in the earliest periods the reclaimed amount can be the
-        // pot's only balance, so a `KeepAlive` transfer would fail the `>= ED`
-        // check and strand the funds. The pot's genesis provider reference keeps
-        // the account from being reaped, and it is re-funded at the next
-        // rollover, so allowing the balance to reach zero here is safe.
+        // `AllowDeath`: the reclaimed amount can be the pot's only balance, so `KeepAlive`
+        // would fail the `>= ED` check and strand the funds. The pot's genesis provider
+        // reference keeps the account from being reaped, so reaching zero is safe.
         match T::Currency::transfer(&pot, &treasury, amount, ExistenceRequirement::AllowDeath) {
             Ok(()) => {
                 Self::deposit_event(Event::UndistributedRewardReclaimed {
@@ -531,43 +503,43 @@ impl<T: Config> Pallet<T> {
         Ok(())
     }
 
-    /// Record `amount` as `period`'s reward-distribution total, unblocking
-    /// the `on_idle` drain to start paying it out. `period` must have ended
-    /// (`on_initialize` always records it as awaiting an amount,
-    /// `funding_failed: true`, the moment it closes) but not already have
-    /// one - once calculations have started for a period its amount is
-    /// final, so a period with no `RewardPot` entry at all (hasn't ended
-    /// yet, or was already fully paid out and cleaned up) or one that's
-    /// already set (`funding_failed == false`) is rejected.
+    /// Set `amount` (which may be zero) as `period`'s reward total. `period` must have ended
+    /// and still have its `RewardPot` entry.
     ///
-    /// The pot must already hold enough balance to cover `amount` on top of
-    /// everything already promised elsewhere (`OutstandingRewardToPay`,
-    /// `TotalLockedRewards`) - no currency moves here, funds must already be
-    /// sitting in the pot via `top_up_reward_pot`. If the pot can't cover it
-    /// yet, the call is rejected outright (nothing is recorded) rather than
-    /// left half-applied; top up the pot and call this again.
+    /// Allowed while the period is unfunded, or funded and still inside its update window
+    /// (`REWARD_UPDATE_WINDOW_SECS` after it ends). Re-setting a funded amount replaces the
+    /// previous one: `OutstandingRewardToPay` is adjusted by the difference. Rewards are paid
+    /// only once the window has closed.
+    ///
+    /// The pot must already hold `amount` on top of everything else promised
+    /// (`OutstandingRewardToPay` excluding this period's current amount, and
+    /// `TotalLockedRewards`). No currency moves here; fund the pot with `top_up_reward_pot`.
     pub(crate) fn do_set_reward_amount(
         period: RewardPeriodIndex,
         amount: BalanceOf<T>,
     ) -> DispatchResult {
-        ensure!(!amount.is_zero(), Error::<T>::ZeroAmount);
+        ensure!(amount <= T::MaxRewardPerPeriod::get(), Error::<T>::RewardExceedsMax);
 
         let mut pot_info = RewardPot::<T>::get(period).ok_or(Error::<T>::RewardPotNotFound)?;
-        ensure!(pot_info.funding_failed, Error::<T>::RewardPotAlreadyFunded);
+        ensure!(
+            pot_info.can_update_amount(Self::time_now_sec()),
+            Error::<T>::RewardUpdateWindowClosed
+        );
 
+        let previous = pot_info.total_reward;
+        let outstanding_without_period =
+            OutstandingRewardToPay::<T>::get().saturating_sub(previous);
         let already_committed =
-            OutstandingRewardToPay::<T>::get().saturating_add(TotalLockedRewards::<T>::get());
+            outstanding_without_period.saturating_add(TotalLockedRewards::<T>::get());
         ensure!(
             Self::reward_pot_balance() >= already_committed.saturating_add(amount),
             Error::<T>::InsufficientPotBalance
         );
 
         pot_info.total_reward = amount;
-        pot_info.funding_failed = false;
+        pot_info.funded = true;
         RewardPot::<T>::insert(period, pot_info);
-        OutstandingRewardToPay::<T>::mutate(|outstanding| {
-            *outstanding = outstanding.saturating_add(amount);
-        });
+        OutstandingRewardToPay::<T>::put(outstanding_without_period.saturating_add(amount));
 
         Self::deposit_event(Event::RewardAmountSet { period, amount });
         Ok(())

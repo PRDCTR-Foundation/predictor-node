@@ -15,8 +15,8 @@ pub const SECONDS_PER_WEEK: Duration = 7 * 24 * 60 * 60;
 
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 /// The current era index and transition information. Carries no reward
-/// amount - a period's amount is only ever decided after it ends, via
-/// `set_reward_amount`/`top_up_reward_pot` funding its `RewardPot` entry.
+/// amount - a period's amount is set after it ends, via `set_reward_amount`,
+/// which fills in its `RewardPot` entry.
 pub struct RewardPeriodInfo<BlockNumber> {
     /// Current era index
     pub current: RewardPeriodIndex,
@@ -82,19 +82,19 @@ impl<
     }
 }
 
+/// How long after a period ends its reward amount can still be changed, and no rewards are paid.
+pub const REWARD_UPDATE_WINDOW_SECS: Duration = 5 * 60;
+
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 pub struct RewardPotInfo<Balance> {
     /// The total reward to pay out
     pub total_reward: Balance,
     /// The minimum number of uptime reports required to earn full reward
     pub uptime_threshold: u32,
-    /// The last timestamp of the previous reward period, used to calculate genesis bonus
+    /// The timestamp at which the reward period ended
     pub reward_end_time: Duration,
-    /// `true` when the rollover treasury transfer for this period failed, so the
-    /// snapshot exists with `total_reward == 0` and is awaiting recovery via
-    /// `top_up_reward_pot`. Distinguishes a recoverable failed-funding period
-    /// from a legitimately zero-reward period (which the drain may skip).
-    pub funding_failed: bool,
+    /// `true` once `set_reward_amount` has set the amount (which may be zero)
+    pub funded: bool,
 }
 
 impl<Balance: Copy> RewardPotInfo<Balance> {
@@ -102,9 +102,19 @@ impl<Balance: Copy> RewardPotInfo<Balance> {
         total_reward: Balance,
         uptime_threshold: u32,
         reward_end_time: Duration,
-        funding_failed: bool,
+        funded: bool,
     ) -> Self {
-        RewardPotInfo { total_reward, uptime_threshold, reward_end_time, funding_failed }
+        RewardPotInfo { total_reward, uptime_threshold, reward_end_time, funded }
+    }
+
+    /// Whether `now` is still within `REWARD_UPDATE_WINDOW_SECS` of the period's end
+    pub fn update_window_open(&self, now: Duration) -> bool {
+        now < self.reward_end_time.saturating_add(REWARD_UPDATE_WINDOW_SECS)
+    }
+
+    /// An unfunded period can always be set; a funded one only while the window is open.
+    pub fn can_update_amount(&self, now: Duration) -> bool {
+        !self.funded || self.update_window_open(now)
     }
 }
 
@@ -114,7 +124,7 @@ impl<Balance: Copy> RewardPotInfo<Balance> {
 pub struct UptimeInfo<BlockNumber> {
     /// Number of uptime reported
     pub count: u64,
-    /// The weight of the node (including genesis bonus and stake multiplier)
+    /// The weight of the node (heartbeats reported x `HEARTBEAT_BASE_WEIGHT`)
     pub weight: u128,
     /// Block number when the uptime was last reported
     pub last_reported: BlockNumber,

@@ -178,7 +178,7 @@ pub mod pallet {
     #[pallet::storage]
     pub type NextRewardPeriodLength<T: Config> = StorageValue<_, u32, ValueQuery>;
 
-    /// Reward snapshots by period
+    /// Reward amount and state of each ended period. Removed once the period is paid.
     #[pallet::storage]
     pub(super) type RewardPot<T: Config> = StorageMap<
         _,
@@ -407,7 +407,7 @@ pub mod pallet {
         SigningKeyUpdated { owner: T::AccountId, node: NodeId<T> },
         /// Treasury funds moved into the reward pot's balance
         RewardPotToppedUp { amount: BalanceOf<T> },
-        /// `period`'s reward-distribution total recorded
+        /// `period`'s reward amount set or updated
         RewardAmountSet { period: RewardPeriodIndex, amount: BalanceOf<T> },
         /// A reward accrued into `LockedRewards` instead of free balance
         /// (the global lock window is active or not yet configured).
@@ -502,14 +502,16 @@ pub mod pallet {
         BalanceOverflow,
         /// Balance underflow
         BalanceUnderflow,
-        /// Reward pot snapshot not found
+        /// No reward pot entry for the period (not ended yet, or already paid)
         RewardPotNotFound,
-        /// Reward pot already funded for the given period
-        RewardPotAlreadyFunded,
+        /// The period is funded and its update window has closed
+        RewardUpdateWindowClosed,
         /// Treasury could not supply the requested amount
         TreasuryUnderfunded,
         /// The reward pot's current balance is insufficient
         InsufficientPotBalance,
+        /// The reward amount exceeds `MaxRewardPerPeriod`
+        RewardExceedsMax,
         /// `proof.signer` does not resolve to a registered node
         ProverNotRegistered,
         /// A node in the batch is not registered or not owned by the prover
@@ -559,7 +561,8 @@ pub mod pallet {
         /// Reward pot ID
         #[pallet::constant]
         type RewardPotId: Get<PalletId>;
-        /// Source account from which the reward pot is funded at each period rollover
+        /// Treasury account: funds `top_up_reward_pot`, receives reclaimed rewards and, by
+        /// default, forfeited rewards
         type TreasurySource: Get<Self::AccountId>;
         /// Maximum number of nodes covered by a single
         /// `heartbeat_for_owned_nodes` call. Bounds extrinsic weight and
@@ -572,18 +575,16 @@ pub mod pallet {
         /// frees capacity.
         #[pallet::constant]
         type MaxRegisteredNodes: Get<u32>;
-        /// Recovery window, in reward periods, for a period whose rollover
-        /// funding failed (`funding_failed == true`). While such a period's age
-        /// (`current period index - the period`) stays within this window the
-        /// `on_idle` drain leaves it in place so `top_up_reward_pot` can still
-        /// fund it retroactively, head-of-line-blocking the payout stream. Once
-        /// the age exceeds this window the drain abandons the unrecovered period
-        /// (completing it without payout, as nothing was ever funded) so the
-        /// cursor advances and later periods' operators get paid. This bounds
-        /// the maximum payout stall to this many periods rather than an
-        /// indefinite freeze behind one never-recovered period.
+        /// How many reward periods an unfunded period (`funded == false`) blocks the payout
+        /// queue while waiting for `set_reward_amount`. Once its age
+        /// (`current period index - the period`) exceeds this, the `on_idle` drain abandons it
+        /// without payout so later periods can be paid.
         #[pallet::constant]
         type MaxFailedFundingRecoveryPeriods: Get<RewardPeriodIndex>;
+        /// Maximum reward amount that can be set for a single reward period
+        /// via `set_reward_amount`.
+        #[pallet::constant]
+        type MaxRewardPerPeriod: Get<BalanceOf<Self>>;
         /// Signed transaction lifetime in blocks
         #[pallet::constant]
         type SignedTxLifetime: Get<u32>;
@@ -741,7 +742,9 @@ pub mod pallet {
             }
         }
 
-        /// Registrar or root: set the reward amount for a reward period.
+        /// Registrar or root: set the reward amount for an ended reward period. The amount
+        /// can be changed until the period's update window closes; an unfunded period can
+        /// always still be set. See `Pallet::do_set_reward_amount`.
         #[pallet::call_index(2)]
         #[pallet::weight(<T as Config>::WeightInfo::set_reward_amount())]
         pub fn set_reward_amount(
@@ -1093,15 +1096,15 @@ pub mod pallet {
             );
             RewardPeriod::<T>::put(next_reward_period);
 
-            // The period that just closed (`previous_index`) starts out
-            // unfunded. `set_reward_amount` must be called to set the payout
+            // The period that just closed starts out unfunded. Its amount can be set and
+            // changed for `REWARD_UPDATE_WINDOW_SECS` after this point.
             <RewardPot<T>>::insert(
                 previous_index,
                 RewardPotInfo::<BalanceOf<T>>::new(
                     BalanceOf::<T>::zero(),
                     previous_uptime_threshold,
                     Self::time_now_sec(),
-                    true,
+                    false,
                 ),
             );
 
@@ -1114,12 +1117,11 @@ pub mod pallet {
             <T as Config>::WeightInfo::on_initialise_with_new_reward_period()
         }
 
-        /// `on_idle` drain: when block production has remaining weight, walk
-        /// the oldest unpaid reward period and pay nodes one at a time until
-        /// (a) the weight budget is exhausted, (b) the per-block batch cap is
-        /// hit, or (c) the period is fully paid (in which case
-        /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`
-        /// and we may roll into the next period if weight remains).
+        /// `on_idle` drain: walk the oldest unpaid reward period and pay nodes one at
+        /// a time until (a) the weight budget is exhausted, (b) the per-block batch cap
+        /// is hit, or (c) the period is fully paid (`complete_reward_payout` then
+        /// advances `OldestUnpaidRewardPeriodIndex` and the next period may follow).
+        /// A period is only paid once it is funded and its update window has closed.
         fn on_idle(_n: BlockNumberFor<T>, remaining_weight: Weight) -> Weight {
             if !RewardEnabled::<T>::get() {
                 return Weight::zero()

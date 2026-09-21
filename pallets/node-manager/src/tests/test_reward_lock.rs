@@ -74,6 +74,7 @@ fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> Rew
     roll_forward(20);
     assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
     assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period_to_pay, 1_000 * PRD));
+    advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
     period_to_pay
 }
 
@@ -197,6 +198,7 @@ fn locked_rewards_accumulate_across_periods() {
         roll_forward(20);
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
         let after_second = LockedRewards::<TestRuntime>::get(owner);
@@ -419,6 +421,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         roll_forward(20);
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
         let combined = LockedRewards::<TestRuntime>::get(owner);

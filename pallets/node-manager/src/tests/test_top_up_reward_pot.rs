@@ -3,16 +3,6 @@
 //
 // Aventus Node Manager, from https://github.com/AventusDAO/avn-parachain
 // Added for PRDCTR on 2026-07-07.
-// Rewritten for PRDCTR on 2026-09-18: `on_initialize` no longer attempts a
-// treasury transfer at rollover - every period closes into an unfunded
-// `RewardPot` (`funding_failed: true`) regardless of treasury balance.
-// Rewritten again for PRDCTR on 2026-09-19: `top_up_reward_pot` is now a
-// plain, period-agnostic balance top-up (root-only) - it just moves funds
-// from the treasury into the pot's balance, see `Pallet::do_top_up_reward_pot`.
-// Allocating a topped-up balance to a specific period's distribution is
-// `set_reward_amount`'s job, covered in `test_next_reward_amount.rs`. This
-// file focuses on the top-up mechanics themselves and the drain's
-// recovery-window handling of a still-unfunded period.
 
 #![cfg(test)]
 
@@ -169,6 +159,8 @@ fn drain_blocks_on_an_unfunded_period_then_resumes_after_top_up_and_set_amount()
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), reward_amount));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, reward_amount));
 
+        // Rewards resume once the update window closes.
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
         roll_forward(1);
         assert!(
             OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() > 0,

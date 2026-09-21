@@ -25,7 +25,7 @@
 //!     hand-written default is `length: 20, heartbeat_period: 10, uptime_threshold: u32::MAX` - a
 //!     third value that agrees with neither the `GenesisConfig` default nor zero.
 //!   - The reward pot account never gets its provider reference, so on a zero-existential-deposit
-//!     chain the first rollover transfer into it is silently lost.
+//!     chain the first `top_up_reward_pot` transfer into it is silently lost.
 //!   - `LockSchedule` is `None`, which the payout path reads as "locked" (lock-by-default) while
 //!     `withdraw_rewards` rejects with `LockScheduleNotSet`. Rewards would accrue that nobody can
 //!     ever claim until root happens to configure a window.
@@ -166,7 +166,7 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
                 target: "runtime::node-manager",
                 "SeedGenesisOnUpgrade: retired (on-chain version {on_chain:?} > {SEEDED_STORAGE_VERSION}), skipping",
             );
-            return T::DbWeight::get().reads(1);
+            return T::DbWeight::get().reads(1)
         }
 
         if !Self::needs_seeding() {
@@ -179,13 +179,13 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
                     target: "runtime::node-manager",
                     "SeedGenesisOnUpgrade: storage already seeded, converged version {on_chain:?} -> {SEEDED_STORAGE_VERSION}",
                 );
-                return T::DbWeight::get().reads_writes(2, 1);
+                return T::DbWeight::get().reads_writes(2, 1)
             }
             log::info!(
                 target: "runtime::node-manager",
                 "SeedGenesisOnUpgrade: storage already seeded (version {on_chain:?}), skipping",
             );
-            return T::DbWeight::get().reads(2);
+            return T::DbWeight::get().reads(2)
         }
 
         log::info!(
@@ -209,7 +209,7 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
         use genesis_defaults::*;
         // A retired seeder makes no claims about a newer layout.
         if Pallet::<T>::on_chain_storage_version() > StorageVersion::new(SEEDED_STORAGE_VERSION) {
-            return Ok(());
+            return Ok(())
         }
         // After the migration, the pallet must be in a usable state: a non-zero
         // batch size (so the drain rate is > 0) and a reward period that matches

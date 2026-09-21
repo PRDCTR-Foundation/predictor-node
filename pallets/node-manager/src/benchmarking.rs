@@ -162,8 +162,8 @@ benchmarks! {
         assert!(<NextHeartbeatPeriod<T>>::get() == new_heartbeat);
     }
 
-    // Worst case: a period awaiting funding (as `on_initialize` always
-    // leaves the one it just closed) gets funded from the treasury.
+    // Worst case: a period awaiting its amount (as `on_initialize` always
+    // leaves the one it just closed) gets its amount set.
     set_reward_amount {
         let reward_period = <RewardPeriod<T>>::get();
         let period_index = reward_period.current;
@@ -175,7 +175,7 @@ benchmarks! {
                 BalanceOf::<T>::zero(),
                 reward_period.uptime_threshold,
                 Pallet::<T>::time_now_sec(),
-                true,
+                false,
             ),
         );
 
@@ -183,7 +183,7 @@ benchmarks! {
     verify {
         let pot_info = <RewardPot<T>>::get(period_index).expect("pot must exist");
         assert_eq!(pot_info.total_reward, new_amount);
-        assert!(!pot_info.funding_failed);
+        assert!(pot_info.funded);
     }
 
     set_admin_config_reward_enabled {
@@ -339,7 +339,7 @@ benchmarks! {
             reward_amount,
             reward_period.uptime_threshold,
             Pallet::<T>::time_now_sec(),
-            false,
+            true,
         );
     }: {
         let _ = Pallet::<T>::pay_one_node(period, &pot_info, &total_weight, node.clone(), uptime_info);

@@ -48,10 +48,7 @@ fn record_uptime(period: RewardPeriodIndex, node: &AccountId, count: u64) {
 
 /// Configure the chain for fast-rolling reward periods so a single
 /// `roll_forward` triggers `on_initialize` rollover and seeds the period
-/// snapshot we want to drain. Reward amounts are no longer set up front -
-/// each period is topped up then funded via `top_up_reward_pot` +
-/// `set_reward_amount` only once it has actually closed (see
-/// `setup_unpaid_period_with_nodes`).
+/// snapshot we want to drain.
 fn fast_periods() {
     assert_ok!(NodeManager::set_admin_config(
         RawOrigin::Root.into(),
@@ -95,6 +92,7 @@ fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> Rew
     roll_forward(20);
     assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
     assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period_to_pay, 1_000 * PRD));
+    advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
     period_to_pay
 }
 
@@ -242,6 +240,7 @@ fn drain_advances_past_empty_period() {
         roll_forward(20);
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 1, PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let oldest_before = OldestUnpaidRewardPeriodIndex::<TestRuntime>::get();
 
         let budget = per_iter().saturating_mul(10);
@@ -268,6 +267,7 @@ fn drain_reclaims_undistributed_reward_for_empty_period() {
         roll_forward(20); // enter period 2
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 1, 1_000 * PRD)); // fund period 1
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
 
         let p0 = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
         let p1 = RewardPot::<TestRuntime>::get(1).map(|p| p.total_reward).unwrap_or_default();
@@ -384,7 +384,7 @@ fn drain_keeps_failed_funding_within_recovery_window() {
         // recovery window, so the drain must leave it recoverable and not
         // advance the cursor past it.
         OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
-        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, false));
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window);
 
         let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
@@ -412,19 +412,20 @@ fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
 
         // Period 0: failed funding, never recovered.
         OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
-        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, false));
 
         // Period 2: funded successfully with real uptime for one node.
         let node = register_node(registrar, 101, 1, 11);
         let pot = NodeManager::compute_reward_account_id();
         let _ = Balances::deposit_creating(&pot, reward);
-        RewardPot::<TestRuntime>::insert(2, RewardPotInfo::new(reward, 20u32, 0u64, false));
+        RewardPot::<TestRuntime>::insert(2, RewardPotInfo::new(reward, 20u32, 0u64, true));
         OutstandingRewardToPay::<TestRuntime>::put(reward);
         record_uptime(2, &node, 5);
 
         // Push the current period index past period 0 + the recovery window so
         // the unrecovered failed-funding period must be abandoned.
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 2);
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
 
         let owner = TestAccount::new([101u8; 32]).account_id();
         assert_eq!(Balances::free_balance(owner), 0, "owner starts unfunded");
@@ -461,7 +462,7 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         // Period 0: funding failed at rollover, but three nodes had already
         // recorded heartbeats into NodeUptime[0] during the period.
         OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
-        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, false));
         let n1 = TestAccount::new([21u8; 32]).account_id();
         let n2 = TestAccount::new([22u8; 32]).account_id();
         let n3 = TestAccount::new([23u8; 32]).account_id();
@@ -475,16 +476,14 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         let node = register_node(registrar, 101, 1, 11);
         let pot = NodeManager::compute_reward_account_id();
         let _ = Balances::deposit_creating(&pot, reward);
-        RewardPot::<TestRuntime>::insert(
-            window + 1,
-            RewardPotInfo::new(reward, 20u32, 0u64, false),
-        );
+        RewardPot::<TestRuntime>::insert(window + 1, RewardPotInfo::new(reward, 20u32, 0u64, true));
         OutstandingRewardToPay::<TestRuntime>::put(reward);
         record_uptime(window + 1, &node, 5);
 
         // Push the current period past period 0 + the recovery window so the
         // unrecovered failed-funding period must be abandoned.
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 2);
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
 
         // First pass: bound the batch to two entries so the abandonment cleanup
         // is forced to span more than one drain call. The period must NOT be
@@ -546,7 +545,7 @@ fn drain_charges_weight_and_bounds_empty_abandoned_period_completions() {
         // entries, all pushed past the recovery window so they must be abandoned.
         OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
         for p in 0..5u64 {
-            RewardPot::<TestRuntime>::insert(p, RewardPotInfo::new(0u128, 20u32, 0u64, true));
+            RewardPot::<TestRuntime>::insert(p, RewardPotInfo::new(0u128, 20u32, 0u64, false));
         }
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 10);
 
@@ -625,6 +624,7 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
         roll_forward(20);
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
 
         let funded = RewardPot::<TestRuntime>::get(period).unwrap().total_reward;
         let reclaimed =
