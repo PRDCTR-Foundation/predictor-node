@@ -59,10 +59,8 @@ pub trait WeightInfo {
 	fn top_up_reward_pot() -> Weight;
 	fn heartbeat_for_owned_nodes(b: u32, ) -> Weight;
 	fn pay_one_node() -> Weight;
-	fn apply_halving() -> Weight;
 	fn set_admin_config_lock_schedule() -> Weight;
 	fn set_admin_config_forfeiture_destination() -> Weight;
-	fn set_admin_config_halving_enabled() -> Weight;
 	fn set_admin_config_reserve_nodes(b: u32, ) -> Weight;
 	fn withdraw_rewards() -> Weight;
 }
@@ -320,14 +318,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(3_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
-	// Applied-halving path: reads HalvingEnabled + RewardAmountHalvingsApplied +
-	// NextRewardAmountPerPeriod + RewardPeriod; writes NextRewardAmountPerPeriod +
-	// RewardAmountHalvingsApplied; plus one event.
-	fn apply_halving() -> Weight {
-		Weight::from_parts(20_000_000, 0)
-			.saturating_add(T::DbWeight::get().reads(4_u64))
-			.saturating_add(T::DbWeight::get().writes(2_u64))
-	}
 	// One storage write to `LockSchedule` + one event.
 	fn set_admin_config_lock_schedule() -> Weight {
 		Weight::from_parts(15_000_000, 0)
@@ -335,11 +325,6 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	// One storage write to `ForfeitureDestination` + one event.
 	fn set_admin_config_forfeiture_destination() -> Weight {
-		Weight::from_parts(15_000_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1_u64))
-	}
-	// One storage write to `HalvingEnabled` + one event.
-	fn set_admin_config_halving_enabled() -> Weight {
 		Weight::from_parts(15_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -607,20 +592,11 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().reads(3_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}
-	fn apply_halving() -> Weight {
-		Weight::from_parts(20_000_000, 0)
-			.saturating_add(RocksDbWeight::get().reads(4_u64))
-			.saturating_add(RocksDbWeight::get().writes(2_u64))
-	}
 	fn set_admin_config_lock_schedule() -> Weight {
 		Weight::from_parts(15_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 	fn set_admin_config_forfeiture_destination() -> Weight {
-		Weight::from_parts(15_000_000, 0)
-			.saturating_add(RocksDbWeight::get().writes(1_u64))
-	}
-	fn set_admin_config_halving_enabled() -> Weight {
 		Weight::from_parts(15_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
