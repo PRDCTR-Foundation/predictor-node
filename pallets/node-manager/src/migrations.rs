@@ -6,160 +6,71 @@
 
 //! Storage migrations for `pallet-node-manager`.
 //!
-//! # Why this exists
+//! A pallet added to a running chain by `System::set_code` never has its `genesis_build`
+//! executed. Almost everything `genesis_build` writes is now covered by storage defaults
+//! (`MaxBatchSize`, the next period length and heartbeat period, `MinUptimeThreshold`,
+//! `RewardPeriod`), so only two things still need seeding on that path:
 //!
-//! A pallet added to a running chain by `System::set_code` (a forkless upgrade)
-//! never has its `genesis_build` executed - that hook only runs when a chain is
-//! started from a genesis config that includes the pallet. Introduced by
-//! upgrade, every storage item therefore lands on its *type* default rather than
-//! the value `genesis_build` would have written.
+//!   - The reward pot account's provider reference. On a zero-existential-deposit chain a credit to
+//!     a provider-less account does not persist, so the first `top_up_reward_pot` would be lost.
+//!   - `LockSchedule`. Left unset, payouts lock while `withdraw_rewards` rejects with
+//!     `LockScheduleNotSet`, so rewards would accrue unclaimable. `GenesisConfig` leaves it unset
+//!     because a chain spec configures it before anyone can earn. An upgraded chain has no such
+//!     moment, so a live window is anchored at the upgrade instead. Root overrides it via
+//!     `AdminConfig::LockSchedule`.
 //!
-//! For this pallet that is not a cosmetic gap, it is a brick:
-//!
-//!   - `MaxBatchSize` defaults to `0`, so `drain_outstanding_payouts` hits its batch cap
-//!     immediately and pays nobody, ever - accrued rewards never drain.
-//!   - `NextRewardPeriodLength` and `NextHeartbeatPeriod` default to `0`, so `on_initialize` never
-//!     rolls a reward period, and `AdminConfig::NextHeartbeatPeriod` is unsettable (it must be
-//!     strictly below the period length) until root first repairs the period length.
-//!   - `RewardPeriod` (a `ValueQuery` item) resolves to `RewardPeriodInfo::default()`, whose
-//!     hand-written default is `length: 20, heartbeat_period: 10, uptime_threshold: u32::MAX` - a
-//!     third value that agrees with neither the `GenesisConfig` default nor zero.
-//!   - The reward pot account never gets its provider reference, so on a zero-existential-deposit
-//!     chain the first `top_up_reward_pot` transfer into it is silently lost.
-//!   - `LockSchedule` is `None`, which the payout path reads as "locked" (lock-by-default) while
-//!     `withdraw_rewards` rejects with `LockScheduleNotSet`. Rewards would accrue that nobody can
-//!     ever claim until root happens to configure a window.
-//!
-//! This migration seeds exactly what `genesis_build` seeds, so a chain upgraded
-//! into the pallet begins in the same state as one started from genesis with the
-//! `GenesisConfig` defaults. It runs once, gated on the on-chain
-//! `StorageVersion`, and is a no-op on any chain that already ran
-//! `genesis_build` (which leaves the version at whatever the pallet declares).
-//!
-//! Keep the seeded values in lockstep with `GenesisConfig::default()` in
-//! `lib.rs`. The single point of truth for "what a fresh pallet looks like" is
-//! that `Default` impl; this migration mirrors it for the upgrade path.
-//!
-//! One value deliberately diverges: `GenesisConfig` leaves `LockSchedule`
-//! unset, because a chain started from genesis configures the window in its
-//! chain spec before anyone can earn. An upgraded chain has no such moment, so
-//! the migration seeds a live window anchored at the upgrade block rather than
-//! leaving withdrawals bricked. Both paths end in the same lock-by-default
-//! posture; only the upgrade path needs a concrete anchor to get there.
+//! `SeedGenesisOnUpgrade` runs once, gated on the pot account having no provider (the exact
+//! tell-tale of a missing `genesis_build`), and is a no-op on a genesis-started chain.
 
 use crate::{
-    pallet::Config, LockSchedule, LockScheduleInfo, MaxBatchSize, MinUptimeThreshold,
-    NextHeartbeatPeriod, NextRewardPeriodLength, OutstandingRewardToPay, Pallet, RewardPeriod,
-    RewardPeriodInfo,
+    pallet::Config, LockSchedule, LockScheduleInfo, Pallet, DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
 };
 use frame_support::{
     traits::{Get, GetStorageVersion, OnRuntimeUpgrade, StorageVersion},
     weights::Weight,
 };
-use sp_runtime::traits::Zero;
 
-/// Genesis-equivalent defaults for a forkless introduction. These mirror
-/// `GenesisConfig::default()` in `lib.rs` and must be changed together with it.
-mod genesis_defaults {
-    pub const MAX_BATCH_SIZE: u32 = 1;
-    pub const REWARD_PERIOD: u32 = 2;
-    pub const HEARTBEAT_PERIOD: u32 = 1;
-    /// Week-one forfeiture rate; the window's length is implied by the 1%-per-
-    /// week decay (52% -> zero after 52 weeks).
-    pub const LOCK_INITIAL_PENALTY_PERCENT: u32 = 52;
-}
-
-/// The storage version this migration brings the pallet up to. The pallet's
-/// declared `STORAGE_VERSION` is deliberately kept BELOW this number (see its
-/// doc comment in `lib.rs`) - a pallet introduced by `set_code` pre-initialises
-/// its on-chain version to the in-code `STORAGE_VERSION`, so keeping that below
-/// `SEEDED_STORAGE_VERSION` is what lets `needs_seeding`'s data-driven gate
-/// (not a version comparison) decide whether this seeder should run. A chain
-/// that ran `genesis_build` is already seeded, so [`SeedGenesisOnUpgrade`]
-/// leaves its data alone.
+/// The storage version this migration brings the pallet up to. The pallet's declared
+/// `STORAGE_VERSION` is deliberately kept BELOW this number: a pallet introduced by `set_code`
+/// pre-initialises its on-chain version to the in-code one, so the seeding decision is driven by
+/// data, not by a version comparison (see `needs_seeding`).
 ///
-/// Once a future migration moves the on-chain version PAST this number, this
-/// seeder retires permanently - see the version gate in `on_runtime_upgrade`.
-/// If the pallet's declared `STORAGE_VERSION` is ever bumped to or past this
-/// number, a pallet introduced by `set_code` at that point pre-initialises at
-/// that version, so THIS seeder will (correctly, per its retirement contract)
-/// not run - the new version's migration must take over the introduction
-/// seeding.
+/// Once a future migration moves the on-chain version PAST this number, this seeder retires
+/// permanently. If the declared `STORAGE_VERSION` is ever bumped to or past this number, that
+/// version's migration must take over the introduction seeding.
 pub const SEEDED_STORAGE_VERSION: u16 = 1;
 
-/// Seed the storage `genesis_build` would have written, for a pallet introduced
-/// by a forkless upgrade. Idempotent and gated on the on-chain storage version.
+/// Seed what `genesis_build` would have written that storage defaults cannot express, for a
+/// pallet introduced by a forkless upgrade. Idempotent and gated on the on-chain storage version.
 pub struct SeedGenesisOnUpgrade<T>(core::marker::PhantomData<T>);
 
 impl<T: Config> SeedGenesisOnUpgrade<T> {
-    /// The predicate the migration acts on: `MaxBatchSize == 0` is the exact
-    /// tell-tale of a missing `genesis_build`. `MaxBatchSize` is validated to
-    /// `1..=MAX_BATCH_SIZE` whenever it is set (genesis or `set_admin_config`),
-    /// so `0` is only ever the un-seeded state, and never a value an operator
-    /// can produce. That makes this gate both correct and idempotent: after
-    /// seeding it is `1`, so a re-run is a no-op, and a genesis-started chain
-    /// (where it is already `>= 1`) is never touched.
+    /// `genesis_build` always gives the reward pot account a provider reference, and nothing
+    /// else does before the first top-up, so no provider means `genesis_build` never ran. After
+    /// seeding there is one, so a re-run is a no-op and a genesis-started chain is never touched.
     ///
-    /// NB: this deliberately does NOT use a LOWER-bound version gate
-    /// (`on_chain < SEEDED`). A pallet introduced by `set_code` has its
-    /// on-chain storage version pre-initialised to the in-code
-    /// `STORAGE_VERSION` (currently 0, deliberately kept below
-    /// `SEEDED_STORAGE_VERSION` - see that constant's doc comment) - so a
-    /// lower-bound gate would incorrectly treat a freshly-introduced pallet
-    /// as already seeded. That failure is invisible to a mock runtime (where
-    /// the pallet is always present) and only surfaces on a real forkless
-    /// upgrade. The UPPER-bound retirement gate in `on_runtime_upgrade` is
-    /// the only version check that is safe here.
+    /// This deliberately does NOT use a lower-bound version gate (`on_chain < SEEDED`): a pallet
+    /// introduced by `set_code` has its on-chain version pre-initialised to the in-code
+    /// `STORAGE_VERSION`, so such a gate would treat a freshly introduced pallet as already
+    /// seeded. Mock runtimes hide this; only a real forkless upgrade exposes it.
     fn needs_seeding() -> bool {
-        MaxBatchSize::<T>::get() == 0
+        frame_system::Pallet::<T>::providers(&Pallet::<T>::compute_reward_account_id()) == 0
     }
 
     fn seed() {
-        use genesis_defaults::*;
-
-        // Same provider-reference fix genesis_build applies: on a zero-ED chain
-        // a credit to the provider-less pot account would not persist.
         frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
 
-        let default_threshold = Pallet::<T>::get_default_threshold();
-        NextRewardPeriodLength::<T>::set(REWARD_PERIOD);
-        NextHeartbeatPeriod::<T>::set(HEARTBEAT_PERIOD);
-        MaxBatchSize::<T>::set(MAX_BATCH_SIZE);
-        MinUptimeThreshold::<T>::set(Some(default_threshold));
-        OutstandingRewardToPay::<T>::set(Zero::zero());
-
-        let uptime_threshold =
-            Pallet::<T>::calculate_uptime_threshold(REWARD_PERIOD, HEARTBEAT_PERIOD);
-        RewardPeriod::<T>::put(RewardPeriodInfo::new(
-            0u64,
-            Zero::zero(),
-            REWARD_PERIOD,
-            HEARTBEAT_PERIOD,
-            uptime_threshold,
-        ));
-
-        // Anchor the lock window at the upgrade itself. `GenesisConfig` leaves
-        // the schedule unset (`lock_schedule_start: None`), but "unset" is not a
-        // sensible default on the upgrade path: the payout path treats it as
-        // locked while `withdraw_rewards` refuses to run, so rewards would pile
-        // up unclaimable. Seeding the proposal's 52%-decaying-1%-per-week curve
-        // from the upgrade block keeps the lock semantics intended for the T1
-        // migration while leaving the pallet immediately usable. Root overrides
-        // both the anchor and the shape via `AdminConfig::LockSchedule` once the
-        // real Global Start Date is known.
         LockSchedule::<T>::put(LockScheduleInfo::new(
             Pallet::<T>::time_now_sec(),
-            LOCK_INITIAL_PENALTY_PERCENT,
+            DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
         ));
     }
 }
 
 impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
     fn on_runtime_upgrade() -> Weight {
-        // Retirement gate: once a future migration has moved the pallet past
-        // the seeded layout, this seeder must never run again - whatever the
-        // data looks like. This is the only SAFE direction for a version check
-        // here (see `needs_seeding` for why a lower bound is not).
+        // Retirement gate: once a future migration has moved the pallet past the seeded layout,
+        // this seeder must never run again, whatever the data looks like.
         let on_chain = Pallet::<T>::on_chain_storage_version();
         if on_chain > StorageVersion::new(SEEDED_STORAGE_VERSION) {
             log::info!(
@@ -170,9 +81,8 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
         }
 
         if !Self::needs_seeding() {
-            // Already seeded (genesis chain). Converge the version so both
-            // paths land at SEEDED_STORAGE_VERSION: a chain whose genesis ran
-            // on a runtime that still declared version 0 sits below it.
+            // Already seeded (genesis chain). Converge the version so both paths land at
+            // SEEDED_STORAGE_VERSION.
             if on_chain < StorageVersion::new(SEEDED_STORAGE_VERSION) {
                 StorageVersion::new(SEEDED_STORAGE_VERSION).put::<Pallet<T>>();
                 log::info!(
@@ -195,8 +105,8 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
         Self::seed();
         StorageVersion::new(SEEDED_STORAGE_VERSION).put::<Pallet<T>>();
 
-        // ~9 writes + inc_providers + version write, plus version + data reads.
-        T::DbWeight::get().reads_writes(2, 11)
+        // Version + provider reads; provider, lock schedule and version writes.
+        T::DbWeight::get().reads_writes(2, 3)
     }
 
     #[cfg(feature = "try-runtime")]
@@ -206,29 +116,21 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
 
     #[cfg(feature = "try-runtime")]
     fn post_upgrade(_state: sp_std::vec::Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-        use genesis_defaults::*;
         // A retired seeder makes no claims about a newer layout.
         if Pallet::<T>::on_chain_storage_version() > StorageVersion::new(SEEDED_STORAGE_VERSION) {
             return Ok(())
         }
-        // After the migration, the pallet must be in a usable state: a non-zero
-        // batch size (so the drain rate is > 0) and a reward period that matches
-        // the genesis defaults rather than the junk type default of 20.
         frame_support::ensure!(
-            MaxBatchSize::<T>::get() == MAX_BATCH_SIZE,
-            "SeedGenesisOnUpgrade: MaxBatchSize not seeded",
+            !Self::needs_seeding(),
+            "SeedGenesisOnUpgrade: reward pot account has no provider reference",
         );
-        frame_support::ensure!(
-            RewardPeriod::<T>::get().length == REWARD_PERIOD,
-            "SeedGenesisOnUpgrade: RewardPeriod.length not seeded (still the type default?)",
-        );
-        // A seeded window must exist and be well-formed, otherwise payouts
-        // accrue into a lock that `withdraw_rewards` will not open.
+        // A seeded window must exist, otherwise payouts accrue into a lock that
+        // `withdraw_rewards` will not open.
         let schedule = LockSchedule::<T>::get().ok_or(
             "SeedGenesisOnUpgrade: LockSchedule not seeded (withdrawals would be bricked)",
         )?;
         frame_support::ensure!(
-            schedule.initial_penalty_percent == LOCK_INITIAL_PENALTY_PERCENT,
+            schedule.initial_penalty_percent == DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
             "SeedGenesisOnUpgrade: LockSchedule seeded with unexpected parameters",
         );
         frame_support::ensure!(

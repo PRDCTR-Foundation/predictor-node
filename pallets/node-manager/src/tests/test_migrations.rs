@@ -23,64 +23,24 @@ use frame_system::RawOrigin;
 
 type Migration = SeedGenesisOnUpgrade<TestRuntime>;
 
-#[test]
-fn forkless_defaults_are_the_broken_state_the_migration_fixes() {
-    // Documents the bug the migration exists for: without genesis_build, the
-    // pallet is unusable, and RewardPeriod resolves to a third default (20) that
-    // matches neither the GenesisConfig default (2) nor zero.
-    let mut ext = ExtBuilder::build_default().as_externality();
-    ext.execute_with(|| {
-        assert_eq!(MaxBatchSize::<TestRuntime>::get(), 0, "type default is 0");
-        assert_eq!(NextRewardPeriodLength::<TestRuntime>::get(), 0);
-        assert_eq!(
-            RewardPeriod::<TestRuntime>::get().length,
-            20,
-            "ValueQuery resolves to RewardPeriodInfo::default() = 20, not the GenesisConfig 2",
-        );
-        // The brick: with a zero period length, no heartbeat period is settable
-        // (it must be strictly below the period length).
-        assert_noop!(
-            NodeManager::set_admin_config(
-                RawOrigin::Root.into(),
-                AdminConfig::NextHeartbeatPeriod(1)
-            ),
-            Error::<TestRuntime>::NextHeartbeatPeriodInvalid,
-        );
-    });
+fn pot_providers() -> u32 {
+    frame_system::Pallet::<TestRuntime>::providers(&NodeManager::compute_reward_account_id())
 }
 
 #[test]
-fn migration_seeds_genesis_equivalent_storage() {
+fn forkless_defaults_make_the_pallet_usable_without_seeding() {
+    // Without genesis_build the storage defaults alone give a working config, and
+    // `RewardPeriod` agrees with them.
     let mut ext = ExtBuilder::build_default().as_externality();
     ext.execute_with(|| {
-        // The mock ext leaves the version at 0; a real set_code introduction
-        // pre-initialises it to the in-code version (1) instead. The seeder
-        // accepts both (its gate is `<= SEEDED` + the data tell-tale);
-        // migration_gate_is_the_data_not_the_storage_version covers the
-        // pre-initialised variant.
-        assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(0));
-
-        let _ = Migration::on_runtime_upgrade();
-
-        // Matches GenesisConfig::default() in lib.rs.
-        assert_eq!(MaxBatchSize::<TestRuntime>::get(), 1);
-        assert_eq!(NextRewardPeriodLength::<TestRuntime>::get(), 2);
-        assert_eq!(NextHeartbeatPeriod::<TestRuntime>::get(), 1);
-        assert_eq!(RewardPeriod::<TestRuntime>::get().length, 2, "no longer the junk 20");
-        assert!(MinUptimeThreshold::<TestRuntime>::get().is_some());
-        // Version is still bumped for hygiene (marks the pallet as touched), even
-        // though the gate no longer reads it.
-        assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(1));
-    });
-}
-
-#[test]
-fn after_migration_the_pallet_is_usable() {
-    let mut ext = ExtBuilder::build_default().as_externality();
-    ext.execute_with(|| {
-        let _ = Migration::on_runtime_upgrade();
-        // The whole point: the seeded config makes the admin surface usable
-        // again - a longer reward period, then a heartbeat period below it.
+        assert_eq!(MaxBatchSize::<TestRuntime>::get(), DEFAULT_BATCH_SIZE);
+        assert_eq!(NextRewardPeriodLength::<TestRuntime>::get(), DEFAULT_REWARD_PERIOD);
+        assert_eq!(NextHeartbeatPeriod::<TestRuntime>::get(), DEFAULT_HEARTBEAT_PERIOD);
+        assert_eq!(MinUptimeThreshold::<TestRuntime>::get(), DEFAULT_MIN_UPTIME_THRESHOLD);
+        assert!(OutstandingRewardToPay::<TestRuntime>::get().is_zero());
+        let period = RewardPeriod::<TestRuntime>::get();
+        assert_eq!(period.length, DEFAULT_REWARD_PERIOD);
+        assert_eq!(period.heartbeat_period, DEFAULT_HEARTBEAT_PERIOD);
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardPeriodLength(10)
@@ -93,50 +53,54 @@ fn after_migration_the_pallet_is_usable() {
 }
 
 #[test]
-fn migration_gate_is_the_data_not_the_storage_version() {
-    // Regression guard for a real bug: the first cut gated on
-    // `on_chain_storage_version() < 1`, which passed every mock test but SKIPPED
-    // on a real forkless upgrade - a pallet added by `set_code` has its on-chain
-    // version pre-initialised to the in-code STORAGE_VERSION (1), so `1 < 1` is
-    // false. The gate must be the data tell-tale (`MaxBatchSize == 0`) instead.
-    //
-    // This test forces the exact production condition the mock otherwise hides:
-    // version already at the seeded value, but data still unseeded. The migration
-    // MUST still fire.
+fn migration_seeds_what_defaults_cannot_express() {
     let mut ext = ExtBuilder::build_default().as_externality();
     ext.execute_with(|| {
-        StorageVersion::new(SEEDED_STORAGE_VERSION).put::<Pallet<TestRuntime>>();
-        assert_eq!(MaxBatchSize::<TestRuntime>::get(), 0, "still unseeded");
+        // The mock ext leaves the version at 0; a real set_code introduction
+        // pre-initialises it to the in-code version instead. The gate is the data
+        // (no provider on the pot), see `migration_gate_is_the_data_not_the_storage_version`.
+        assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(0));
+        assert_eq!(pot_providers(), 0);
+        assert!(LockSchedule::<TestRuntime>::get().is_none());
 
         let _ = Migration::on_runtime_upgrade();
 
-        assert_eq!(
-            MaxBatchSize::<TestRuntime>::get(),
-            1,
-            "migration skipped because the version was already 1 - the production bug",
-        );
-        assert_eq!(RewardPeriod::<TestRuntime>::get().length, 2);
+        assert_eq!(pot_providers(), 1);
+        assert!(LockSchedule::<TestRuntime>::get().is_some());
+        assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(1));
+    });
+}
+
+#[test]
+fn migration_gate_is_the_data_not_the_storage_version() {
+    // Regression guard for a real bug: gating on `on_chain_storage_version() < 1` passed every
+    // mock test but SKIPPED on a real forkless upgrade, because a pallet added by `set_code` has
+    // its on-chain version pre-initialised to the in-code one. This forces that condition:
+    // version already at the seeded value, data still unseeded. The migration MUST still fire.
+    let mut ext = ExtBuilder::build_default().as_externality();
+    ext.execute_with(|| {
+        StorageVersion::new(SEEDED_STORAGE_VERSION).put::<Pallet<TestRuntime>>();
+        assert_eq!(pot_providers(), 0, "still unseeded");
+
+        let _ = Migration::on_runtime_upgrade();
+
+        assert_eq!(pot_providers(), 1, "migration skipped because the version was already 1");
+        assert!(LockSchedule::<TestRuntime>::get().is_some());
     });
 }
 
 #[test]
 fn migration_retires_once_the_version_moves_past_the_seeded_layout() {
-    // The version check the retirement contract promises: after a future
-    // migration bumps the pallet past SEEDED_STORAGE_VERSION, this seeder must
-    // never fire again - even if the data happens to look unseeded (a future
-    // layout is free to give MaxBatchSize new semantics, including 0).
+    // After a future migration bumps the pallet past SEEDED_STORAGE_VERSION, this seeder must
+    // never fire again, even if the data looks unseeded.
     let mut ext = ExtBuilder::build_default().as_externality();
     ext.execute_with(|| {
         StorageVersion::new(SEEDED_STORAGE_VERSION + 1).put::<Pallet<TestRuntime>>();
-        assert_eq!(MaxBatchSize::<TestRuntime>::get(), 0, "data looks unseeded on purpose");
 
         let _ = Migration::on_runtime_upgrade();
 
-        assert_eq!(
-            MaxBatchSize::<TestRuntime>::get(),
-            0,
-            "retired seeder fired on a newer storage layout",
-        );
+        assert_eq!(pot_providers(), 0, "retired seeder fired on a newer storage layout");
+        assert!(LockSchedule::<TestRuntime>::get().is_none());
         assert_eq!(
             Pallet::<TestRuntime>::on_chain_storage_version(),
             StorageVersion::new(SEEDED_STORAGE_VERSION + 1),
@@ -147,9 +111,8 @@ fn migration_retires_once_the_version_moves_past_the_seeded_layout() {
 
 #[test]
 fn migration_converges_a_version_zero_genesis_chain_without_touching_data() {
-    // A chain whose genesis ran on a runtime that still declared version 0 has
-    // seeded data but sits below SEEDED_STORAGE_VERSION. The seeder must bump
-    // the version and leave the data alone.
+    // A chain whose genesis ran on a runtime that still declared version 0 has seeded data but
+    // sits below SEEDED_STORAGE_VERSION. The seeder must bump the version and leave data alone.
     let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
     ext.execute_with(|| {
         StorageVersion::new(0).put::<Pallet<TestRuntime>>();
@@ -163,6 +126,7 @@ fn migration_converges_a_version_zero_genesis_chain_without_touching_data() {
             "version not converged",
         );
         assert_eq!(MaxBatchSize::<TestRuntime>::get(), 500, "seeder clobbered live data");
+        assert!(LockSchedule::<TestRuntime>::get().is_none(), "genesis left it unset on purpose");
     });
 }
 
@@ -171,32 +135,13 @@ fn migration_is_idempotent() {
     let mut ext = ExtBuilder::build_default().as_externality();
     ext.execute_with(|| {
         let _ = Migration::on_runtime_upgrade();
-        // Mutate a seeded value, then run again: the second pass must NOT clobber
-        // it, because MaxBatchSize is now non-zero so the data gate skips.
-        MaxBatchSize::<TestRuntime>::put(500);
-        let _ = Migration::on_runtime_upgrade();
-        assert_eq!(
-            MaxBatchSize::<TestRuntime>::get(),
-            500,
-            "re-running the migration re-seeded over live data",
-        );
-    });
-}
-
-#[test]
-fn migration_does_not_touch_a_genesis_started_chain() {
-    // A chain that ran genesis_build already has real config and is at the
-    // declared storage version. The migration must be inert.
-    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
-    ext.execute_with(|| {
-        let batch_before = MaxBatchSize::<TestRuntime>::get();
-        let period_before = RewardPeriod::<TestRuntime>::get().length;
-        assert!(batch_before > 0, "genesis_config sets a real batch size");
+        let configured = crate::types::LockScheduleInfo::new(1_234_567, 31);
+        LockSchedule::<TestRuntime>::put(configured);
 
         let _ = Migration::on_runtime_upgrade();
 
-        assert_eq!(MaxBatchSize::<TestRuntime>::get(), batch_before, "genesis data clobbered");
-        assert_eq!(RewardPeriod::<TestRuntime>::get().length, period_before);
+        assert_eq!(pot_providers(), 1, "provider added twice");
+        assert_eq!(LockSchedule::<TestRuntime>::get(), Some(configured));
     });
 }
 
@@ -243,24 +188,5 @@ fn withdrawals_work_after_a_forkless_introduction() {
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
         // Week one of the seeded window: 52% forfeited, 48% to the owner.
         assert_eq!(Balances::free_balance(owner), 48 * PRD);
-    });
-}
-
-#[test]
-fn migration_does_not_clobber_a_configured_lock_window() {
-    // If root already set a real Global Start Date, a re-run must leave it be.
-    let mut ext = ExtBuilder::build_default().as_externality();
-    ext.execute_with(|| {
-        let _ = Migration::on_runtime_upgrade();
-        let configured = crate::types::LockScheduleInfo::new(1_234_567, 31);
-        LockSchedule::<TestRuntime>::put(configured);
-
-        let _ = Migration::on_runtime_upgrade();
-
-        assert_eq!(
-            LockSchedule::<TestRuntime>::get(),
-            Some(configured),
-            "re-running the migration overwrote an operator-configured window",
-        );
     });
 }

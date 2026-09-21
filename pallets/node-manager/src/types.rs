@@ -68,20 +68,6 @@ impl<
     }
 }
 
-impl<
-        B: Copy
-            + sp_std::ops::Add<Output = B>
-            + sp_std::ops::Sub<Output = B>
-            + From<u32>
-            + PartialOrd
-            + Saturating,
-    > Default for RewardPeriodInfo<B>
-{
-    fn default() -> RewardPeriodInfo<B> {
-        RewardPeriodInfo::new(0u64, 0u32.into(), 20u32, 10u32, u32::MAX)
-    }
-}
-
 /// How long after a period ends its reward amount can still be changed, and no rewards are paid.
 pub const REWARD_UPDATE_WINDOW_SECS: Duration = 5 * 60;
 
