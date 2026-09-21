@@ -78,6 +78,7 @@ parameter_types! {
     /// and the "abandoned after the window" branches of the failed-funding
     /// drain handling without rolling thousands of periods.
     pub const MaxFailedFundingRecoveryPeriods: u64 = 5;
+    pub const MaxRewardPerPeriod: u128 = 10_000_000 * PRD;
 }
 
 /// A pseudo-treasury account used as the funding source for the reward pot in
@@ -89,7 +90,7 @@ pub fn treasury_account() -> AccountId {
 }
 
 /// Default treasury balance available in mock genesis (covers thousands of
-/// rollovers at the default reward_amount_per_period).
+/// period fundings via `set_reward_amount`/`top_up_reward_pot`).
 pub const TREASURY_GENESIS_BALANCE: u128 = 1_000_000 * PRD;
 
 impl Config for TestRuntime {
@@ -104,6 +105,7 @@ impl Config for TestRuntime {
     type MaxNodesPerAggregateHeartbeat = MaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = MaxRegisteredNodes;
     type MaxFailedFundingRecoveryPeriods = MaxFailedFundingRecoveryPeriods;
+    type MaxRewardPerPeriod = MaxRewardPerPeriod;
     type TimeProvider = pallet_timestamp::Pallet<TestRuntime>;
     type SignedTxLifetime = ConstU32<64>;
     type WeightInfo = ();
@@ -255,7 +257,6 @@ impl ExtBuilder {
             reward_period: 200u32,
             max_batch_size: 10u32,
             heartbeat_period: 5u32,
-            reward_amount_per_period: 20 * PRD,
             ..Default::default()
         }
         .assimilate_storage(&mut self.storage);
@@ -334,6 +335,11 @@ impl ExtBuilder {
 pub(crate) fn advance_time_weeks(weeks: u64) {
     let now_ms = Timestamp::get();
     Timestamp::set_timestamp(now_ms + weeks * crate::types::SECONDS_PER_WEEK * 1_000);
+}
+
+/// Advance the mock clock by `secs` seconds.
+pub(crate) fn advance_time_secs(secs: u64) {
+    Timestamp::set_timestamp(Timestamp::get() + secs * 1_000);
 }
 
 /// Set the global lock window anchored `weeks_ago` full weeks before the

@@ -55,20 +55,26 @@ fn fast_periods() {
         RawOrigin::Root.into(),
         AdminConfig::NextHeartbeatPeriod(5),
     ));
-    assert_ok!(NodeManager::set_next_reward_amount(RawOrigin::Root.into(), 1_000 * PRD));
     assert_ok!(NodeManager::set_admin_config(RawOrigin::Root.into(), AdminConfig::BatchSize(64),));
 }
 
-/// Cross the genesis period boundary, record uptime for the given nodes in
-/// the new period, then cross that period's boundary so it's snapshot-funded
-/// and drainable. See `test_on_idle_drain.rs` for the period mechanics.
+/// Cross the genesis period boundary, fund period 0 trivially (no uptime
+/// recorded for it, so the drain reclaims and completes it immediately
+/// instead of blocking on an unfunded period), record uptime for the given
+/// nodes in the new period, then cross that period's boundary and fund it so
+/// it's drainable. See `test_on_idle_drain.rs` for the period mechanics.
 fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> RewardPeriodIndex {
     roll_forward(200);
+    assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+    assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
     let period_to_pay = RewardPeriod::<TestRuntime>::get().current;
     for (node, count) in nodes_with_uptime {
         record_uptime(period_to_pay, node, *count);
     }
     roll_forward(20);
+    assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+    assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period_to_pay, 1_000 * PRD));
+    advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
     period_to_pay
 }
 
@@ -185,10 +191,14 @@ fn locked_rewards_accumulate_across_periods() {
         let after_first = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_first > 0);
 
-        // ...and a second period's reward stacks on the same claim.
+        // ...and a second period's reward stacks on the same claim. This
+        // period also needs its own amount configured, once it has ended.
         let period = RewardPeriod::<TestRuntime>::get().current;
         record_uptime(period, &node, 1);
         roll_forward(20);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
         let after_second = LockedRewards::<TestRuntime>::get(owner);
@@ -409,6 +419,9 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         let period = RewardPeriod::<TestRuntime>::get().current;
         record_uptime(period, &node, 1);
         roll_forward(20);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
 
         let combined = LockedRewards::<TestRuntime>::get(owner);

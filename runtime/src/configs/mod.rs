@@ -947,6 +947,8 @@ parameter_types! {
     /// `top_up_reward_pot` before the drain abandons it, so one unfunded period
     /// cannot indefinitely block the payout stream behind it.
     pub const NodeManagerMaxFailedFundingRecoveryPeriods: u64 = 100;
+    /// Maximum reward that can be set for a single reward period.
+    pub const NodeManagerMaxRewardPerPeriod: Balance = 37_500_000 * BASE;
     /// Reward-period rollover funds the reward pot from the TokenManager treasury.
     pub NodeManagerTreasurySource: AccountId =
         pallet_token_manager::Pallet::<Runtime>::compute_treasury_account_id();
@@ -966,6 +968,7 @@ impl pallet_node_manager::Config for Runtime {
     type MaxNodesPerAggregateHeartbeat = NodeManagerMaxNodesPerAggregateHeartbeat;
     type MaxRegisteredNodes = NodeManagerMaxRegisteredNodes;
     type MaxFailedFundingRecoveryPeriods = NodeManagerMaxFailedFundingRecoveryPeriods;
+    type MaxRewardPerPeriod = NodeManagerMaxRewardPerPeriod;
     type SignedTxLifetime = NodeManagerSignedTxLifetime;
     type WeightInfo = pallet_node_manager::default_weights::SubstrateWeight<Runtime>;
 }
