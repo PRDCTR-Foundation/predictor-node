@@ -146,7 +146,7 @@ pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
 ///
 /// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 #[allow(unused_parens)]
-type Migrations = ();
+type Migrations = (pallet_node_manager::migrations::SeedGenesisOnUpgrade<Runtime>,);
 
 /// Executive: handles dispatch to the various modules.
 pub type Executive = frame_executive::Executive<
@@ -305,8 +305,6 @@ mod runtime {
     #[runtime::pallet_index(92)]
     pub type SignedNeoSwaps = pallet_pm_signed_neo_swaps;
 
-    // Feature flags are not supported within runtime macro till version 33.0.1
-    // To enable the pallet, uncomment the two lines below and build with `--features node-manager`.
-    // #[runtime::pallet_index(93)]
-    // pub type NodeManager = pallet_node_manager;
+    #[runtime::pallet_index(93)]
+    pub type NodeManager = pallet_node_manager;
 }

@@ -58,7 +58,6 @@ pub use common_primitives::constants::{
     currency::*, BLOCKS_PER_DAY, BLOCKS_PER_HOUR, BLOCKS_PER_YEAR, MILLISECS_PER_BLOCK,
 };
 
-#[cfg(feature = "node-manager")]
 pub use common_primitives::constants::NODE_MANAGER_PALLET_ID;
 
 use crate::{asset_registry::CustomAssetProcessor, impl_fee_types, BlakeTwo256};
@@ -935,7 +934,6 @@ impl pallet_pm_combinatorial_tokens::Config for Runtime {
     type WeightInfo = pallet_pm_combinatorial_tokens::weights::WeightInfo<Runtime>;
 }
 
-#[cfg(feature = "node-manager")]
 parameter_types! {
     pub const NodeManagerRewardPotId: PalletId = NODE_MANAGER_PALLET_ID;
     pub const NodeManagerSignedTxLifetime: u32 = 64;
@@ -954,7 +952,6 @@ parameter_types! {
         pallet_token_manager::Pallet::<Runtime>::compute_treasury_account_id();
 }
 
-#[cfg(feature = "node-manager")]
 impl pallet_node_manager::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type RuntimeCall = RuntimeCall;
