@@ -100,6 +100,15 @@ pub type MaxNodesToDeregister = ConstU32<MAX_NODES_TO_DEREGISTER>;
 /// Max entries per `AdminConfig::ReserveNodes` call
 pub type MaxReservedNodesPerCall = ConstU32<MAX_RESERVED_NODES_PER_CALL>;
 
+/// Storage defaults, so the pallet works without `genesis_build`. Also used by
+/// `GenesisConfig::default()`.
+pub const DEFAULT_BATCH_SIZE: u32 = 1;
+pub const DEFAULT_REWARD_PERIOD: u32 = 2;
+pub const DEFAULT_HEARTBEAT_PERIOD: u32 = 1;
+pub const DEFAULT_MIN_UPTIME_THRESHOLD: Perbill = Perbill::from_percent(33);
+/// Week-one forfeiture rate. It decays 1% per week, so the lock window lasts 52 weeks.
+pub const DEFAULT_LOCK_INITIAL_PENALTY_PERCENT: u32 = 52;
+
 #[frame_support::pallet]
 pub mod pallet {
     use sp_avn_common::{verify_signature, InnerCallValidator, Proof};
@@ -168,15 +177,18 @@ pub mod pallet {
 
     /// Max nodes paid per batch
     #[pallet::storage]
-    pub type MaxBatchSize<T: Config> = StorageValue<_, u32, ValueQuery>;
+    pub type MaxBatchSize<T: Config> =
+        StorageValue<_, u32, ValueQuery, ConstU32<DEFAULT_BATCH_SIZE>>;
 
     /// Heartbeat period in blocks for the next reward period
     #[pallet::storage]
-    pub type NextHeartbeatPeriod<T: Config> = StorageValue<_, u32, ValueQuery>;
+    pub type NextHeartbeatPeriod<T: Config> =
+        StorageValue<_, u32, ValueQuery, ConstU32<DEFAULT_HEARTBEAT_PERIOD>>;
 
     /// Length of the next reward period in blocks
     #[pallet::storage]
-    pub type NextRewardPeriodLength<T: Config> = StorageValue<_, u32, ValueQuery>;
+    pub type NextRewardPeriodLength<T: Config> =
+        StorageValue<_, u32, ValueQuery, ConstU32<DEFAULT_REWARD_PERIOD>>;
 
     /// Reward amount and state of each ended period. Removed once the period is paid.
     #[pallet::storage]
@@ -188,15 +200,36 @@ pub mod pallet {
         OptionQuery,
     >;
 
+    #[pallet::type_value]
+    pub fn ZeroBalance<T: Config>() -> BalanceOf<T> {
+        BalanceOf::<T>::zero()
+    }
+
     /// Total rewards still to be paid
     #[pallet::storage]
-    pub type OutstandingRewardToPay<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+    pub type OutstandingRewardToPay<T: Config> =
+        StorageValue<_, BalanceOf<T>, ValueQuery, ZeroBalance<T>>;
+
+    /// Period 0 built from the default period length, heartbeat period and uptime threshold.
+    #[pallet::type_value]
+    pub fn DefaultRewardPeriod<T: Config>() -> RewardPeriodInfo<BlockNumberFor<T>> {
+        RewardPeriodInfo::new(
+            0u64,
+            Zero::zero(),
+            DEFAULT_REWARD_PERIOD,
+            DEFAULT_HEARTBEAT_PERIOD,
+            Pallet::<T>::calculate_uptime_threshold(
+                DEFAULT_REWARD_PERIOD,
+                DEFAULT_HEARTBEAT_PERIOD,
+            ),
+        )
+    }
 
     /// Current reward period
     #[pallet::storage]
     #[pallet::getter(fn current_reward_period)]
     pub(super) type RewardPeriod<T: Config> =
-        StorageValue<_, RewardPeriodInfo<BlockNumberFor<T>>, ValueQuery>;
+        StorageValue<_, RewardPeriodInfo<BlockNumberFor<T>>, ValueQuery, DefaultRewardPeriod<T>>;
 
     /// Oldest unpaid reward period
     #[pallet::storage]
@@ -232,9 +265,15 @@ pub mod pallet {
     #[pallet::storage]
     pub(super) type RewardEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+    #[pallet::type_value]
+    pub fn DefaultMinUptimeThreshold() -> Perbill {
+        DEFAULT_MIN_UPTIME_THRESHOLD
+    }
+
     /// Minimum uptime threshold
     #[pallet::storage]
-    pub type MinUptimeThreshold<T: Config> = StorageValue<_, Perbill, OptionQuery>;
+    pub type MinUptimeThreshold<T: Config> =
+        StorageValue<_, Perbill, ValueQuery, DefaultMinUptimeThreshold>;
 
     /// Next node serial number
     #[pallet::storage]
@@ -285,11 +324,11 @@ pub mod pallet {
     impl<T: Config> Default for GenesisConfig<T> {
         fn default() -> Self {
             Self {
-                max_batch_size: 1,
-                reward_period: 2,
-                heartbeat_period: 1,
+                max_batch_size: DEFAULT_BATCH_SIZE,
+                reward_period: DEFAULT_REWARD_PERIOD,
+                heartbeat_period: DEFAULT_HEARTBEAT_PERIOD,
                 lock_schedule_start: None,
-                lock_initial_penalty_percent: 52,
+                lock_initial_penalty_percent: DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
                 forfeiture_destination: None,
             }
         }
@@ -307,12 +346,10 @@ pub mod pallet {
             frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
 
             assert!(self.reward_period > self.heartbeat_period);
-            let default_threshold = Pallet::<T>::get_default_threshold();
 
             NextRewardPeriodLength::<T>::set(self.reward_period);
             MaxBatchSize::<T>::set(self.max_batch_size);
             NextHeartbeatPeriod::<T>::set(self.heartbeat_period);
-            MinUptimeThreshold::<T>::set(Some(default_threshold));
 
             let uptime_threshold =
                 Pallet::<T>::calculate_uptime_threshold(self.reward_period, self.heartbeat_period);
@@ -325,7 +362,6 @@ pub mod pallet {
             );
 
             <RewardPeriod<T>>::put(reward_period);
-            OutstandingRewardToPay::<T>::put(BalanceOf::<T>::zero());
 
             assert!(self.lock_initial_penalty_percent <= 100, "lock penalty must be a percentage");
             if let Some(start) = self.lock_schedule_start {
@@ -1314,7 +1350,7 @@ pub mod pallet {
             reward_period_length: u32,
             heartbeat_period: u32,
         ) -> u32 {
-            let threshold = MinUptimeThreshold::<T>::get().unwrap_or(Self::get_default_threshold());
+            let threshold = MinUptimeThreshold::<T>::get();
 
             let max_heartbeats = reward_period_length.saturating_div(heartbeat_period);
             threshold * max_heartbeats
@@ -1424,10 +1460,6 @@ pub mod pallet {
                 },
                 _ => None,
             }
-        }
-
-        pub fn get_default_threshold() -> Perbill {
-            Perbill::from_percent(33)
         }
 
         /// Insert signing key reverse index. Fails if key already belongs to another node.

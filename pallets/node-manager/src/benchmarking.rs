@@ -202,7 +202,7 @@ benchmarks! {
 
     }: set_admin_config(RawOrigin::Root, config.clone())
     verify {
-        assert!(<MinUptimeThreshold<T>>::get() == Some(new_threshold));
+        assert!(<MinUptimeThreshold<T>>::get() == new_threshold);
     }
 
     on_initialise_with_new_reward_period {

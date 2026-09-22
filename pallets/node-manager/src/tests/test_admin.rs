@@ -283,7 +283,7 @@ mod min_uptime_threshold {
                 AdminConfig::MinUptimeThreshold(new_threshold),
             ));
 
-            assert_eq!(MinUptimeThreshold::<TestRuntime>::get(), Some(new_threshold));
+            assert_eq!(MinUptimeThreshold::<TestRuntime>::get(), new_threshold);
             assert_eq!(RewardPeriod::<TestRuntime>::get().uptime_threshold, current_threshold);
 
             System::assert_last_event(
