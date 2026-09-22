@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.2.1...v1.3.0) (2026-09-22)
+
+
+### Features
+
+* add pallet-node-manager (baseline import) ([#44](https://github.com/PRDCTR-Foundation/predictor-node/issues/44)) ([50a2700](https://github.com/PRDCTR-Foundation/predictor-node/commit/50a270045221ccf119adb659a405a5f28aeef84b))
+* **node-manager:** Award reward periods after expiration ([#100](https://github.com/PRDCTR-Foundation/predictor-node/issues/100)) ([9d5e2b4](https://github.com/PRDCTR-Foundation/predictor-node/commit/9d5e2b426b8bf7e8e3f1b777d0de95d40536c1e2))
+* **node-manager:** reserve nodes for migration ([#98](https://github.com/PRDCTR-Foundation/predictor-node/issues/98)) ([ecf9a0d](https://github.com/PRDCTR-Foundation/predictor-node/commit/ecf9a0dcdad060c5d484f4d1cfc510d3840d2ffd))
+* **runtime:** route native transaction fees to treasury instead of burning them ([#93](https://github.com/PRDCTR-Foundation/predictor-node/issues/93)) ([971c91b](https://github.com/PRDCTR-Foundation/predictor-node/commit/971c91ba149baefc33a1fc513f33d3e2e386d568))
+
 ## [1.2.1](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.2.0...v1.2.1) (2026-08-18)
 
 
