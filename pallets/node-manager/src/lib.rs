@@ -1375,14 +1375,15 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Clamped to at least 1: `MinUptimeThreshold * max_heartbeats` can round down to 0,
+        /// which would cap every node's weight to zero and pay out nothing for a funded period.
         pub(crate) fn calculate_uptime_threshold(
             reward_period_length: u32,
             heartbeat_period: u32,
         ) -> u32 {
             let threshold = MinUptimeThreshold::<T>::get();
-
             let max_heartbeats = reward_period_length.saturating_div(heartbeat_period);
-            threshold * max_heartbeats
+            (threshold * max_heartbeats).max(1)
         }
 
         fn do_register_node(

@@ -41,6 +41,7 @@ fn forkless_defaults_make_the_pallet_usable_without_seeding() {
         let period = RewardPeriod::<TestRuntime>::get();
         assert_eq!(period.length, DEFAULT_REWARD_PERIOD);
         assert_eq!(period.heartbeat_period, DEFAULT_HEARTBEAT_PERIOD);
+        assert_eq!(period.uptime_threshold, 1, "uptime_threshold must never be 0");
         assert_ok!(NodeManager::set_admin_config(
             RawOrigin::Root.into(),
             AdminConfig::NextRewardPeriodLength(10)
