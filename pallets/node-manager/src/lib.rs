@@ -104,7 +104,7 @@ pub type MaxReservedNodesPerCall = ConstU32<MAX_RESERVED_NODES_PER_CALL>;
 
 /// Storage defaults, so the pallet works without `genesis_build`. Also used by
 /// `GenesisConfig::default()`.
-pub const DEFAULT_BATCH_SIZE: u32 = 1;
+pub const DEFAULT_BATCH_SIZE: u32 = 50;
 pub const DEFAULT_REWARD_PERIOD: u32 = 2;
 pub const DEFAULT_HEARTBEAT_PERIOD: u32 = 1;
 pub const DEFAULT_MIN_UPTIME_THRESHOLD: Perbill = Perbill::from_percent(33);
