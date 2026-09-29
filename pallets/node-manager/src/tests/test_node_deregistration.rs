@@ -233,7 +233,7 @@ fn deregistration_decrements_total_uptime_by_exactly_the_removed_nodes() {
 }
 
 #[test]
-fn deregistration_leaves_earlier_period_uptime_untouched() {
+fn deregistration_blocked_until_earlier_period_payouts_complete() {
     let (mut ext, _, _) = ExtBuilder::build_default()
         .with_genesis_config()
         .for_offchain_worker()
@@ -242,27 +242,34 @@ fn deregistration_leaves_earlier_period_uptime_untouched() {
         let context = Context::new(1u8);
         let node = context.registered_nodes[0];
         let earlier_period = <RewardPeriod<TestRuntime>>::get().current;
-        let earlier_uptime = <NodeUptime<TestRuntime>>::get(earlier_period, node).unwrap();
-        let earlier_totals = <TotalUptime<TestRuntime>>::get(earlier_period);
 
-        // Roll past the genesis period (length 200) into the next one.
         roll_forward(200);
         let current_period = <RewardPeriod<TestRuntime>>::get().current;
         assert_ne!(current_period, earlier_period, "expected a period rollover");
         incr_heartbeats(current_period, vec![node], 2);
+
+        assert_noop!(
+            NodeManager::deregister_nodes(
+                RuntimeOrigin::signed(context.registrar),
+                context.owner,
+                BoundedVec::truncate_from(vec![node]),
+            ),
+            Error::<TestRuntime>::RewardPayoutsPending,
+        );
+
+        // Drain the earlier period (funded with zero) so the guard is satisfied.
+        assert_ok!(NodeManager::set_reward_amount(RuntimeOrigin::root(), earlier_period, 0));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+        NodeManager::drain_outstanding_payouts(
+            NodeManager::worst_case_iteration_weight().saturating_mul(10),
+        );
+        assert_eq!(<OldestUnpaidRewardPeriodIndex<TestRuntime>>::get(), current_period);
 
         assert_ok!(NodeManager::deregister_nodes(
             RuntimeOrigin::signed(context.registrar),
             context.owner,
             BoundedVec::truncate_from(vec![node]),
         ));
-
-        // The earlier period is either draining or queued to drain: touching
-        // its denominator mid-drain would overpay the nodes drained after us.
-        assert_eq!(<NodeUptime<TestRuntime>>::get(earlier_period, node), Some(earlier_uptime));
-        assert_eq!(<TotalUptime<TestRuntime>>::get(earlier_period), earlier_totals);
-
-        // The current period is cleaned.
         assert!(!<NodeUptime<TestRuntime>>::contains_key(current_period, node));
         assert_eq!(<TotalUptime<TestRuntime>>::get(current_period).total_weight, 0);
     });
