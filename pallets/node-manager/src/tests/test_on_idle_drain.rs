@@ -694,8 +694,8 @@ fn zero_funded_period_drains_node_uptime_before_completing() {
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 0));
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
 
-        assert!(NodeUptime::<TestRuntime>::contains_key(period, &n1));
-        assert!(NodeUptime::<TestRuntime>::contains_key(period, &n2));
+        assert!(NodeUptime::<TestRuntime>::contains_key(period, n1));
+        assert!(NodeUptime::<TestRuntime>::contains_key(period, n2));
 
         let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
         assert!(used.any_gt(Weight::zero()));
