@@ -66,6 +66,8 @@ use sp_std::prelude::*;
 
 const HEARTBEAT_CONTEXT: &[u8] = b"NodeManager_heartbeat";
 const MAX_BATCH_SIZE: u32 = 1_000;
+/// Above a default (no-tip) signed transaction priority.
+const HEARTBEAT_TX_PRIORITY: TransactionPriority = 1_000_000;
 /// Fraction of a block's leftover (`on_idle`) weight the reward drain may
 /// consume, leaving headroom for other `on_idle` consumers so the pallet is
 /// not greedy.
@@ -1191,7 +1193,6 @@ pub mod pallet {
                 return InvalidTransaction::Custom(ERROR_CODE_REWARD_DISABLED).into()
             }
 
-            let reduce_priority: TransactionPriority = TransactionPriority::from(1000u64);
             match call {
                 Call::offchain_submit_heartbeat {
                     node,
@@ -1231,7 +1232,7 @@ pub mod pallet {
                                     reward_period_index,
                                     heartbeat_count,
                                 ))
-                                .priority(TransactionPriority::MAX - reduce_priority)
+                                .priority(HEARTBEAT_TX_PRIORITY)
                                 .longevity(64_u64)
                                 .build()
                         },
