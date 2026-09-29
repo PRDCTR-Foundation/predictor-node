@@ -566,6 +566,8 @@ pub mod pallet {
         MaxNodesReached,
         /// Migration of `node` failed due to a mismatch with the `ReservedNodes` entry
         ReservedNodeMismatch,
+        /// `deregister_nodes` called while an earlier reward period is still unpaid
+        RewardPayoutsPending,
     }
 
     #[pallet::config]
@@ -851,6 +853,8 @@ pub mod pallet {
         }
 
         /// Deregister one or more of `owner`'s nodes. Registrar-only.
+        ///
+        /// Fails while an earlier reward period still has an outstanding payout.
         #[pallet::call_index(4)]
         #[pallet::weight(<T as Config>::WeightInfo::deregister_nodes(nodes_to_deregister.len() as u32))]
         pub fn deregister_nodes(
@@ -1295,6 +1299,14 @@ pub mod pallet {
             nodes: &BoundedVec<NodeId<T>, MaxNodesToDeregister>,
         ) -> DispatchResult {
             let current_period = RewardPeriod::<T>::get().current;
+
+            // Only the current period's uptime is cleaned below; block until earlier
+            // periods are fully paid out.
+            ensure!(
+                OldestUnpaidRewardPeriodIndex::<T>::get() >= current_period,
+                Error::<T>::RewardPayoutsPending
+            );
+
             let mut discarded_heartbeats: u64 = 0;
             let mut discarded_weight: u128 = 0;
 

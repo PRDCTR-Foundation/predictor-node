@@ -613,6 +613,12 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
         let period = RewardPeriod::<TestRuntime>::get().current;
+
+        // Drain period 0 first so deregistration below isn't blocked as pending.
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+        NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(5));
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period);
+
         for node in [n1, n2, leaver] {
             record_uptime(period, &node, 1);
         }
