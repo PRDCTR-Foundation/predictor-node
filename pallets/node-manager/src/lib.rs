@@ -770,7 +770,8 @@ pub mod pallet {
                     let new_reservations = to_write
                         .iter()
                         .filter(|e| {
-                            !ReservedNodes::<T>::contains_key(&e.node) && seen.insert(e.node.clone())
+                            !ReservedNodes::<T>::contains_key(&e.node) &&
+                                seen.insert(e.node.clone())
                         })
                         .count() as u32;
 
