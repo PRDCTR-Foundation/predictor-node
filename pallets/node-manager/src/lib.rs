@@ -384,7 +384,7 @@ pub mod pallet {
     pub enum Event<T: Config> {
         /// Node registered
         NodeRegistered { owner: T::AccountId, node: NodeId<T> },
-        /// `count` (node, owner, signing_key) entries reserved for migration
+        /// `count` new reservations added
         NodesReserved { count: u32 },
         /// `node` was registered against a matching `ReservedNodes` entry
         NodeMigrated { owner: T::AccountId, node: NodeId<T>, credited_heartbeats: u32 },
@@ -759,15 +759,30 @@ pub mod pallet {
                 AdminConfig::ReserveNodes(entries) => {
                     let submitted = entries.len() as u32;
 
-                    let mut seen: BTreeSet<T::AccountId> = BTreeSet::new();
-                    let (new_entries, _already_pending): (Vec<_>, Vec<_>) =
-                        entries.iter().partition(|e| {
-                            !ReservedNodes::<T>::contains_key(&e.node) &&
-                                seen.insert(e.node.clone())
-                        });
-                    let new_reservations = new_entries.len() as u32;
+                    // Skip nodes already registered - do_register_node would reject them,
+                    // leaving a dead reservation that permanently inflates TotalReservedNodes.
+                    let to_write: Vec<_> = entries
+                        .into_iter()
+                        .filter(|e| !NodeRegistry::<T>::contains_key(&e.node))
+                        .collect();
 
-                    for entry in entries.into_iter() {
+                    let mut seen: BTreeSet<T::AccountId> = BTreeSet::new();
+                    let new_reservations = to_write
+                        .iter()
+                        .filter(|e| {
+                            !ReservedNodes::<T>::contains_key(&e.node) && seen.insert(e.node.clone())
+                        })
+                        .count() as u32;
+
+                    ensure!(
+                        TotalRegisteredNodes::<T>::get()
+                            .saturating_add(TotalReservedNodes::<T>::get())
+                            .saturating_add(new_reservations) <=
+                            T::MaxRegisteredNodes::get(),
+                        Error::<T>::MaxNodesReached
+                    );
+
+                    for entry in to_write {
                         ReservedNodes::<T>::insert(
                             &entry.node,
                             ReservedNodeInfo::new(entry.owner, entry.signing_key),
@@ -775,7 +790,7 @@ pub mod pallet {
                     }
                     TotalReservedNodes::<T>::mutate(|n| *n = n.saturating_add(new_reservations));
 
-                    Self::deposit_event(Event::NodesReserved { count: submitted });
+                    Self::deposit_event(Event::NodesReserved { count: new_reservations });
                     Ok(Some(<T as Config>::WeightInfo::set_admin_config_reserve_nodes(submitted))
                         .into())
                 },
