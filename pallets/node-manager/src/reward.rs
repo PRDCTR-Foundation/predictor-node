@@ -240,10 +240,24 @@ impl<T: Config> Pallet<T> {
                 break
             }
             if pot_info.total_reward.is_zero() {
-                // Funded with a zero amount: nothing to distribute or reclaim.
-                Self::complete_reward_payout(period);
-                used = used.saturating_add(per_iter);
-                continue
+                // Nothing to pay, but NodeUptime rows still need draining before completing.
+                match Self::drain_period_in_batches(
+                    period,
+                    remaining_weight,
+                    per_iter,
+                    max_batch,
+                    &mut used,
+                    &mut paid_this_block,
+                    |_node, _uptime_info| {},
+                ) {
+                    Ok(true) => continue,
+                    Ok(false) => break,
+                    Err(()) => {
+                        Self::complete_reward_payout(period);
+                        used = used.saturating_add(per_iter);
+                        continue
+                    },
+                }
             }
             let total_uptime = TotalUptime::<T>::get(period);
             if total_uptime.total_weight == 0u128 {

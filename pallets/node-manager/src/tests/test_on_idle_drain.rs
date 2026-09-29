@@ -671,3 +671,72 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
         );
     });
 }
+
+#[test]
+fn zero_funded_period_drains_node_uptime_before_completing() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+        let n1 = register_node(registrar, 121, 41, 51);
+        let n2 = register_node(registrar, 122, 42, 52);
+
+        roll_forward(200);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        record_uptime(period, &n1, 4);
+        record_uptime(period, &n2, 4);
+
+        roll_forward(20);
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 0));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+
+        assert!(NodeUptime::<TestRuntime>::contains_key(period, &n1));
+        assert!(NodeUptime::<TestRuntime>::contains_key(period, &n2));
+
+        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        assert!(used.any_gt(Weight::zero()));
+
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period.saturating_add(1));
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(period).count(), 0);
+    });
+}
+
+#[test]
+fn zero_funded_period_with_many_nodes_drains_across_multiple_calls() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+
+        roll_forward(200);
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
+
+        let period = RewardPeriod::<TestRuntime>::get().current;
+        let node_count = 5u8;
+        for seed in 0..node_count {
+            let node = register_node(registrar, 200 + seed, 60 + seed, 70 + seed);
+            record_uptime(period, &node, 1);
+        }
+
+        roll_forward(20);
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 0));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+
+        // Tight budget: only one node's worth of work per call.
+        let tight_budget = per_iter().saturating_mul(1);
+        let mut calls = 0u32;
+        while OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() <= period {
+            NodeManager::drain_outstanding_payouts(tight_budget);
+            calls = calls.saturating_add(1);
+            assert!(calls <= node_count as u32 + 2);
+        }
+
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(period).count(), 0);
+    });
+}
