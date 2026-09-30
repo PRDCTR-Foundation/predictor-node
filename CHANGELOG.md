@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.1](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.0...v1.3.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **node-manager:** block deregistration while earlier payouts are pending ([#108](https://github.com/PRDCTR-Foundation/predictor-node/issues/108)) ([c898b6d](https://github.com/PRDCTR-Foundation/predictor-node/commit/c898b6d239839bc70cf77d38ad93a99d1199fba5))
+* **node-manager:** clamp uptime_threshold to a minimum of 1 ([#111](https://github.com/PRDCTR-Foundation/predictor-node/issues/111)) ([6b71496](https://github.com/PRDCTR-Foundation/predictor-node/commit/6b71496bcf275852bf9fc2fb00de9d4ae90bb9a5))
+* **node-manager:** drain NodeUptime for zero-funded reward periods ([#107](https://github.com/PRDCTR-Foundation/predictor-node/issues/107)) ([0f77158](https://github.com/PRDCTR-Foundation/predictor-node/commit/0f77158947ce3ed18502ded4617277d36dd19ba8))
+* **node-manager:** fix ReserveNodes capacity check and dead reservations ([#109](https://github.com/PRDCTR-Foundation/predictor-node/issues/109)) ([4cc1f43](https://github.com/PRDCTR-Foundation/predictor-node/commit/4cc1f437ae5a14527621930dd5ea991b11594e21))
+* **node-manager:** fix unsigned heartbeat transaction priority ([#104](https://github.com/PRDCTR-Foundation/predictor-node/issues/104)) ([98d0961](https://github.com/PRDCTR-Foundation/predictor-node/commit/98d0961302e59f8128bde50f3d4dca16be85bf3c))
+* **node-manager:** raise default reward payout batch size ([#105](https://github.com/PRDCTR-Foundation/predictor-node/issues/105)) ([e53b594](https://github.com/PRDCTR-Foundation/predictor-node/commit/e53b5940b7704c40c3349595afeaecd256a22092))
+
 ## [1.3.0](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.2.1...v1.3.0) (2026-09-22)
 
 
