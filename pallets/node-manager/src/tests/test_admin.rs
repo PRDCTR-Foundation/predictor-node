@@ -317,4 +317,19 @@ mod min_uptime_threshold {
             );
         });
     }
+
+    #[test]
+    fn never_rounds_down_to_zero() {
+        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+        ext.execute_with(|| {
+            assert_eq!(MinUptimeThreshold::<TestRuntime>::get(), Perbill::from_percent(33));
+            for (period_length, heartbeat_period) in [(2u32, 1u32), (3, 2), (6, 5)] {
+                assert_eq!(
+                    NodeManager::calculate_uptime_threshold(period_length, heartbeat_period),
+                    1,
+                );
+            }
+            assert_eq!(NodeManager::calculate_uptime_threshold(200, 5), 13);
+        });
+    }
 }
