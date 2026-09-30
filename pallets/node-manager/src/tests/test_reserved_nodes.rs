@@ -151,6 +151,63 @@ mod reserve_nodes {
             "a batch above MaxReservedNodesPerCall must not fit in the bounded call argument"
         );
     }
+
+    #[test]
+    fn reserving_an_already_registered_node_is_skipped_not_counted() {
+        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+        ext.execute_with(|| {
+            let registrar = setup_registrar();
+            let node = TestAccount::new([6u8; 32]).account_id();
+            let owner = TestAccount::new([7u8; 32]).account_id();
+            assert_ok!(NodeManager::register_node(
+                RuntimeOrigin::signed(registrar),
+                node,
+                owner,
+                SignerId::generate_pair(None),
+            ));
+
+            let other_node = TestAccount::new([8u8; 32]).account_id();
+            reserve(vec![
+                entry(node, owner, SignerId::generate_pair(None)),
+                entry(other_node, owner, SignerId::generate_pair(None)),
+            ]);
+
+            assert!(ReservedNodes::<TestRuntime>::get(node).is_none());
+            assert!(ReservedNodes::<TestRuntime>::get(other_node).is_some());
+            assert_eq!(TotalReservedNodes::<TestRuntime>::get(), 1);
+            System::assert_last_event(Event::NodesReserved { count: 1 }.into());
+        });
+    }
+
+    #[test]
+    fn reservation_is_rejected_when_it_would_exceed_the_registered_node_cap() {
+        let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+        ext.execute_with(|| {
+            let cap = <TestRuntime as pallet::Config>::MaxRegisteredNodes::get();
+            TotalRegisteredNodes::<TestRuntime>::put(cap - 1);
+
+            let node_a = TestAccount::new([9u8; 32]).account_id();
+            let node_b = TestAccount::new([10u8; 32]).account_id();
+            let owner = TestAccount::new([11u8; 32]).account_id();
+
+            reserve(vec![entry(node_a, owner, SignerId::generate_pair(None))]);
+            assert_eq!(TotalReservedNodes::<TestRuntime>::get(), 1);
+
+            assert_noop!(
+                NodeManager::set_admin_config(
+                    RawOrigin::Root.into(),
+                    AdminConfig::ReserveNodes(BoundedVec::truncate_from(vec![entry(
+                        node_b,
+                        owner,
+                        SignerId::generate_pair(None),
+                    )])),
+                ),
+                Error::<TestRuntime>::MaxNodesReached
+            );
+            assert!(ReservedNodes::<TestRuntime>::get(node_b).is_none());
+            assert_eq!(TotalReservedNodes::<TestRuntime>::get(), 1);
+        });
+    }
 }
 
 mod migration {
