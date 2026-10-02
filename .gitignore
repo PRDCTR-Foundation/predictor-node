@@ -1,2 +1,8 @@
+.codex
+.claude/
+
+.vscode/
+
+.cargo/
 target/
 authors.json

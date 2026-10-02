@@ -414,7 +414,7 @@ impl pallet_eth_bridge::Config for Runtime {
 
 parameter_types! {
     pub const AvnTreasuryPotId: frame_support::PalletId = frame_support::PalletId(*b"Treasury");
-    pub const TreasuryGrowthPercentage: Perbill = Perbill::from_percent(75);
+    pub const TreasuryGrowthPercentage: Perbill = Perbill::from_percent(100);
 }
 
 impl pallet_token_manager::Config for Runtime {

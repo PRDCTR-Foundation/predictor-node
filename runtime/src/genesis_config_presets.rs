@@ -2,8 +2,8 @@ use crate::{
     configs::genesis_config_helpers::{get_account_id_from_seed, get_validator_keys_from_seed},
     opaque::SessionKeys,
     AccountId, AuraId, AuthorityDiscoveryId, AuthorsManagerConfig, AvnId, BalancesConfig,
-    GrandpaId, ImOnlineId, RuntimeGenesisConfig, SessionConfig, SudoConfig, SummaryConfig,
-    TokenManagerConfig,
+    GrandpaId, ImOnlineId, NodeManagerConfig, RuntimeGenesisConfig, SessionConfig, SudoConfig,
+    SummaryConfig, TokenManagerConfig,
 };
 use alloc::{vec, vec::Vec};
 use frame_support::PalletId;
@@ -14,7 +14,10 @@ use sp_genesis_builder::PresetId;
 use sp_runtime::traits::AccountIdConversion;
 
 type EthPublicKey = ecdsa::Public;
-use common_primitives::constants::{BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
+use common_primitives::constants::{currency::BASE, BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
+
+pub const BILLION_BASE: u128 = BASE * 10u128.pow(9u32);
+pub const THOUSAND_BASE: u128 = BASE * 10u128.pow(3u32);
 
 #[cfg(feature = "enable-static-presents")]
 mod public_testnet;
@@ -38,9 +41,17 @@ fn testnet_genesis(
     // TokenManager treasury account, pre-funded so pallet-node-manager's
     // reward-period rollover transfer into the reward pot succeeds.
     let treasury_account: AccountId = PalletId(*b"Treasury").into_account_truncating();
-    let mut balances: Vec<(AccountId, u128)> =
-        endowed_accounts.iter().cloned().map(|k| (k, 1u128 << 60)).collect();
-    balances.push((treasury_account, 1u128 << 60));
+    // The Dev registar account 5CiXuNy1qnhyWAn2ea8MqXNsMWmvf8VNWHvE2em5MqKJaYSL
+    let registar_account: AccountId =
+        hex!["1cd9d1d7badff11b789d2d0fa58fe636342bb720468f87d302b60cbb7650620a"].into();
+
+    let mut balances: Vec<(AccountId, u128)> = endowed_accounts
+        .iter()
+        .chain(vec![registar_account.clone()].iter())
+        .cloned()
+        .map(|k| (k, 100 * THOUSAND_BASE))
+        .collect();
+    balances.push((treasury_account, 10 * BILLION_BASE));
     let config = RuntimeGenesisConfig {
         balances: BalancesConfig { balances },
         authors_manager: AuthorsManagerConfig {
@@ -83,9 +94,15 @@ fn testnet_genesis(
             lower_schedule_period: 5 * BLOCKS_PER_MINUTE,
             ..Default::default()
         },
+        node_manager: NodeManagerConfig {
+            reward_period: 120u32,
+            max_batch_size: 50u32,
+            heartbeat_period: 5u32,
+            registar_maybe: Some(registar_account),
+            ..Default::default()
+        },
         ..Default::default()
     };
-
     serde_json::to_value(config).expect("Could not build genesis config.")
 }
 

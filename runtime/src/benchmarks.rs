@@ -56,6 +56,7 @@ frame_benchmarking::define_benchmarks!(
     [pallet_pm_neo_swaps, NeoSwaps]
     [pallet_pm_order_book, Orderbook]
     [pallet_prediction_markets, PredictionMarkets]
+    [pallet_node_manager, NodeManager]
     // NOTE: `orml_tokens` and `pallet_pm_eth_asset_registry` are excluded
     // from `define_benchmarks!` because they don't expose the standard
     // `frame_benchmarking::Benchmarking` impl. ORML uses its own
