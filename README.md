@@ -185,7 +185,7 @@ weights for a pallet:
      --extrinsic '*' \
      --steps=50 \
      --repeat=20 \
-     --output .pallets/node-manager/src/default_weights.rs \
+     --output pallets/node-manager/src/default_weights.rs \
      --template ./templates/frame-weight-template.hbs
    ```
 More information available [here](https://docs.polkadot.com/parachains/customize-runtime/pallet-development/benchmark-pallet/)
