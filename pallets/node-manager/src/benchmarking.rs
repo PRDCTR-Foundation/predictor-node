@@ -11,6 +11,9 @@ use frame_benchmarking::v2::*;
 use frame_support::weights::WeightMeter;
 use frame_system::{EventRecord, RawOrigin};
 
+/// Keystore key type for the benchmark-only sr25519 prover key.
+const BENCHMARK_KEY_TYPE: sp_core::crypto::KeyTypeId = sp_core::crypto::KeyTypeId(*b"nmbk");
+
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
     let events = frame_system::Pallet::<T>::events();
     let system_event: <T as frame_system::Config>::RuntimeEvent = generic_event.into();
@@ -85,7 +88,11 @@ where
     pallet_timestamp::Pallet::<T>::set_timestamp(10 * 12_000);
 }
 
-#[benchmarks(where T: pallet_timestamp::Config<Moment = u64>)]
+#[benchmarks(
+    where
+        T: pallet_timestamp::Config<Moment = u64>,
+        <T as Config>::Signature: From<sp_core::sr25519::Signature>,
+)]
 mod benchmarks {
     use super::*;
 
@@ -317,6 +324,65 @@ mod benchmarks {
         let uptime_info = <NodeUptime<T>>::get(reward_period_index, &node).expect("No uptime info");
         assert!(uptime_info.count == heartbeat_count + 1);
         assert_last_event::<T>(Event::HeartbeatReceived { reward_period_index, node }.into());
+    }
+
+    // Worst case: every node already has uptime below the threshold and outside the spacing
+    // window, so each one is read, updated and emits an event.
+    #[benchmark]
+    fn heartbeat_for_owned_nodes(b: Linear<1, { T::MaxNodesPerAggregateHeartbeat::get() }>) {
+        enable_rewards::<T>();
+        RewardPeriod::<T>::mutate(|reward_period| reward_period.uptime_threshold = u32::MAX);
+        let reward_period = <RewardPeriod<T>>::get();
+        let period = reward_period.current;
+
+        let prover_key =
+            sp_io::crypto::sr25519_generate(BENCHMARK_KEY_TYPE, Some(b"//Prover".to_vec()));
+        let prover = T::AccountId::decode(&mut prover_key.as_ref()).expect("32-byte account id");
+        let owner: T::AccountId = account("owner", 0, 0);
+        let _ = register_new_node::<T>(prover.clone(), owner.clone());
+        let nodes: BoundedVec<NodeId<T>, T::MaxNodesPerAggregateHeartbeat> =
+            create_nodes_and_heartbeat::<T>(owner, period, b)
+                .try_into()
+                .expect("b is within MaxNodesPerAggregateHeartbeat");
+
+        // Move past every node's heartbeat spacing window.
+        let now = frame_system::Pallet::<T>::block_number()
+            .saturating_add(reward_period.heartbeat_period.into())
+            .saturating_add(1u32.into());
+        frame_system::Pallet::<T>::set_block_number(now);
+
+        let relayer: T::AccountId = account("relayer", 0, 0);
+        let payload = encode_aggregate_heartbeat_params::<T>(&relayer, &nodes, &b, &now);
+        let signature = sp_io::crypto::sr25519_sign(BENCHMARK_KEY_TYPE, &prover_key, &payload)
+            .expect("prover key is in the keystore");
+        let proof =
+            sp_avn_common::Proof { signer: prover.clone(), relayer, signature: signature.into() };
+        let expected = nodes.clone();
+
+        #[extrinsic_call]
+        heartbeat_for_owned_nodes(RawOrigin::Signed(prover), proof, nodes, now);
+
+        for node in expected.iter() {
+            assert_eq!(<NodeUptime<T>>::get(period, node).map(|u| u.count), Some(2));
+        }
+    }
+
+    // Worst case: the transfer from the treasury creates the reward pot account.
+    #[benchmark]
+    fn top_up_reward_pot() {
+        let amount: BalanceOf<T> =
+            T::Currency::minimum_balance().saturating_add(1_000_000u32.into());
+        T::Currency::make_free_balance_be(
+            &T::TreasurySource::get(),
+            amount
+                .saturating_mul(2u32.into())
+                .saturating_add(T::Currency::minimum_balance()),
+        );
+
+        #[extrinsic_call]
+        top_up_reward_pot(RawOrigin::Root, amount);
+
+        assert_last_event::<T>(Event::RewardPotToppedUp { amount }.into());
     }
 
     #[benchmark]
