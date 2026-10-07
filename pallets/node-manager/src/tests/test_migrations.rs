@@ -59,7 +59,7 @@ fn migration_seeds_what_defaults_cannot_express() {
     ext.execute_with(|| {
         // The mock ext leaves the version at 0; a real set_code introduction
         // pre-initialises it to the in-code version instead. The gate is the data
-        // (no provider on the pot), see `migration_gate_is_the_data_not_the_storage_version`.
+        // (`GenesisSeeded` unset), see `migration_gate_is_the_data_not_the_storage_version`.
         assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(0));
         assert_eq!(pot_providers(), 0);
         assert!(LockSchedule::<TestRuntime>::get().is_none());
@@ -67,6 +67,7 @@ fn migration_seeds_what_defaults_cannot_express() {
         let _ = Migration::on_runtime_upgrade();
 
         assert_eq!(pot_providers(), 1);
+        assert!(GenesisSeeded::<TestRuntime>::get());
         assert!(LockSchedule::<TestRuntime>::get().is_some());
         assert_eq!(Pallet::<TestRuntime>::on_chain_storage_version(), StorageVersion::new(1));
     });
@@ -189,5 +190,35 @@ fn withdrawals_work_after_a_forkless_introduction() {
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
         // Week one of the seeded window: 52% forfeited, 48% to the owner.
         assert_eq!(Balances::free_balance(owner), 48 * PRD);
+    });
+}
+
+#[test]
+fn migration_seeds_even_if_the_pot_was_funded_before_the_upgrade() {
+    // Anyone can transfer to the pot's predictable address before the upgrade, giving it a
+    // provider. That must not make the seeder treat the pallet as already seeded.
+    let mut ext = ExtBuilder::build_default().as_externality();
+    ext.execute_with(|| {
+        let _ = Balances::deposit_creating(&NodeManager::compute_reward_account_id(), PRD);
+        assert_eq!(pot_providers(), 1);
+
+        let _ = Migration::on_runtime_upgrade();
+
+        assert!(GenesisSeeded::<TestRuntime>::get());
+        assert!(LockSchedule::<TestRuntime>::get().is_some(), "seeding was skipped");
+        assert_eq!(pot_providers(), 2, "the pallet's own provider was not added");
+    });
+}
+
+#[test]
+fn genesis_build_marks_the_pallet_as_seeded() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        assert!(GenesisSeeded::<TestRuntime>::get());
+        let providers_before = pot_providers();
+
+        let _ = Migration::on_runtime_upgrade();
+
+        assert_eq!(pot_providers(), providers_before, "a genesis chain was re-seeded");
     });
 }

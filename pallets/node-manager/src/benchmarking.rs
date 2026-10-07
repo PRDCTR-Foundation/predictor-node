@@ -8,6 +8,7 @@
 
 use super::*;
 use frame_benchmarking::v2::*;
+use frame_support::weights::WeightMeter;
 use frame_system::{EventRecord, RawOrigin};
 
 fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
@@ -382,8 +383,8 @@ mod benchmarks {
         assert_last_event::<T>(Event::SigningKeyUpdated { owner, node }.into());
     }
 
-    // Worst-case cost of paying one node in the `on_idle` drain: owner lookup,
-    // reward transfer from the pot, and the `RewardPaid` event.
+    // Worst-case cost of paying one node in the `on_idle` drain: reading and deleting its
+    // `NodeUptime` entry, owner lookup, reward transfer from the pot, and the `RewardPaid` event.
     #[benchmark]
     fn pay_one_node() {
         enable_rewards::<T>();
@@ -396,11 +397,9 @@ mod benchmarks {
         let reward_period = <RewardPeriod<T>>::get();
         let period = reward_period.current;
         let owner: T::AccountId = account("owner", 0, 0);
-        let node: NodeId<T> = account("node", 1, 1);
-        let _ = register_new_node::<T>(node.clone(), owner.clone());
-        create_heartbeat::<T>(node.clone(), period);
-
-        let uptime_info = <NodeUptime<T>>::get(period, &node).expect("uptime recorded");
+        // Two rows and a one-node budget, so the period stays open and its completion is not
+        // part of the measurement.
+        let _ = create_nodes_and_heartbeat::<T>(owner.clone(), period, 2);
         let total_weight = <TotalUptime<T>>::get(period).total_weight;
         let reward_amount: BalanceOf<T> = 1_000_000u32.into();
         let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
@@ -409,19 +408,57 @@ mod benchmarks {
             Pallet::<T>::time_now_sec(),
             true,
         );
+        let mut meter = WeightMeter::new();
+        let mut nodes_left = 1u32;
 
         #[block]
         {
-            let _ = Pallet::<T>::pay_one_node(
+            let _ = Pallet::<T>::drain_period_in_batches(
                 period,
-                &pot_info,
-                &total_weight,
-                node.clone(),
-                uptime_info,
+                Some((&pot_info, total_weight)),
+                &mut meter,
+                &mut nodes_left,
             );
         }
 
+        assert_eq!(<NodeUptime<T>>::iter_prefix(period).count(), 1);
         assert!(T::Currency::free_balance(&owner) > BalanceOf::<T>::zero());
+    }
+
+    // Worst-case cost of completing one period in the `on_idle` drain: a funded period with no
+    // uptime, so its reward is returned to the treasury after it completes.
+    #[benchmark]
+    fn complete_reward_period() {
+        fund_reward_pot::<T>();
+        let reward_period = <RewardPeriod<T>>::get();
+        let period = reward_period.current;
+        <RewardPeriod<T>>::mutate(|p| p.current = period.saturating_add(1));
+        <OldestUnpaidRewardPeriodIndex<T>>::put(period);
+
+        let reward_amount: BalanceOf<T> = 1_000_000u32.into();
+        <RewardPot<T>>::insert(
+            period,
+            RewardPotInfo::<BalanceOf<T>>::new(
+                reward_amount,
+                reward_period.uptime_threshold,
+                0u64,
+                true,
+            ),
+        );
+        <OutstandingRewardToPay<T>>::put(reward_amount);
+        // Close the period's update window.
+        pallet_timestamp::Pallet::<T>::set_timestamp((REWARD_UPDATE_WINDOW_SECS + 1) * 1_000);
+
+        #[block]
+        {
+            let _ = Pallet::<T>::drain_outstanding_payouts(Weight::MAX);
+        }
+
+        assert_eq!(<OldestUnpaidRewardPeriodIndex<T>>::get(), period.saturating_add(1));
+        assert_last_event::<T>(
+            Event::UndistributedRewardReclaimed { reward_period: period, amount: reward_amount }
+                .into(),
+        );
     }
 
     #[benchmark]

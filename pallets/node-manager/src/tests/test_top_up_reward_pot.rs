@@ -19,7 +19,7 @@ use sp_runtime::DispatchError;
 /// drain, reproducing the production sequencing where `on_idle` runs in the
 /// same block as the rollover `on_initialize`.
 fn generous_idle_weight() -> Weight {
-    NodeManager::worst_case_iteration_weight().saturating_mul(20)
+    drain_budget(20, 20)
 }
 
 fn drain_treasury() {

@@ -14,7 +14,6 @@ use alloc::string::ToString;
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
-    storage::{generator::StorageDoubleMap as StorageDoubleMapTrait, PrefixIterator},
     traits::{Currency, ExistenceRequirement, IsSubType, StorageVersion, UnixTime},
     PalletId,
 };
@@ -104,7 +103,7 @@ pub type MaxReservedNodesPerCall = ConstU32<MAX_RESERVED_NODES_PER_CALL>;
 
 /// Storage defaults, so the pallet works without `genesis_build`. Also used by
 /// `GenesisConfig::default()`.
-pub const DEFAULT_BATCH_SIZE: u32 = 50;
+pub const DEFAULT_BATCH_SIZE: u32 = 64;
 pub const DEFAULT_REWARD_PERIOD: u32 = 2;
 pub const DEFAULT_HEARTBEAT_PERIOD: u32 = 1;
 pub const DEFAULT_MIN_UPTIME_THRESHOLD: Perbill = Perbill::from_percent(33);
@@ -239,12 +238,6 @@ pub mod pallet {
     pub(super) type OldestUnpaidRewardPeriodIndex<T: Config> =
         StorageValue<_, RewardPeriodIndex, ValueQuery>;
 
-    /// Last paid node pointer
-    #[pallet::storage]
-    #[pallet::getter(fn last_paid_pointer)]
-    pub(super) type LastPaidPointer<T: Config> =
-        StorageValue<_, PaymentPointer<T::AccountId>, OptionQuery>;
-
     /// Node uptime by reward period
     #[pallet::storage]
     #[pallet::getter(fn node_uptime)]
@@ -301,6 +294,13 @@ pub mod pallet {
     #[pallet::storage]
     pub type LockSchedule<T: Config> = StorageValue<_, LockScheduleInfo, OptionQuery>;
 
+    /// Set once the state `genesis_build` writes exists, by `genesis_build` or by
+    /// `migrations::SeedGenesisOnUpgrade`. The seeder is gated on this flag because only the
+    /// pallet can write it, unlike the reward pot's provider count, which any transfer to the
+    /// pot can raise.
+    #[pallet::storage]
+    pub type GenesisSeeded<T: Config> = StorageValue<_, bool, ValueQuery>;
+
     /// Destination for forfeited (early-withdrawn) reward amounts - the
     /// foundation forfeiture-liquidity wallet on mainnet. Falls back to
     /// `T::TreasurySource` while unset, which keeps forfeits in-system.
@@ -349,6 +349,7 @@ pub mod pallet {
             // gets its provider reference at genesis - the same pattern
             // pallet-treasury uses for its pot account.
             frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
+            GenesisSeeded::<T>::put(true);
 
             assert!(self.reward_period > self.heartbeat_period);
 
@@ -483,10 +484,6 @@ pub mod pallet {
     pub enum Error<T> {
         /// Invalid node registrar
         OriginNotRegistrar,
-        /// Invalid last paid node
-        InvalidNodePointer,
-        /// Invalid last paid period
-        InvalidPeriodPointer,
         /// Node registrar not set
         RegistrarNotSet,
         /// Node already registered

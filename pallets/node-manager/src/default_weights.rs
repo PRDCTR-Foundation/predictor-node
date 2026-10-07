@@ -59,6 +59,7 @@ pub trait WeightInfo {
 	fn top_up_reward_pot() -> Weight;
 	fn heartbeat_for_owned_nodes(b: u32, ) -> Weight;
 	fn pay_one_node() -> Weight;
+	fn complete_reward_period() -> Weight;
 	fn set_admin_config_lock_schedule() -> Weight;
 	fn set_admin_config_forfeiture_destination() -> Weight;
 	fn set_admin_config_reserve_nodes(b: u32, ) -> Weight;
@@ -304,12 +305,23 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(b.into())))
 			.saturating_add(T::DbWeight::get().writes((1_u64).saturating_mul(b.into())))
 	}
-	// Per-node payout: 1 NodeRegistry read (owner lookup) + 1 Currency::transfer
-	// (2 reads, 2 writes on Balances) + 1 RewardPaid event.
+	// Per paid node: 1 NodeUptime read and delete of the node's entry, 1 NodeRegistry read
+	// (owner lookup), 1 LockSchedule read, 1 Currency::transfer (2 reads, 2 writes on
+	// Balances) and 1 RewardPaid event. Estimate pending a benchmark run.
 	fn pay_one_node() -> Weight {
-		Weight::from_parts(45_000_000, 3656)
-			.saturating_add(T::DbWeight::get().reads(3_u64))
-			.saturating_add(T::DbWeight::get().writes(2_u64))
+		Weight::from_parts(60_000_000, 6231)
+			.saturating_add(T::DbWeight::get().reads(5_u64))
+			.saturating_add(T::DbWeight::get().writes(3_u64))
+	}
+	// Per completed period, worst case (reward returned to the treasury): RewardPot and
+	// TotalUptime reads, an empty NodeUptime prefix scan, `complete_reward_payout`
+	// (RewardPot read, OutstandingRewardToPay read/write, OldestUnpaidRewardPeriodIndex
+	// write, TotalUptime and RewardPot removal), 1 Currency::transfer (2 reads, 2 writes on
+	// Balances) and 2 events. Estimate pending a benchmark run.
+	fn complete_reward_period() -> Weight {
+		Weight::from_parts(80_000_000, 8000)
+			.saturating_add(T::DbWeight::get().reads(7_u64))
+			.saturating_add(T::DbWeight::get().writes(6_u64))
 	}
 	// One storage write to `LockSchedule` + one event.
 	fn set_admin_config_lock_schedule() -> Weight {
@@ -574,9 +586,14 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().writes((1_u64).saturating_mul(b.into())))
 	}
 	fn pay_one_node() -> Weight {
-		Weight::from_parts(45_000_000, 3656)
-			.saturating_add(RocksDbWeight::get().reads(3_u64))
-			.saturating_add(RocksDbWeight::get().writes(2_u64))
+		Weight::from_parts(60_000_000, 6231)
+			.saturating_add(RocksDbWeight::get().reads(5_u64))
+			.saturating_add(RocksDbWeight::get().writes(3_u64))
+	}
+	fn complete_reward_period() -> Weight {
+		Weight::from_parts(80_000_000, 8000)
+			.saturating_add(RocksDbWeight::get().reads(7_u64))
+			.saturating_add(RocksDbWeight::get().writes(6_u64))
 	}
 	fn set_admin_config_lock_schedule() -> Weight {
 		Weight::from_parts(15_000_000, 0)

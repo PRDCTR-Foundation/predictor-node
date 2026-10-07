@@ -123,23 +123,6 @@ impl<BlockNumber: Copy> UptimeInfo<BlockNumber> {
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
-pub struct PaymentPointer<AccountId> {
-    pub period_index: RewardPeriodIndex,
-    pub node: AccountId,
-}
-
-impl<AccountId: Clone + FullCodec + MaxEncodedLen + TypeInfo> PaymentPointer<AccountId> {
-    /// Return the *final* storage key for NodeUptime<(period, node)>.
-    /// This positions iteration beyond (period,node), preventing double payments.
-    pub fn get_final_key<T: Config<AccountId = AccountId>>(&self) -> Vec<u8> {
-        crate::pallet::NodeUptime::<T>::storage_double_map_final_key(
-            self.period_index,
-            self.node.clone(),
-        )
-    }
-}
-
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug, Eq, TypeInfo, MaxEncodedLen)]
 pub struct NodeInfo<SignerId, AccountId> {
     /// The node owner
     pub owner: AccountId,

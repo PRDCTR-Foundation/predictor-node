@@ -150,9 +150,7 @@ fn zero_reward_period_completes_without_paying_once_the_window_closes() {
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 0));
         close_update_window(period);
 
-        let _ = NodeManager::drain_outstanding_payouts(
-            NodeManager::worst_case_iteration_weight().saturating_mul(10),
-        );
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
 
         assert!(RewardPot::<TestRuntime>::get(period).is_none());
         assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period + 1);
@@ -202,7 +200,7 @@ fn no_rewards_are_paid_while_the_update_window_is_open() {
         let period = roll_past_period_0();
         top_up(20 * PRD);
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 20 * PRD));
-        let budget = NodeManager::worst_case_iteration_weight().saturating_mul(10);
+        let budget = drain_budget(10, 10);
 
         let _ = NodeManager::drain_outstanding_payouts(budget);
         assert!(RewardPot::<TestRuntime>::get(period).is_some());
@@ -220,7 +218,7 @@ fn unfunded_period_does_not_start_after_the_window_but_can_still_be_set() {
     ext.execute_with(|| {
         let period = roll_past_period_0();
         close_update_window(period);
-        let budget = NodeManager::worst_case_iteration_weight().saturating_mul(10);
+        let budget = drain_budget(10, 10);
 
         let _ = NodeManager::drain_outstanding_payouts(budget);
         assert!(RewardPot::<TestRuntime>::get(period).is_some());
@@ -262,9 +260,7 @@ mod fails_to_be_set_when {
             close_update_window(period);
             // No uptime recorded, so the drain reclaims and completes it -
             // removing its `RewardPot` entry.
-            let _ = NodeManager::drain_outstanding_payouts(
-                NodeManager::worst_case_iteration_weight().saturating_mul(10),
-            );
+            let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
             assert!(RewardPot::<TestRuntime>::get(period).is_none());
 
             assert_noop!(

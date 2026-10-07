@@ -5,6 +5,7 @@
 // Modified for PRDCTR on 2026-07-07.
 
 use crate::*;
+use frame_support::weights::WeightMeter;
 use sp_runtime::{ArithmeticError, SaturatedConversion};
 
 impl<T: Config> Pallet<T> {
@@ -109,22 +110,6 @@ impl<T: Config> Pallet<T> {
         Ok(())
     }
 
-    /// Worst-case weight charged per `on_idle` per-node iteration. Set
-    /// conservatively above the sum of a NodeRegistry read, a
-    /// `Currency::transfer` (reward pot -> owner, touching two accounts), the
-    /// NodeUptime removal write, and the event deposit - or the equivalent
-    /// locked-accrual writes when the lock window is active.
-    pub fn worst_case_iteration_weight() -> Weight {
-        // ref_time is denominated in picoseconds, so 200_000_000_000 is ~200 ms
-        // per iteration - a generous safety margin over the measured cost on
-        // similar runtimes. The block-weight cap and `MaxBatchSize` are the
-        // real upper bounds; this is the granularity at which `on_idle` decides
-        // whether to attempt another iteration.
-        Weight::from_parts(200_000_000_000, 4096)
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(4))
-            .saturating_add(<T as frame_system::Config>::DbWeight::get().writes(4))
-    }
-
     /// Pay one node out of the given period. Returns the amount paid (or
     /// `Zero` on a soft-failure path that emitted `ErrorPayingReward`).
     pub(crate) fn pay_one_node(
@@ -167,223 +152,124 @@ impl<T: Config> Pallet<T> {
         Ok(amount)
     }
 
-    /// Walk the oldest unpaid reward period (and the next one if weight is
-    /// left) paying nodes one at a time. Each iteration consumes at most
-    /// `worst_case_iteration_weight`; the loop terminates when the weight
-    /// budget cannot cover one more iteration, `MaxBatchSize` per-block is
-    /// hit, or the iterator is exhausted (in which case
-    /// `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex`).
+    /// Pay out finished reward periods in order, starting at `OldestUnpaidRewardPeriodIndex`.
+    ///
+    /// Walks `oldest..current` and stops at the first period that must wait for its amount
+    /// (see `awaiting_funding`), when a period's entries do not fit in the budget, or when
+    /// `meter` cannot afford one more period step plus one node. Each period is drained by
+    /// `drain_period_in_batches`; its nodes are paid only when it is funded with a non-zero
+    /// reward and has uptime. A funded reward with no uptime is returned to the treasury once
+    /// the period completes. Returns the weight consumed.
     pub fn drain_outstanding_payouts(remaining_weight: Weight) -> Weight {
-        let per_iter = Self::worst_case_iteration_weight();
-        let max_batch = MaxBatchSize::<T>::get();
-        let mut used = Weight::zero();
-        let mut paid_this_block: u32 = 0;
+        let mut meter = WeightMeter::with_limit(remaining_weight);
+        // `MaxBatchSize`, `RewardPeriod`, `OldestUnpaidRewardPeriodIndex` and the timestamp.
+        if meter
+            .try_consume(<T as frame_system::Config>::DbWeight::get().reads(4))
+            .is_err()
+        {
+            return meter.consumed()
+        }
+        let mut nodes_left = MaxBatchSize::<T>::get();
+        let current = RewardPeriod::<T>::get().current;
+        let oldest = OldestUnpaidRewardPeriodIndex::<T>::get();
+        let now = Self::time_now_sec();
+        // Entering a period must afford its completion plus one node, so every period that is
+        // entered either completes or drains at least one entry.
+        let min_step = <T as Config>::WeightInfo::complete_reward_period()
+            .saturating_add(<T as Config>::WeightInfo::pay_one_node());
 
-        loop {
-            // (A) Weight check: can we afford another iteration's worst-case?
-            if remaining_weight.saturating_sub(used).any_lt(per_iter) {
+        // `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex` by one, so the
+        // walk visits periods in the same order the cursor does.
+        for period in oldest..current {
+            if !meter.can_consume(min_step) || nodes_left == 0 {
                 break
             }
-            // (B) Batch cap: prevents storage thrash regardless of weight headroom.
-            if paid_this_block >= max_batch {
+
+            let pot_info = RewardPot::<T>::get(period);
+            if pot_info
+                .as_ref()
+                .is_some_and(|p| Self::awaiting_funding(p, period, current, now))
+            {
                 break
             }
 
-            let period = OldestUnpaidRewardPeriodIndex::<T>::get();
-            let current = RewardPeriod::<T>::get().current;
-            if period >= current {
-                // Nothing to drain yet (the period we'd pay hasn't rolled).
+            let total_weight = TotalUptime::<T>::get(period).total_weight;
+            let reward = pot_info.filter(|p| p.funded && !p.total_reward.is_zero());
+            let payout = reward.as_ref().filter(|_| total_weight != 0).map(|p| (p, total_weight));
+
+            if !Self::drain_period_in_batches(period, payout, &mut meter, &mut nodes_left) {
                 break
             }
-
-            // Resolve the snapshot for this period. If missing, skip the period
-            // cleanly via `complete_reward_payout`.
-            let pot_info = match RewardPot::<T>::get(period) {
-                Some(p) => p,
-                None => {
-                    Self::complete_reward_payout(period);
-                    used = used.saturating_add(per_iter);
-                    continue
-                },
-            };
-            if !pot_info.funded {
-                // No amount has been set yet, so nothing is paid and the cursor stays put; the
-                // drain resumes once `set_reward_amount` funds the period. An unfunded period
-                // older than `MaxFailedFundingRecoveryPeriods` is abandoned instead, so it
-                // cannot block later periods forever.
-                let age = current.saturating_sub(period);
-                if age <= T::MaxFailedFundingRecoveryPeriods::get() {
-                    break
-                }
-                // Abandon: clear the period's `NodeUptime` entries in weight-bounded batches
-                // and complete the period once they are drained. Nothing is paid.
-                match Self::drain_period_in_batches(
-                    period,
-                    remaining_weight,
-                    per_iter,
-                    max_batch,
-                    &mut used,
-                    &mut paid_this_block,
-                    |_node, _uptime_info| {},
-                ) {
-                    Ok(true) => continue,
-                    Ok(false) => break,
-                    Err(()) => {
-                        Self::complete_reward_payout(period);
-                        used = used.saturating_add(per_iter);
-                        continue
-                    },
-                }
-            }
-            // No rewards are paid while the amount can still be updated.
-            if pot_info.update_window_open(Self::time_now_sec()) {
-                break
-            }
-            if pot_info.total_reward.is_zero() {
-                // Nothing to pay, but NodeUptime rows still need draining before completing.
-                match Self::drain_period_in_batches(
-                    period,
-                    remaining_weight,
-                    per_iter,
-                    max_batch,
-                    &mut used,
-                    &mut paid_this_block,
-                    |_node, _uptime_info| {},
-                ) {
-                    Ok(true) => continue,
-                    Ok(false) => break,
-                    Err(()) => {
-                        Self::complete_reward_payout(period);
-                        used = used.saturating_add(per_iter);
-                        continue
-                    },
-                }
-            }
-            let total_uptime = TotalUptime::<T>::get(period);
-            if total_uptime.total_weight == 0u128 {
-                // No reportable uptime: nothing to distribute. Return the period's
-                // amount to the treasury instead of stranding it in the pot, then advance.
-                Self::reclaim_undistributed_reward(period, pot_info.total_reward);
-                Self::complete_reward_payout(period);
-                used = used.saturating_add(per_iter);
-                continue
-            }
-
-            // Pay nodes in weight/batch-bounded batches, soft-failing with an
-            // `ErrorPayingReward` event per node. The shared helper handles the
-            // resume pointer and completes the period only once every node is
-            // drained.
-            match Self::drain_period_in_batches(
-                period,
-                remaining_weight,
-                per_iter,
-                max_batch,
-                &mut used,
-                &mut paid_this_block,
-                |node, uptime_info| {
-                    let _ = Self::pay_one_node(
-                        period,
-                        &pot_info,
-                        &total_uptime.total_weight,
-                        node,
-                        uptime_info,
-                    );
-                },
-            ) {
-                Ok(true) => continue,
-                Ok(false) => break,
-                Err(()) => {
-                    // Defensive: a pointer mismatch shouldn't happen but if it
-                    // does, advance and don't get stuck.
-                    Self::complete_reward_payout(period);
-                    used = used.saturating_add(per_iter);
-                    continue
-                },
+            // Reclaim only after completion, so a period that spans several calls cannot
+            // return its reward twice.
+            if let (Some(p), None) = (&reward, payout) {
+                Self::reclaim_undistributed_reward(period, p.total_reward);
             }
         }
 
-        used
+        meter.consumed()
     }
 
-    /// Drain a period's `NodeUptime` entries in weight/batch-bounded batches,
-    /// invoking `on_node` for each entry before removing it. Resumes from the
-    /// `LastPaidPointer` if one is set, otherwise from the start of the period.
-    /// Advances the cursor via `complete_reward_payout` only once every entry
-    /// has been drained (across as many `on_idle` calls as needed); otherwise
-    /// records a fresh `LastPaidPointer` so the next call resumes where this one
-    /// stopped. Shared by the normal pay path and the unfunded-period abandonment
-    /// path so both complete a period only once it is empty.
-    /// Returns `Ok(true)` when the period is fully drained, `Ok(false)` when
-    /// stopped early on the weight/batch budget, and `Err(())` on a
-    /// pointer-resolution failure (the caller should complete the period).
-    fn drain_period_in_batches(
+    /// Whether `period` must wait before it is drained: its amount can still be set or
+    /// changed, and it is not an unfunded period older than `MaxFailedFundingRecoveryPeriods`.
+    fn awaiting_funding(
+        pot_info: &RewardPotInfo<BalanceOf<T>>,
         period: RewardPeriodIndex,
-        remaining_weight: Weight,
-        per_iter: Weight,
-        max_batch: u32,
-        used: &mut Weight,
-        paid_this_block: &mut u32,
-        mut on_node: impl FnMut(T::AccountId, UptimeInfo<BlockNumberFor<T>>),
-    ) -> Result<bool, ()> {
-        let iter_result = match LastPaidPointer::<T>::get() {
-            Some(ptr) => Self::get_iterator_from_last_paid(period, ptr),
-            None => Ok(NodeUptime::<T>::iter_prefix(period)),
-        };
-        let mut iter = iter_result.map_err(|_| ())?;
-
-        // Track the drained nodes so we can drop their NodeUptime entries after
-        // iterating (mutating the map mid-iteration is unsafe), keeping the
-        // pointer's "node not in storage" invariant on the next block.
-        let mut drained_nodes: Vec<T::AccountId> = Vec::new();
-        let mut last_node: Option<T::AccountId> = None;
-        let mut iterator_exhausted = false;
-        loop {
-            if remaining_weight.saturating_sub(*used).any_lt(per_iter) {
-                break
-            }
-            if *paid_this_block >= max_batch {
-                break
-            }
-            let (node, uptime_info) = match iter.next() {
-                Some(x) => x,
-                None => {
-                    iterator_exhausted = true;
-                    break
-                },
-            };
-            on_node(node.clone(), uptime_info);
-            drained_nodes.push(node.clone());
-            last_node = Some(node);
-            *paid_this_block = paid_this_block.saturating_add(1);
-            *used = used.saturating_add(per_iter);
-        }
-
-        Self::remove_paid_nodes(period, &drained_nodes);
-        if iterator_exhausted {
-            // Completing a period with no drained entries (e.g. an empty abandoned
-            // period) still does storage work but charged no `per_iter` above; charge
-            // one so the outer loop's guards bound how many empty periods complete per
-            // block. The outer loop only enters here with at least one `per_iter` of
-            // budget left, so progress is still guaranteed.
-            if drained_nodes.is_empty() {
-                *used = used.saturating_add(per_iter);
-            }
-            Self::complete_reward_payout(period);
-        } else {
-            Self::update_last_paid_pointer(period, last_node);
-        }
-        Ok(iterator_exhausted)
+        current: RewardPeriodIndex,
+        now: Duration,
+    ) -> bool {
+        let abandoned = !pot_info.funded &&
+            current.saturating_sub(period) > T::MaxFailedFundingRecoveryPeriods::get();
+        pot_info.can_update_amount(now) && !abandoned
     }
 
-    pub fn remove_paid_nodes(
-        period_index: RewardPeriodIndex,
-        paid_nodes_to_remove: &Vec<T::AccountId>,
-    ) {
-        // Remove the paid nodes. We do this separately to avoid changing the map while iterating
-        // it
-        for node in paid_nodes_to_remove {
-            NodeUptime::<T>::remove(period_index, node);
+    /// Remove up to `limit` of `period`'s `NodeUptime` rows and complete the period once it
+    /// has no rows left. With `payout` set to `(pot_info, total_weight)`, each removed node is
+    /// paid; with `None`, rows are only deleted and no reward event is emitted.
+    ///
+    /// `limit` is the smaller of `nodes_left` and the number of `WeightInfo::pay_one_node`
+    /// weights (which include deleting the entry) that fit in `meter` after reserving one
+    /// `WeightInfo::complete_reward_period` for the completion.
+    /// Both `meter` and `nodes_left` are charged for what is spent, and `meter` never exceeds
+    /// its limit. A later call continues with the rows still in storage.
+    ///
+    /// Returns `true` if the period was completed.
+    pub(crate) fn drain_period_in_batches(
+        period: RewardPeriodIndex,
+        payout: Option<(&RewardPotInfo<BalanceOf<T>>, u128)>,
+        meter: &mut WeightMeter,
+        nodes_left: &mut u32,
+    ) -> bool {
+        let per_node = <T as Config>::WeightInfo::pay_one_node();
+        let completion = <T as Config>::WeightInfo::complete_reward_period();
+        // A zero `per_node` returns `None`: weight then places no limit on the count.
+        let by_weight: u32 = meter
+            .remaining()
+            .saturating_sub(completion)
+            .checked_div_per_component(&per_node)
+            .unwrap_or(u64::MAX)
+            .saturated_into();
+        let limit = by_weight.min(*nodes_left);
+
+        let mut drained: u32 = 0;
+        for (node, uptime_info) in NodeUptime::<T>::drain_prefix(period).take(limit as usize) {
+            if let Some((pot_info, total_weight)) = payout {
+                // Failures are reported by `pay_one_node` as `ErrorPayingReward` events.
+                let _ = Self::pay_one_node(period, pot_info, &total_weight, node, uptime_info);
+            }
+            meter.consume(per_node);
+            drained = drained.saturating_add(1);
         }
+        *nodes_left = nodes_left.saturating_sub(drained);
+
+        // Fewer rows than `limit` means the period is empty. If exactly `limit` rows were
+        // left, the next call finds it empty and completes it.
+        let period_drained = drained < limit;
+        if period_drained {
+            Self::complete_reward_payout(period);
+            meter.consume(completion);
+        }
+        period_drained
     }
 
     /// Return a funded period's reward from the pot to the treasury when the
@@ -425,20 +311,10 @@ impl<T: Config> Pallet<T> {
 
         // We finished paying all nodes for this period
         OldestUnpaidRewardPeriodIndex::<T>::put(period_index.saturating_add(1));
-        LastPaidPointer::<T>::kill();
         <TotalUptime<T>>::remove(period_index);
         <RewardPot<T>>::remove(period_index);
 
         Self::deposit_event(Event::RewardPayoutCompleted { reward_period_index: period_index });
-    }
-
-    pub fn update_last_paid_pointer(
-        period_index: RewardPeriodIndex,
-        last_node_paid: Option<T::AccountId>,
-    ) {
-        if let Some(node) = last_node_paid {
-            LastPaidPointer::<T>::put(PaymentPointer { period_index, node });
-        }
     }
 
     /// The account ID of the reward pot.
@@ -451,23 +327,6 @@ impl<T: Config> Pallet<T> {
         // Must never be less than 0 but better be safe.
         <T as pallet::Config>::Currency::free_balance(&Self::compute_reward_account_id())
             .saturating_sub(<T as pallet::Config>::Currency::minimum_balance())
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn get_iterator_from_last_paid(
-        oldest_period: RewardPeriodIndex,
-        last_paid_pointer: PaymentPointer<T::AccountId>,
-    ) -> Result<PrefixIterator<(T::AccountId, UptimeInfo<BlockNumberFor<T>>)>, DispatchError> {
-        ensure!(last_paid_pointer.period_index == oldest_period, Error::<T>::InvalidPeriodPointer);
-        // Make sure the last paid node has been remove, to be extra sure we won't double pay
-        ensure!(
-            !NodeUptime::<T>::contains_key(oldest_period, &last_paid_pointer.node),
-            Error::<T>::InvalidNodePointer
-        );
-
-        // Start iteration just after `(oldest_period, last_paid_pointer.node)`.
-        let final_key = last_paid_pointer.get_final_key::<T>();
-        Ok(NodeUptime::<T>::iter_prefix_from(oldest_period, final_key))
     }
 
     /// Get the current time in seconds
