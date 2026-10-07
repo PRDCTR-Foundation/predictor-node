@@ -47,7 +47,7 @@ fn testnet_genesis(
 
     let mut balances: Vec<(AccountId, u128)> = endowed_accounts
         .iter()
-        .chain(vec![registar_account.clone()].iter())
+        .chain([registar_account.clone()].iter())
         .cloned()
         .map(|k| (k, 100 * THOUSAND_BASE))
         .collect();
