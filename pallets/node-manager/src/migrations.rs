@@ -19,11 +19,12 @@
 //!     moment, so a live window is anchored at the upgrade instead. Root overrides it via
 //!     `AdminConfig::LockSchedule`.
 //!
-//! `SeedGenesisOnUpgrade` runs once, gated on the pot account having no provider (the exact
-//! tell-tale of a missing `genesis_build`), and is a no-op on a genesis-started chain.
+//! `SeedGenesisOnUpgrade` runs once, gated on `GenesisSeeded` being unset, and is a no-op on a
+//! genesis-started chain.
 
 use crate::{
-    pallet::Config, LockSchedule, LockScheduleInfo, Pallet, DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
+    pallet::Config, GenesisSeeded, LockSchedule, LockScheduleInfo, Pallet,
+    DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
 };
 use frame_support::{
     traits::{Get, GetStorageVersion, OnRuntimeUpgrade, StorageVersion},
@@ -45,20 +46,23 @@ pub const SEEDED_STORAGE_VERSION: u16 = 1;
 pub struct SeedGenesisOnUpgrade<T>(core::marker::PhantomData<T>);
 
 impl<T: Config> SeedGenesisOnUpgrade<T> {
-    /// `genesis_build` always gives the reward pot account a provider reference, and nothing
-    /// else does before the first top-up, so no provider means `genesis_build` never ran. After
-    /// seeding there is one, so a re-run is a no-op and a genesis-started chain is never touched.
+    /// `GenesisSeeded` is set by `genesis_build` and by `seed`, so an unset flag means neither
+    /// has run. Only the pallet writes it: gating on the pot's provider count instead would let
+    /// anyone skip the seeding by transferring to the pot before the upgrade.
     ///
     /// This deliberately does NOT use a lower-bound version gate (`on_chain < SEEDED`): a pallet
     /// introduced by `set_code` has its on-chain version pre-initialised to the in-code
     /// `STORAGE_VERSION`, so such a gate would treat a freshly introduced pallet as already
     /// seeded. Mock runtimes hide this; only a real forkless upgrade exposes it.
     fn needs_seeding() -> bool {
-        frame_system::Pallet::<T>::providers(&Pallet::<T>::compute_reward_account_id()) == 0
+        !GenesisSeeded::<T>::get()
     }
 
     fn seed() {
+        // The pot may already have a provider from an earlier transfer; adding the pallet's own
+        // keeps the account alive once that balance is spent.
         frame_system::Pallet::<T>::inc_providers(&Pallet::<T>::compute_reward_account_id());
+        GenesisSeeded::<T>::put(true);
 
         LockSchedule::<T>::put(LockScheduleInfo::new(
             Pallet::<T>::time_now_sec(),
@@ -105,8 +109,8 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
         Self::seed();
         StorageVersion::new(SEEDED_STORAGE_VERSION).put::<Pallet<T>>();
 
-        // Version + provider reads; provider, lock schedule and version writes.
-        T::DbWeight::get().reads_writes(2, 3)
+        // Version and flag reads; provider, flag, lock schedule and version writes.
+        T::DbWeight::get().reads_writes(2, 4)
     }
 
     #[cfg(feature = "try-runtime")]
@@ -122,6 +126,10 @@ impl<T: Config> OnRuntimeUpgrade for SeedGenesisOnUpgrade<T> {
         }
         frame_support::ensure!(
             !Self::needs_seeding(),
+            "SeedGenesisOnUpgrade: GenesisSeeded not set",
+        );
+        frame_support::ensure!(
+            frame_system::Pallet::<T>::providers(&Pallet::<T>::compute_reward_account_id()) > 0,
             "SeedGenesisOnUpgrade: reward pot account has no provider reference",
         );
         // A seeded window must exist, otherwise payouts accrue into a lock that

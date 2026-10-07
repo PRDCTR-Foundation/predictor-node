@@ -260,9 +260,7 @@ fn deregistration_blocked_until_earlier_period_payouts_complete() {
         // Drain the earlier period (funded with zero) so the guard is satisfied.
         assert_ok!(NodeManager::set_reward_amount(RuntimeOrigin::root(), earlier_period, 0));
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
-        NodeManager::drain_outstanding_payouts(
-            NodeManager::worst_case_iteration_weight().saturating_mul(10),
-        );
+        NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
         assert_eq!(<OldestUnpaidRewardPeriodIndex<TestRuntime>>::get(), current_period);
 
         assert_ok!(NodeManager::deregister_nodes(

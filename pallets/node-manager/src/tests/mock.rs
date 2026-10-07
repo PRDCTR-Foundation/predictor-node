@@ -392,6 +392,25 @@ pub(crate) fn set_idle_drain_weight(weight: Weight) {
     IDLE_DRAIN_WEIGHT.with(|w| *w.borrow_mut() = weight);
 }
 
+/// Weight the drain charges to complete one reward period.
+pub(crate) fn period_weight() -> Weight {
+    <TestRuntime as Config>::WeightInfo::complete_reward_period()
+}
+
+/// Weight the drain charges to pay one node, including deleting its `NodeUptime` entry.
+pub(crate) fn node_weight() -> Weight {
+    <TestRuntime as Config>::WeightInfo::pay_one_node()
+}
+
+/// A drain budget covering the fixed reads, `periods` period completions and `nodes` payouts.
+pub(crate) fn drain_budget(periods: u64, nodes: u64) -> Weight {
+    use frame_support::{traits::Get, weights::RuntimeDbWeight};
+    <<TestRuntime as frame_system::Config>::DbWeight as Get<RuntimeDbWeight>>::get()
+        .reads(4)
+        .saturating_add(period_weight().saturating_mul(periods))
+        .saturating_add(node_weight().saturating_mul(nodes))
+}
+
 pub(crate) fn roll_one_block() -> u64 {
     Balances::on_finalize(System::block_number());
     System::on_finalize(System::block_number());

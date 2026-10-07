@@ -10,12 +10,8 @@
 //! forfeiture, forfeiture routing, and self-expiry back to direct payout.
 
 use crate::{tests::mock::*, *};
-use frame_support::{assert_noop, assert_ok, weights::Weight};
+use frame_support::{assert_noop, assert_ok};
 use frame_system::RawOrigin;
-
-fn per_iter() -> Weight {
-    NodeManager::worst_case_iteration_weight()
-}
 
 fn setup_registrar() -> AccountId {
     let registrar = TestAccount::new([1u8; 32]).account_id();
@@ -106,7 +102,7 @@ fn payout_locks_when_schedule_unset() {
         let reclaimed =
             RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
 
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         // Lock-by-default: nothing reaches free balance, the claim accrues.
         let locked = LockedRewards::<TestRuntime>::get(owner);
@@ -141,7 +137,7 @@ fn payout_locks_during_active_window() {
         let owner = TestAccount::new([102u8; 32]).account_id();
 
         let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         let locked = LockedRewards::<TestRuntime>::get(owner);
         assert!(locked > 0);
@@ -164,7 +160,7 @@ fn payout_direct_after_window_expiry() {
         let owner = TestAccount::new([103u8; 32]).account_id();
 
         let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         let paid = Balances::free_balance(owner);
         assert!(paid > 0, "expired window must pay free balance directly");
@@ -187,7 +183,7 @@ fn locked_rewards_accumulate_across_periods() {
 
         // First period accrues...
         setup_unpaid_period_with_nodes(&[(node, 1)]);
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
         let after_first = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_first > 0);
 
@@ -199,7 +195,7 @@ fn locked_rewards_accumulate_across_periods() {
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         let after_second = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_second > after_first, "second period must accumulate");
@@ -409,7 +405,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
 
         // Existing: first period accrues into the locked balance.
         setup_unpaid_period_with_nodes(&[(node, 1)]);
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
         let existing = LockedRewards::<TestRuntime>::get(owner);
         assert!(existing > 0, "existing locked must be non-zero");
 
@@ -422,7 +418,7 @@ fn forfeiture_applies_to_combined_existing_and_new_locked() {
         assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 1_000 * PRD));
         assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, 1_000 * PRD));
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         let combined = LockedRewards::<TestRuntime>::get(owner);
         let new_portion = combined.saturating_sub(existing);

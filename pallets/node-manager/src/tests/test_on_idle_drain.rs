@@ -10,12 +10,6 @@ use crate::{tests::mock::*, *};
 use frame_support::{assert_ok, weights::Weight};
 use frame_system::RawOrigin;
 
-/// Per-iteration weight that the drain charges. Tests that need a small budget
-/// pick a multiple of this to constrain how many nodes drain in one shot.
-fn per_iter() -> Weight {
-    NodeManager::worst_case_iteration_weight()
-}
-
 fn setup_registrar() -> AccountId {
     let registrar = TestAccount::new([1u8; 32]).account_id();
     NodeRegistrar::<TestRuntime>::set(Some(registrar));
@@ -126,7 +120,7 @@ fn drain_pays_all_nodes_within_one_block() {
         let reclaimed = RewardPot::<TestRuntime>::get(0).map(|p| p.total_reward).unwrap_or_default();
 
         // Generous weight budget: pay all 3 nodes (and skip the empty period 0).
-        let budget = per_iter().saturating_mul(20);
+        let budget = drain_budget(20, 20);
         let used = NodeManager::drain_outstanding_payouts(budget);
         assert!(used.any_gt(Weight::zero()), "expected non-zero used weight");
 
@@ -179,7 +173,7 @@ fn drain_respects_max_batch_size() {
         set_batch_size(2);
 
         // First call: skips empty period 0, then pays 2 of the 5 nodes in period 1.
-        let budget = per_iter().saturating_mul(100); // plenty of weight
+        let budget = drain_budget(100, 100); // plenty of weight
         let _ = NodeManager::drain_outstanding_payouts(budget);
 
         // Period 1 not yet complete - 2 of 5 paid.
@@ -188,10 +182,6 @@ fn drain_respects_max_batch_size() {
             period,
             "period 1 should still be the oldest unpaid after a single capped drain",
         );
-        let ptr = LastPaidPointer::<TestRuntime>::get();
-        assert!(ptr.is_some(), "LastPaidPointer should be set after a partial drain");
-        assert_eq!(ptr.as_ref().unwrap().period_index, period);
-
         let remaining = NodeUptime::<TestRuntime>::iter_prefix(period).count();
         assert_eq!(remaining, 3);
 
@@ -199,7 +189,7 @@ fn drain_respects_max_batch_size() {
         let _ = NodeManager::drain_outstanding_payouts(budget); // pays next 2
         let _ = NodeManager::drain_outstanding_payouts(budget); // pays last 1, completes
         assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period.saturating_add(1),);
-        assert!(LastPaidPointer::<TestRuntime>::get().is_none());
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(period).count(), 0);
     });
 }
 
@@ -215,8 +205,8 @@ fn drain_respects_weight_budget() {
         let with_uptime: Vec<_> = nodes.iter().map(|n| (*n, 3u64)).collect();
         let period = setup_unpaid_period_with_nodes(&with_uptime);
 
-        // Budget = 3 iterations: 1 for skipping period 0, 2 for paying nodes.
-        let budget = per_iter().saturating_mul(3);
+        // Completing period 0, then one held-back completion plus two payouts in period 1.
+        let budget = drain_budget(2, 2);
         let used = NodeManager::drain_outstanding_payouts(budget);
         assert!(used.any_gt(Weight::zero()));
         // 2 nodes paid in period 1 -> 2 remain.
@@ -243,7 +233,7 @@ fn drain_advances_past_empty_period() {
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS); // close the update window
         let oldest_before = OldestUnpaidRewardPeriodIndex::<TestRuntime>::get();
 
-        let budget = per_iter().saturating_mul(10);
+        let budget = drain_budget(10, 10);
         let _ = NodeManager::drain_outstanding_payouts(budget);
 
         assert!(
@@ -278,7 +268,7 @@ fn drain_reclaims_undistributed_reward_for_empty_period() {
         let pot_before = NodeManager::reward_pot_balance();
         let outstanding_before = OutstandingRewardToPay::<TestRuntime>::get();
 
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(10));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
 
         // Funds returned to the treasury, pot drawn down, outstanding cleared -
         // nothing stranded.
@@ -310,7 +300,7 @@ fn drain_is_noop_when_rewards_disabled() {
     ext.execute_with(|| {
         // Disable rewards explicitly (ExtBuilder enables them by default).
         RewardEnabled::<TestRuntime>::put(false);
-        let budget = per_iter().saturating_mul(10);
+        let budget = drain_budget(10, 10);
         // Run on_idle as the hook would: the early-exit guard returns Zero.
         let used = NodeManager::on_idle(System::block_number(), budget);
         assert_eq!(used, Weight::zero());
@@ -324,7 +314,7 @@ fn drain_is_noop_when_no_unpaid_period() {
         setup_registrar();
         fast_periods();
         // No rollover yet: oldest unpaid == current.
-        let budget = per_iter().saturating_mul(10);
+        let budget = drain_budget(10, 10);
         let used = NodeManager::drain_outstanding_payouts(budget);
         assert_eq!(used, Weight::zero(), "no period to drain -> no weight charged");
     });
@@ -355,7 +345,7 @@ fn drain_pays_correct_amount_to_owners() {
         let total_reward = pot_info.total_reward;
         assert!(total_reward > 0, "period {period} reward pot expected to be funded");
 
-        let budget = per_iter().saturating_mul(20);
+        let budget = drain_budget(20, 20);
         let _ = NodeManager::drain_outstanding_payouts(budget);
 
         // Direct payout into free balance (no lock). Equal weight -> half each
@@ -387,7 +377,7 @@ fn drain_keeps_failed_funding_within_recovery_window() {
         RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, false));
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window);
 
-        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
         assert_eq!(used, Weight::zero(), "drain should not charge weight while blocked");
         assert!(
             RewardPot::<TestRuntime>::get(0).is_some(),
@@ -430,7 +420,7 @@ fn drain_abandons_failed_funding_past_recovery_window_and_pays_later_period() {
         let owner = TestAccount::new([101u8; 32]).account_id();
         assert_eq!(Balances::free_balance(owner), 0, "owner starts unfunded");
 
-        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
         assert!(used.any_gt(Weight::zero()), "drain should make progress");
 
         // Period 0 abandoned: snapshot removed and cursor advanced past it.
@@ -489,7 +479,7 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         // is forced to span more than one drain call. The period must NOT be
         // completed while NodeUptime[0] still holds entries.
         set_batch_size(2);
-        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(2));
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(2, 2));
         assert!(used.any_gt(Weight::zero()), "drain should make progress");
         assert_eq!(
             NodeUptime::<TestRuntime>::iter_prefix(0).count(),
@@ -509,7 +499,7 @@ fn drain_abandons_failed_funding_clears_node_uptime_in_batches() {
         // Second pass: drains the remaining entry, completes period 0, and pays
         // the later funded period's operator.
         set_batch_size(64);
-        let _ = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(50));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(50, 50));
 
         // (a) NodeUptime[0] fully cleared - no orphaned entries.
         assert_eq!(
@@ -549,15 +539,14 @@ fn drain_charges_weight_and_bounds_empty_abandoned_period_completions() {
         }
         RewardPeriod::<TestRuntime>::mutate(|p| p.current = window + 10);
 
-        // Budget for exactly three completions. Even though empty periods drain
-        // no nodes, completing each still charges one `per_iter`, so the outer
-        // loop's weight guard must stop after three.
-        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(3));
+        // Entering a period needs one completion plus one node. With three completions and
+        // one node of budget, the third period is the last that can be entered.
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(3, 1));
 
         assert_eq!(
             used,
-            per_iter().saturating_mul(3),
-            "each empty-period completion must charge one per_iter",
+            drain_budget(3, 0),
+            "each empty-period completion must charge one period weight",
         );
         assert_eq!(
             OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
@@ -575,7 +564,7 @@ fn drain_charges_weight_and_bounds_empty_abandoned_period_completions() {
         }
 
         // A fresh call with ample budget finishes the remaining periods.
-        let used2 = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(50));
+        let used2 = NodeManager::drain_outstanding_payouts(drain_budget(50, 50));
         assert!(used2.any_gt(Weight::zero()), "drain should make progress");
         for p in 3..5u64 {
             assert!(
@@ -616,7 +605,7 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
 
         // Drain period 0 first so deregistration below isn't blocked as pending.
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
-        NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(5));
+        NodeManager::drain_outstanding_payouts(drain_budget(5, 5));
         assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period);
 
         for node in [n1, n2, leaver] {
@@ -638,7 +627,7 @@ fn deregistered_node_share_is_redistributed_not_stranded() {
         let pot_before = NodeManager::reward_pot_balance();
 
         System::reset_events();
-        NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
 
         assert_eq!(
             OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(),
@@ -703,7 +692,7 @@ fn zero_funded_period_drains_node_uptime_before_completing() {
         assert!(NodeUptime::<TestRuntime>::contains_key(period, n1));
         assert!(NodeUptime::<TestRuntime>::contains_key(period, n2));
 
-        let used = NodeManager::drain_outstanding_payouts(per_iter().saturating_mul(20));
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
         assert!(used.any_gt(Weight::zero()));
 
         assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period.saturating_add(1));
@@ -735,7 +724,7 @@ fn zero_funded_period_with_many_nodes_drains_across_multiple_calls() {
         advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
 
         // Tight budget: only one node's worth of work per call.
-        let tight_budget = per_iter().saturating_mul(1);
+        let tight_budget = drain_budget(1, 1);
         let mut calls = 0u32;
         while OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() <= period {
             NodeManager::drain_outstanding_payouts(tight_budget);
@@ -744,5 +733,291 @@ fn zero_funded_period_with_many_nodes_drains_across_multiple_calls() {
         }
 
         assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(period).count(), 0);
+    });
+}
+
+#[test]
+fn drain_across_calls_pays_each_node_exactly_once() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+        let node_count = 5u8;
+        let nodes = (0..node_count)
+            .map(|i| register_node(registrar, 150 + i, 80 + i, 90 + i))
+            .collect::<Vec<_>>();
+        let with_uptime: Vec<_> = nodes.iter().map(|n| (*n, 1u64)).collect();
+        let period = setup_unpaid_period_with_nodes(&with_uptime);
+        set_batch_size(2);
+
+        let budget = drain_budget(100, 100);
+        let mut calls = 0u32;
+        while OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() <= period {
+            let _ = NodeManager::drain_outstanding_payouts(budget);
+            calls = calls.saturating_add(1);
+            assert!(calls <= node_count as u32, "drain did not make progress");
+        }
+
+        for node in &nodes {
+            let payouts = System::events()
+                .iter()
+                .filter(|r| {
+                    matches!(
+                        &r.event,
+                        RuntimeEvent::NodeManager(Event::RewardPaid { reward_period, node: n, .. })
+                            if *reward_period == period && n == node
+                    )
+                })
+                .count();
+            assert_eq!(payouts, 1, "node {node:?} paid {payouts} times");
+        }
+    });
+}
+
+#[test]
+fn drain_completes_period_on_next_call_when_batch_exactly_empties_it() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        let nodes = (0..2u8)
+            .map(|i| register_node(registrar, 160 + i, 100 + i, 110 + i))
+            .collect::<Vec<_>>();
+        let with_uptime: Vec<_> = nodes.iter().map(|n| (*n, 1u64)).collect();
+        let period = setup_unpaid_period_with_nodes(&with_uptime);
+        set_batch_size(2);
+
+        // Batch cap equals the row count: every row drains, but the cap stops the walk
+        // before the iterator can report it is empty.
+        let budget = drain_budget(100, 100);
+        let _ = NodeManager::drain_outstanding_payouts(budget);
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(period).count(), 0);
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period);
+
+        let _ = NodeManager::drain_outstanding_payouts(budget);
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period.saturating_add(1));
+    });
+}
+
+#[test]
+fn undistributed_reward_is_reclaimed_once_after_the_period_completes() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        setup_registrar();
+        fast_periods();
+        roll_forward(200); // enter period 1
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 20 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, 20 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+
+        let events: Vec<_> = System::events()
+            .into_iter()
+            .filter_map(|r| match r.event {
+                RuntimeEvent::NodeManager(e @ Event::RewardPayoutCompleted { .. }) |
+                RuntimeEvent::NodeManager(e @ Event::UndistributedRewardReclaimed { .. }) =>
+                    Some(e),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            events,
+            vec![
+                Event::RewardPayoutCompleted { reward_period_index: 0 },
+                Event::UndistributedRewardReclaimed { reward_period: 0, amount: 20 * PRD },
+            ],
+        );
+    });
+}
+
+#[test]
+fn drain_clears_node_uptime_of_a_period_without_a_pot() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        let n1 = register_node(registrar, 170, 120, 130);
+        let n2 = register_node(registrar, 171, 121, 131);
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = 1);
+        record_uptime(0, &n1, 1);
+        record_uptime(0, &n2, 1);
+        assert!(RewardPot::<TestRuntime>::get(0).is_none());
+
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), 1);
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(0).count(), 0);
+        assert!(!System::events().iter().any(|r| matches!(
+            r.event,
+            RuntimeEvent::NodeManager(Event::RewardPaid { .. } | Event::RewardLocked { .. })
+        )));
+    });
+}
+
+#[test]
+fn drain_stops_at_the_first_period_awaiting_funding() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        OldestUnpaidRewardPeriodIndex::<TestRuntime>::put(0);
+        RewardPeriod::<TestRuntime>::mutate(|p| p.current = 2);
+        // Period 0 is unfunded and inside its recovery window; period 1 is payable.
+        RewardPot::<TestRuntime>::insert(0, RewardPotInfo::new(0u128, 20u32, 0u64, false));
+        RewardPot::<TestRuntime>::insert(1, RewardPotInfo::new(PRD, 20u32, 0u64, true));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+
+        let used = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+
+        assert_eq!(used, drain_budget(0, 0), "only the fixed reads are charged");
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), 0);
+        assert!(RewardPot::<TestRuntime>::get(1).is_some(), "period 1 must not be drained");
+    });
+}
+
+/// Count `RewardPaid`/`RewardLocked` events for `period`.
+fn payouts_for(period: RewardPeriodIndex) -> usize {
+    System::events()
+        .iter()
+        .filter(|r| {
+            matches!(
+                r.event,
+                RuntimeEvent::NodeManager(
+                    Event::RewardPaid { reward_period, .. } |
+                        Event::RewardLocked { reward_period, .. }
+                ) if reward_period == period
+            )
+        })
+        .count()
+}
+
+#[test]
+fn payouts_across_batches_never_exceed_the_period_reward() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+        // Three equal shares of the reward cannot divide evenly, so rounding leaves a remainder.
+        let nodes = (0..3u8)
+            .map(|i| register_node(registrar, 180 + i, 140 + i, 150 + i))
+            .collect::<Vec<_>>();
+        let with_uptime: Vec<_> = nodes.iter().map(|n| (*n, 1u64)).collect();
+        let period = setup_unpaid_period_with_nodes(&with_uptime);
+        let total_reward = RewardPot::<TestRuntime>::get(period).expect("funded").total_reward;
+        // Complete the empty period 0 first, so only this period's reward is outstanding.
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(1, 1));
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period);
+        let outstanding_before = OutstandingRewardToPay::<TestRuntime>::get();
+        let pot_before = NodeManager::reward_pot_balance();
+        set_batch_size(1);
+
+        let mut calls = 0u32;
+        while OldestUnpaidRewardPeriodIndex::<TestRuntime>::get() <= period {
+            let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+            calls = calls.saturating_add(1);
+            assert!(calls <= 4, "drain did not make progress");
+        }
+
+        let paid: u128 = (0..3u8)
+            .map(|i| Balances::free_balance(TestAccount::new([180 + i; 32]).account_id()))
+            .sum();
+        assert!(paid <= total_reward, "paid {paid} exceeds the period reward {total_reward}");
+        assert!(total_reward - paid < 3, "remainder larger than rounding: {}", total_reward - paid);
+        assert_eq!(pot_before - NodeManager::reward_pot_balance(), paid);
+        // The whole reward is released from `OutstandingRewardToPay`; the rounding remainder
+        // stays in the pot as unallocated balance.
+        assert_eq!(outstanding_before - OutstandingRewardToPay::<TestRuntime>::get(), total_reward);
+    });
+}
+
+#[test]
+fn batch_cap_is_shared_across_periods_in_one_call() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        let a = register_node(registrar, 190, 160, 170);
+        let b = (0..3u8)
+            .map(|i| register_node(registrar, 191 + i, 161 + i, 171 + i))
+            .collect::<Vec<_>>();
+
+        roll_forward(200); // enter period 1; period 0 has no uptime
+        assert_ok!(NodeManager::top_up_reward_pot(RawOrigin::Root.into(), 2_001 * PRD));
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 0, PRD));
+        record_uptime(1, &a, 1);
+        roll_forward(20); // enter period 2
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 1, 1_000 * PRD));
+        for node in &b {
+            record_uptime(2, node, 1);
+        }
+        roll_forward(20); // enter period 3
+        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), 2, 1_000 * PRD));
+        advance_time_secs(REWARD_UPDATE_WINDOW_SECS);
+        set_batch_size(2);
+
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+
+        // Period 1 used one node of the cap and completed; period 2 got the one left.
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), 2);
+        assert_eq!(payouts_for(1), 1);
+        assert_eq!(payouts_for(2), 1);
+        assert_eq!(NodeUptime::<TestRuntime>::iter_prefix(2).count(), 2);
+    });
+}
+
+#[test]
+fn drain_caps_node_weight_at_the_uptime_threshold() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        expire_lock_schedule();
+        let at_threshold = register_node(registrar, 200, 180, 190);
+        let over_threshold = register_node(registrar, 201, 181, 191);
+        // `fast_periods` gives an uptime threshold of 1 heartbeat.
+        let period = setup_unpaid_period_with_nodes(&[(at_threshold, 1), (over_threshold, 3)]);
+        assert_eq!(RewardPot::<TestRuntime>::get(period).expect("funded").uptime_threshold, 1);
+
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(10, 10));
+
+        let at_paid = Balances::free_balance(TestAccount::new([200u8; 32]).account_id());
+        let over_paid = Balances::free_balance(TestAccount::new([201u8; 32]).account_id());
+        assert!(at_paid > 0);
+        assert_eq!(over_paid, at_paid, "uptime above the threshold must not earn more");
+    });
+}
+
+#[test]
+fn on_idle_pays_out_over_several_blocks() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        let nodes = (0..3u8)
+            .map(|i| register_node(registrar, 210 + i, 200 + i, 220 + i))
+            .collect::<Vec<_>>();
+        let with_uptime: Vec<_> = nodes.iter().map(|n| (*n, 1u64)).collect();
+        let period = setup_unpaid_period_with_nodes(&with_uptime);
+        set_batch_size(1);
+
+        // `on_idle` hands the drain only `ON_IDLE_WEIGHT_SHARE` of its weight, so a budget that
+        // exactly covers one step is too small once scaled down.
+        set_idle_drain_weight(drain_budget(1, 1));
+        roll_one_block();
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), 0);
+        assert_eq!(payouts_for(period), 0);
+
+        // With enough weight, the batch cap of 1 pays one node per block.
+        set_idle_drain_weight(drain_budget(10, 10));
+        roll_one_block(); // completes empty period 0, pays one node of `period`
+        assert_eq!(payouts_for(period), 1);
+        roll_one_block();
+        assert_eq!(payouts_for(period), 2);
+        roll_one_block(); // pays the last node; the period is empty but not yet completed
+        roll_one_block(); // completes the period
+        assert_eq!(payouts_for(period), 3);
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period + 1);
     });
 }
