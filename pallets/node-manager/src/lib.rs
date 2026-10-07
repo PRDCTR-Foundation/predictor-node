@@ -321,6 +321,8 @@ pub mod pallet {
         /// Destination for forfeited amounts; `None` falls back to
         /// `T::TreasurySource` at withdrawal time.
         pub forfeiture_destination: Option<T::AccountId>,
+        /// The registar account to use.
+        pub registar_maybe: Option<T::AccountId>,
     }
 
     impl<T: Config> Default for GenesisConfig<T> {
@@ -332,6 +334,7 @@ pub mod pallet {
                 lock_schedule_start: None,
                 lock_initial_penalty_percent: DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
                 forfeiture_destination: None,
+                registar_maybe: None,
             }
         }
     }

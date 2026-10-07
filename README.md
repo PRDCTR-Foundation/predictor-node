@@ -157,6 +157,38 @@ endpoint to interact with the chain.
 > plugged into the `[relaychain]` slot of the config. This works because
 > Zombienet simply spawns the binary as a process.
 
+### Benchmarking
+
+Pallet extrinsics are weighed using [FRAME
+benchmarking](https://docs.substrate.io/test/benchmark/). To (re)generate the
+weights for a pallet:
+
+1. Build the node with the `runtime-benchmarks` feature enabled (it's not part
+   of the default build):
+
+   ```sh
+   cargo build --release --features runtime-benchmarks
+   ```
+
+2. Run the benchmark, pointing `--pallet` at the pallet's crate name as
+   registered in the runtime. The example below benchmarks every extrinsic in
+   `pallet_node_manager` — swap in your own pallet's name and accordingly for the output file.
+
+   ```sh
+   ./target/release/predictor-node \
+     benchmark \
+     pallet \
+     --pallet pallet_node_manager \
+     --runtime ./target/release/wbuild/predictor-runtime/predictor_runtime.compact.wasm \
+     --genesis-builder=runtime \
+     --wasm-execution=compiled \
+     --extrinsic '*' \
+     --steps=50 \
+     --repeat=20 \
+     --output pallets/node-manager/src/default_weights.rs \
+     --template ./templates/frame-weight-template.hbs
+   ```
+More information available [here](https://docs.polkadot.com/parachains/customize-runtime/pallet-development/benchmark-pallet/)
 ## Template Structure
 
 A Substrate project such as this consists of a number of components that are
