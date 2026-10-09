@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.1...v1.3.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **node-manager:** add top_up_reward_pot and heartbeat_for_owned_nodes benchmarks ([84eb6b7](https://github.com/PRDCTR-Foundation/predictor-node/commit/84eb6b7c5bc2c3569760ada3da17b24ae2eb7368))
+
 ## [1.3.1](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.0...v1.3.1) (2026-09-30)
 
 
