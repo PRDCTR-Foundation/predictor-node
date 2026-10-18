@@ -26,7 +26,6 @@ use parity_scale_codec::{Decode, Encode, FullCodec};
 use sp_application_crypto::RuntimeAppPublic;
 use sp_core::MaxEncodedLen;
 use sp_runtime::{
-    offchain::storage::{MutateStorageError, StorageRetrievalError, StorageValueRef},
     scale_info::TypeInfo,
     traits::{AccountIdConversion, Dispatchable, IdentifyAccount, Verify, Zero},
     transaction_validity::{
@@ -75,9 +74,6 @@ pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
 pub const MAX_RESERVED_NODES_PER_CALL: u32 = 64;
-
-/// Offchain-worker storage key under which the local node's registered AccountId is persisted.
-pub const REGISTERED_NODE_KEY: &[u8; 26] = b"ocw_pallet_registered_node";
 
 // Error codes returned by validate unsigned methods
 /// Invalid signature for `heartbeat` transaction
@@ -514,7 +510,7 @@ pub mod pallet {
         InvalidHeartbeat,
         /// Node not registered
         NodeNotRegistered,
-        /// Failed to acquire OCW DB lock
+        /// Failed to acquire OCW DB lock. Unused; kept so later error indices stay stable.
         FailedToAcquireOcwDbLock,
         /// Reward amount is zero
         RewardAmountZero,

@@ -1,6 +1,6 @@
 [relaychain]
 default_command = "./target/release/predictor-node"
-default_args = ["--validator", "-lruntime=debug", "--state-pruning=archive", "--blocks-pruning=archive"]
+default_args = ["-lruntime=debug", "--state-pruning=archive", "--blocks-pruning=archive"]
 
 # Generate the raw spec on-the-fly into zombienet's temp dir. `--raw` output
 # bypasses zombienet's plain→raw pass, which otherwise rewrites `session.keys`
@@ -14,9 +14,18 @@ chain_spec_command = "./target/release/predictor-node build-spec --chain local -
   validator = true
   args = ["--avn-port", "2020"]
   keystore_key_types = ["aura", "audi", "imon", "gran", "avnk", "ethk_ec"]
+  rpc_port = 9944
 
   [[relaychain.nodes]]
   name = "bob"
   validator = true
   args = ["--avn-port", "2021"]
   keystore_key_types = ["aura", "audi", "imon", "gran", "avnk", "ethk_ec"]
+
+  [[relaychain.nodes]]
+  name = "dave"
+  validator = false
+  rpc_port = 9988
+  # Not a validator, so offchain workers (node-manager heartbeats) must be forced on.
+  args = ["--avn-port", "2022", "--rpc-max-connections=1000", "--offchain-worker=always"]
+  keystore_key_types = ["nodk_sr"]

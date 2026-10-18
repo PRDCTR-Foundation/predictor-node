@@ -28,7 +28,9 @@ impl Default for Context {
         let signing_key_id = 987;
 
         setup_registrar(&registrar);
-        set_ocw_node_id(node_id);
+        // Mock heartbeat period 5 gives an attempt interval of 2: key index 0 attempts on even
+        // blocks.
+        System::set_block_number(2);
         UintAuthorityId::set_all_keys(vec![UintAuthorityId(signing_key_id)]);
 
         Context {
@@ -38,22 +40,6 @@ impl Default for Context {
             signing_key: UintAuthorityId(signing_key_id),
         }
     }
-}
-
-fn set_ocw_node_id(node_id: AccountId) {
-    let storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
-    storage
-        .mutate(|r: Result<Option<AccountId>, StorageRetrievalError>| match r {
-            Ok(Some(_)) => Ok(node_id),
-            Ok(None) => Ok(node_id),
-            _ => Err(()),
-        })
-        .unwrap();
-}
-
-fn remove_ocw_node_id() {
-    let mut storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
-    storage.clear();
 }
 
 fn setup_registrar(registrar: &AccountId) {
@@ -74,8 +60,15 @@ fn pop_tx_from_mempool(pool_state: Arc<RwLock<PoolState>>) -> Extrinsic {
     Extrinsic::decode(&mut &*tx).unwrap()
 }
 
+fn move_to_attempt_block() {
+    if System::block_number() % 2 != 0 {
+        System::set_block_number(System::block_number() + 1);
+    }
+}
+
 fn submit_multiple_heartbeats(n: u64, pool_state: Arc<RwLock<PoolState>>) {
     for _ in 0..n {
+        move_to_attempt_block();
         NodeManager::offchain_worker(System::block_number());
         let tx = pop_tx_from_mempool(pool_state.clone());
         assert_ok!(tx.call.clone().dispatch(frame_system::RawOrigin::None.into()));
@@ -146,36 +139,7 @@ mod given_a_reward_period {
     }
 
     #[test]
-    fn heartbeat_submission_succeeds_without_node_id() {
-        let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
-            .with_genesis_config()
-            .for_offchain_worker()
-            .as_externality_with_state();
-        ext.execute_with(|| {
-            let context = Context::default();
-            register_node(&context);
-
-            // Remove the node id from the ocw database
-            remove_ocw_node_id();
-
-            NodeManager::offchain_worker(System::block_number());
-            let tx = pop_tx_from_mempool(pool_state);
-
-            // Check if the transaction from the mempool is what we expected
-            assert!(matches!(
-                tx.call,
-                RuntimeCall::NodeManager(crate::Call::offchain_submit_heartbeat {
-                    node: _,
-                    reward_period_index: _,
-                    heartbeat_count: _,
-                    signature: _,
-                })
-            ));
-        });
-    }
-
-    #[test]
-    fn heartbeat_lock_prevents_duplicate_submissions() {
+    fn heartbeat_is_not_resent_once_on_chain() {
         let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
             .with_genesis_config()
             .for_offchain_worker()
@@ -185,19 +149,18 @@ mod given_a_reward_period {
             register_node(&context);
 
             NodeManager::offchain_worker(System::block_number());
-            assert!(!pool_state.read().transactions.is_empty());
+            let tx = pop_tx_from_mempool(pool_state.clone());
+            assert_ok!(tx.call.dispatch(frame_system::RawOrigin::None.into()));
 
-            // Remove the tx from mempool
-            let _ = pop_tx_from_mempool(pool_state.clone());
-
-            // Call OCW again, but this time it should not submit a new transaction
+            // Next attempt slot, still inside the heartbeat period
+            System::set_block_number(System::block_number() + 2);
             NodeManager::offchain_worker(System::block_number());
             assert!(pool_state.read().transactions.is_empty());
         });
     }
 
     #[test]
-    fn heartbeat_lock_released_automatically() {
+    fn undelivered_heartbeat_is_retried_on_the_next_attempt_slot() {
         let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
             .with_genesis_config()
             .for_offchain_worker()
@@ -207,18 +170,24 @@ mod given_a_reward_period {
             register_node(&context);
 
             NodeManager::offchain_worker(System::block_number());
-            assert!(!pool_state.read().transactions.is_empty());
-
-            // Remove the tx from mempool
+            // Drop the tx without dispatching it
             let _ = pop_tx_from_mempool(pool_state.clone());
 
-            // Move forward to release ocw lock
-            System::set_block_number(System::block_number() + 6u64);
-
-            // Call OCW again, but this time it should not submit a new transaction
+            // Not this key's attempt slot
+            System::set_block_number(System::block_number() + 1);
             NodeManager::offchain_worker(System::block_number());
-            // Mempool is not empty
-            assert!(!pool_state.read().transactions.is_empty());
+            assert!(pool_state.read().transactions.is_empty());
+
+            System::set_block_number(System::block_number() + 1);
+            NodeManager::offchain_worker(System::block_number());
+            let tx = pop_tx_from_mempool(pool_state.clone());
+            assert!(matches!(
+                tx.call,
+                RuntimeCall::NodeManager(crate::Call::offchain_submit_heartbeat {
+                    heartbeat_count: 0,
+                    ..
+                })
+            ));
         });
     }
 
@@ -276,28 +245,20 @@ mod given_a_reward_period {
             let context = Context::default();
             register_node(&context);
 
-            let reward_period_length = <RewardPeriod<TestRuntime>>::get().length as u64;
-
+            // Heartbeat included at block 2: the next one is due from block 7
             NodeManager::offchain_worker(System::block_number());
-            assert!(!pool_state.read().transactions.is_empty());
-            let _ = pop_tx_from_mempool(pool_state.clone());
+            let tx = pop_tx_from_mempool(pool_state.clone());
+            assert_ok!(tx.call.dispatch(frame_system::RawOrigin::None.into()));
 
-            roll_forward(1u64);
-            NodeManager::offchain_worker(System::block_number());
-            // No transaction because we are still in the same heartbeat period
-            assert!(pool_state.read().transactions.is_empty());
+            for _ in 0..2 {
+                roll_forward(2u64);
+                NodeManager::offchain_worker(System::block_number());
+                // Attempt slot, but the heartbeat period has not passed
+                assert!(pool_state.read().transactions.is_empty());
+            }
 
-            roll_forward(1u64);
-            NodeManager::offchain_worker(System::block_number());
-            // No transaction because we are still in the same heartbeat period
-            assert!(pool_state.read().transactions.is_empty());
-
-            roll_forward(1u64);
-            NodeManager::offchain_worker(System::block_number());
-            // No transaction because we are still in the same heartbeat period
-            assert!(pool_state.read().transactions.is_empty());
-
-            roll_forward((reward_period_length - System::block_number()) + 1);
+            roll_forward(2u64);
+            assert_eq!(System::block_number(), 8);
             NodeManager::offchain_worker(System::block_number());
             assert!(!pool_state.read().transactions.is_empty());
         });
@@ -787,5 +748,173 @@ mod fails_when {
                 &call
             ));
         });
+    }
+}
+
+mod with_multiple_local_keys {
+    use super::*;
+
+    fn register_node_with_key(context: &Context, seed: u8, key: u64) -> AccountId {
+        let node_id = TestAccount::new([seed; 32]).account_id();
+        assert_ok!(NodeManager::register_node(
+            RuntimeOrigin::signed(context.registrar),
+            node_id,
+            context.owner,
+            UintAuthorityId(key),
+        ));
+        node_id
+    }
+
+    fn drain_heartbeats(pool_state: Arc<RwLock<PoolState>>) -> Vec<(AccountId, RuntimeCall)> {
+        pool_state
+            .write()
+            .transactions
+            .drain(..)
+            .map(|tx| {
+                let call = Extrinsic::decode(&mut &*tx).unwrap().call;
+                match &call {
+                    RuntimeCall::NodeManager(crate::Call::offchain_submit_heartbeat {
+                        node,
+                        ..
+                    }) => (*node, call),
+                    _ => panic!("expected a heartbeat call"),
+                }
+            })
+            .collect()
+    }
+
+    fn submitted_nodes(pool_state: Arc<RwLock<PoolState>>) -> Vec<AccountId> {
+        let mut nodes: Vec<AccountId> =
+            drain_heartbeats(pool_state).into_iter().map(|(node, _)| node).collect();
+        nodes.sort();
+        nodes
+    }
+
+    fn sorted(mut nodes: Vec<AccountId>) -> Vec<AccountId> {
+        nodes.sort();
+        nodes
+    }
+
+    #[test]
+    fn keys_are_spread_across_attempt_slots() {
+        let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let context = Context::default();
+            let node_a = register_node_with_key(&context, 50, 10);
+            let node_b = register_node_with_key(&context, 51, 11);
+            let node_c = register_node_with_key(&context, 52, 12);
+            UintAuthorityId::set_all_keys(vec![
+                UintAuthorityId(12),
+                UintAuthorityId(10),
+                UintAuthorityId(11),
+            ]);
+
+            // Interval 2: sorted indexes 0 and 2 attempt on even blocks, index 1 on odd blocks
+            System::set_block_number(2);
+            NodeManager::offchain_worker(System::block_number());
+            let even = drain_heartbeats(pool_state.clone());
+            let even_nodes = sorted(even.iter().map(|(node, _)| *node).collect());
+            assert_eq!(even_nodes, sorted(vec![node_a, node_c]));
+
+            System::set_block_number(3);
+            NodeManager::offchain_worker(System::block_number());
+            let odd = drain_heartbeats(pool_state.clone());
+            assert_eq!(odd.iter().map(|(node, _)| *node).collect::<Vec<_>>(), vec![node_b]);
+
+            for (_, call) in even.into_iter().chain(odd) {
+                assert_ok!(call.dispatch(frame_system::RawOrigin::None.into()));
+            }
+            let reward_period = <RewardPeriod<TestRuntime>>::get().current;
+            for node in [node_a, node_b, node_c] {
+                assert_eq!(<NodeUptime<TestRuntime>>::get(reward_period, node).unwrap().count, 1);
+            }
+
+            // The chain now blocks every key until the heartbeat period passes
+            for block in [4, 5] {
+                System::set_block_number(block);
+                NodeManager::offchain_worker(System::block_number());
+                assert!(pool_state.read().transactions.is_empty());
+            }
+        });
+    }
+
+    #[test]
+    fn unregistered_local_key_is_skipped() {
+        let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let context = Context::default();
+            let node_a = register_node_with_key(&context, 50, 10);
+            UintAuthorityId::set_all_keys(vec![UintAuthorityId(5), UintAuthorityId(10)]);
+
+            for block in [2, 3] {
+                System::set_block_number(block);
+                NodeManager::offchain_worker(System::block_number());
+            }
+            assert_eq!(submitted_nodes(pool_state), vec![node_a]);
+        });
+    }
+
+    #[test]
+    fn stale_signing_key_index_is_ignored() {
+        let (mut ext, pool_state, _offchain_state) = ExtBuilder::build_default()
+            .with_genesis_config()
+            .for_offchain_worker()
+            .as_externality_with_state();
+        ext.execute_with(|| {
+            let context = Context::default();
+            let node_a = register_node_with_key(&context, 50, 10);
+            // Index points at a node registered with a different key
+            SigningKeyToNodeId::<TestRuntime>::insert(UintAuthorityId(7), node_a);
+            UintAuthorityId::set_all_keys(vec![UintAuthorityId(7)]);
+
+            NodeManager::offchain_worker(System::block_number());
+            assert!(pool_state.read().transactions.is_empty());
+        });
+    }
+}
+
+mod attempt_slots {
+    use crate::offchain::{
+        heartbeat_attempt_interval, is_attempt_slot, HEARTBEAT_ATTEMPT_INTERVAL,
+    };
+
+    #[test]
+    fn interval_is_capped_at_half_the_heartbeat_period() {
+        assert_eq!(heartbeat_attempt_interval(300), HEARTBEAT_ATTEMPT_INTERVAL as u64);
+        assert_eq!(heartbeat_attempt_interval(40), 20);
+        assert_eq!(heartbeat_attempt_interval(30), 15);
+        assert_eq!(heartbeat_attempt_interval(5), 2);
+        assert_eq!(heartbeat_attempt_interval(1), 1);
+        assert_eq!(heartbeat_attempt_interval(0), 1);
+    }
+
+    #[test]
+    fn single_key_attempts_once_per_interval() {
+        let attempts: Vec<u64> = (0..60).filter(|block| is_attempt_slot(0, 20, *block)).collect();
+        assert_eq!(attempts, vec![0, 20, 40]);
+    }
+
+    #[test]
+    fn keys_are_spread_round_robin() {
+        // 1000 keys over an interval of 20: 50 keys per block, every key once per interval
+        for block in 0..20u64 {
+            let due = (0..1_000).filter(|index| is_attempt_slot(*index, 20, block)).count();
+            assert_eq!(due, 50);
+        }
+        let key_attempts = (0..20u64).filter(|block| is_attempt_slot(137, 20, *block)).count();
+        assert_eq!(key_attempts, 1);
+    }
+
+    #[test]
+    fn extreme_inputs_do_not_panic() {
+        assert!(is_attempt_slot(5, 0, 7));
+        assert!(is_attempt_slot(usize::MAX, 1, u64::MAX));
+        let _ = is_attempt_slot(usize::MAX, u64::MAX, u64::MAX);
     }
 }
