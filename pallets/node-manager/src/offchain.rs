@@ -5,254 +5,129 @@
 // Modified for PRDCTR on 2026-07-07.
 
 // No storage mutation allowed in this file
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
-
 use crate::*;
+use sp_runtime::traits::UniqueSaturatedInto;
 
-// We allow up to 5 blocks for ocw transactions
-const BLOCK_INCLUSION_PERIOD: u32 = 5;
 pub const OCW_ID: &[u8; 22] = b"node_manager::last_run";
-const OC_HB_DB_PREFIX: &[u8] = b"tnf/node-manager-heartbeat/";
+
+/// Upper bound, in blocks, between two heartbeat attempts of the same signing key (2 minutes at
+/// 6s blocks). It leaves time for a submitted heartbeat to reach the chain before the key retries.
+pub const HEARTBEAT_ATTEMPT_INTERVAL: u32 = 20;
 
 impl<T: Config> Pallet<T> {
+    /// Sends a heartbeat for every registered node whose signing key is in the local keystore,
+    /// is in its attempt slot at `block_number` and is due a heartbeat on-chain.
     pub fn send_heartbeat_if_required(block_number: BlockNumberFor<T>) {
-        let maybe_node_key = Self::get_node_from_signing_key();
-        if let Some((node, signing_key)) = maybe_node_key {
-            let reward_period = RewardPeriod::<T>::get();
-            let current_reward_period = reward_period.current;
-            let uptime_info = <NodeUptime<T>>::get(current_reward_period, &node);
-            let heartbeat_count = uptime_info.map(|info| info.count).unwrap_or(0);
-
-            if Self::should_send_heartbeat(
-                block_number,
-                uptime_info,
-                &reward_period,
-                heartbeat_count,
-            ) {
-                log::info!(
-                    "🛠️  Sending heartbeat for reward period: {current_reward_period:?}, block number: {block_number:?}"
-                );
-
-                let signature = signing_key
-                    .sign(&(HEARTBEAT_CONTEXT, heartbeat_count, current_reward_period).encode());
-
-                match signature {
-                    Some(signature) => {
-                        let call = Call::<T>::offchain_submit_heartbeat {
-                            node,
-                            reward_period_index: current_reward_period,
-                            heartbeat_count,
-                            signature,
-                        };
-
-                        match SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(
-                            call.into(),
-                        ) {
-                            Ok(_) => {
-                                // If this fails, the extrinsic will still reject duplicates
-                                let _ = Self::record_heartbeat_ocw_submission(
-                                    block_number,
-                                    current_reward_period,
-                                    heartbeat_count
-                                );
-                            },
-                            Err(e) => log::error!(
-                                "💔 Error submitting heartbeat transaction. Period: {current_reward_period:?}, Heartbeat count: {heartbeat_count:?}, Error: {e:?}"),
-                        }
-
-                        log::info!(
-                            "🛠️  heartbeat transaction sent. Reward period: {current_reward_period:?}, Block number: {block_number:?}");
-                    },
-                    None => {
-                        log::error!(
-                            "💔 Error signing heartbeat transaction. Reward period: {current_reward_period:?}, Block number: {block_number:?}");
-                    },
-                }
-            }
-        }
-    }
-
-    pub fn get_node_from_signing_key() -> Option<(T::AccountId, T::SignerId)> {
         let mut local_keys: Vec<T::SignerId> = T::SignerId::all();
+        if local_keys.is_empty() {
+            log::debug!("🔐 No node signing keys found in the keystore.");
+            return
+        }
+        // Slot assignment relies on a stable order across OCW runs.
         local_keys.sort();
+        local_keys.dedup();
 
-        // Attempt to read the CLI-provided node ID (only happens on startup).
-        let maybe_node_id = Self::get_cli_node_id_from_local_storage();
-        if let Some(cli_node_id) = maybe_node_id {
-            log::debug!(
-                "🛠️  Setting NodeId {:?} in pallet local storage",
-                hex::encode(cli_node_id.encode())
-            );
-            if Self::record_formatted_node_id(cli_node_id).is_ok() {
-                Self::clear_cli_node_id_from_local_storage();
+        let reward_period = RewardPeriod::<T>::get();
+        let block: u64 = block_number.unique_saturated_into();
+        let interval = heartbeat_attempt_interval(reward_period.heartbeat_period);
+
+        for (_, signing_key) in local_keys
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| is_attempt_slot(*index, interval, block))
+        {
+            if let Some(node) = Self::registered_node_for_key(signing_key) {
+                Self::send_node_heartbeat_if_due(block_number, &reward_period, node, signing_key);
             }
         }
-
-        // There is no guarantee that the node_id is stored in the local storage
-        let maybe_node_id = Self::get_formatted_node_id_from_local_storage();
-        if let Some(node_id) = maybe_node_id {
-            if let Some(key_pair) = Self::match_node_id_to_signing_key(node_id, &local_keys) {
-                return Some(key_pair)
-            }
-        }
-
-        // If we get here, we were not successful in finding the nodeId in the local storage
-        // We will search all registered nodes using the local signing key
-        if let Some((node_id, signing_key)) = Self::search_node_id_by_signing_key(&local_keys) {
-            log::debug!("🛠️  NodeId found, storing in local db for next time.");
-            let _ = Self::record_formatted_node_id(node_id.clone());
-            return Some((node_id, signing_key))
-        }
-
-        log::debug!("🛠️  Unable to find a valid nodeId.");
-        None
     }
 
+    /// Mirrors the on-chain heartbeat checks, so the chain state acts as the submission lock.
     pub fn should_send_heartbeat(
         block_number: BlockNumberFor<T>,
         uptime_info: Option<UptimeInfo<BlockNumberFor<T>>>,
         reward_period: &RewardPeriodInfo<BlockNumberFor<T>>,
-        heartbeat_count: u64,
     ) -> bool {
-        if Self::heartbeat_submission_in_progress(
-            reward_period.current,
-            heartbeat_count,
-            block_number,
-        ) {
-            return false
-        }
-
-        if let Some(uptime_info) = uptime_info {
-            let last_submission = uptime_info.last_reported;
-            let below_threshold = uptime_info.count < reward_period.uptime_threshold as u64;
-            // Send heartbeat if threshold is not reached and the current block is at or past the
-            // next allowed block.
-            below_threshold &&
-                block_number >=
-                    last_submission +
-                        BlockNumberFor::<T>::from(reward_period.heartbeat_period)
-        } else {
-            // First heartbeat
-            true
-        }
-    }
-
-    // TODO: cleanup old data
-    fn record_heartbeat_ocw_submission(
-        now: BlockNumberFor<T>,
-        reward_period_index: RewardPeriodIndex,
-        heartbeat_count: u64,
-    ) -> Result<(), Error<T>> {
-        let mut key = OC_HB_DB_PREFIX.to_vec();
-        key.extend((reward_period_index, heartbeat_count).encode());
-
-        let storage = StorageValueRef::persistent(&key);
-        let result =
-            storage.mutate(|_: Result<Option<BlockNumberFor<T>>, StorageRetrievalError>| Ok(now));
-        match result {
-            Err(MutateStorageError::ValueFunctionFailed(e)) => Err(e),
-            Err(MutateStorageError::ConcurrentModification(_)) =>
-                Err(Error::<T>::FailedToAcquireOcwDbLock),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    // Formatted - because the nodeId has the correct type (unlike the cli nodeId which is a string)
-    fn record_formatted_node_id(node_id: NodeId<T>) -> Result<(), Error<T>> {
-        let storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
-        match storage.mutate(|_: Result<Option<NodeId<T>>, StorageRetrievalError>| Ok(node_id)) {
-            Err(MutateStorageError::ValueFunctionFailed(e)) => Err(e),
-            Err(MutateStorageError::ConcurrentModification(_)) =>
-                Err(Error::<T>::FailedToAcquireOcwDbLock),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    fn heartbeat_submission_in_progress(
-        reward_period_index: RewardPeriodIndex,
-        heartbeat_count: u64,
-        current_block: BlockNumberFor<T>,
-    ) -> bool {
-        let mut key = OC_HB_DB_PREFIX.to_vec();
-        key.extend((reward_period_index, heartbeat_count).encode());
-
-        match StorageValueRef::persistent(&key).get::<BlockNumberFor<T>>().ok().flatten() {
-            Some(last_submission) => {
-                // Allow BLOCK_INCLUSION_PERIOD blocks for the transaction to be included
-                current_block <=
-                    last_submission
-                        .saturating_add(BlockNumberFor::<T>::from(BLOCK_INCLUSION_PERIOD))
+        match uptime_info {
+            Some(uptime_info) => {
+                let below_threshold = uptime_info.count < reward_period.uptime_threshold as u64;
+                below_threshold &&
+                    block_number >=
+                        uptime_info.last_reported.saturating_add(BlockNumberFor::<T>::from(
+                            reward_period.heartbeat_period,
+                        ))
             },
-            _ => false,
+            // First heartbeat
+            None => true,
         }
     }
 
-    fn clear_cli_node_id_from_local_storage() {
-        let mut storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
-        storage.clear();
-    }
-
-    // Get the nodeId passed in the CLI arguments (Initial nodeId).
-    // This will read the nodeId as a string, which is what the client does.
-    fn get_cli_node_id_from_local_storage() -> Option<NodeId<T>> {
-        StorageValueRef::persistent(REGISTERED_NODE_KEY)
-            .get::<String>()
-            .ok()
-            .flatten()
-            .and_then(|node_id_string| hex::decode(&node_id_string).ok())
-            .and_then(|node_id_bytes| T::AccountId::decode(&mut &node_id_bytes[..]).ok())
-    }
-
-    // Get the correctly formatted nodeId from OCW database
-    // This will expect the nodeId to be set as a NodeId
-    fn get_formatted_node_id_from_local_storage() -> Option<NodeId<T>> {
-        let node_id = StorageValueRef::persistent(REGISTERED_NODE_KEY)
-            .get::<NodeId<T>>()
-            .ok()
-            .flatten();
-
-        if node_id.is_none() {
-            log::warn!("🔐 Cannot find nodeId in local database");
+    /// Resolves the node registered with `signing_key`, ignoring stale reverse-index entries.
+    fn registered_node_for_key(signing_key: &T::SignerId) -> Option<NodeId<T>> {
+        let node = SigningKeyToNodeId::<T>::get(signing_key)?;
+        match NodeRegistry::<T>::get(&node) {
+            Some(info) if info.signing_key == *signing_key => Some(node),
+            _ => {
+                log::warn!(
+                    "🔐 Signing key is indexed to node {:?} but the registry does not match.",
+                    hex::encode(node.encode())
+                );
+                None
+            },
         }
-
-        node_id
     }
 
-    fn match_node_id_to_signing_key(
-        node_id: NodeId<T>,
-        local_keys: &[T::SignerId],
-    ) -> Option<(T::AccountId, T::SignerId)> {
-        if let Some(node_info) = NodeRegistry::<T>::get(&node_id) {
-            if local_keys.binary_search(&node_info.signing_key).is_ok() {
-                return Some((node_id, node_info.signing_key))
-            } else {
-                log::warn!("🔐 NodeId and signing key do not match");
-            }
-        } else {
-            log::warn!("🔐 Node {:?} not found in registry.", hex::encode(node_id.encode()));
+    fn send_node_heartbeat_if_due(
+        block_number: BlockNumberFor<T>,
+        reward_period: &RewardPeriodInfo<BlockNumberFor<T>>,
+        node: NodeId<T>,
+        signing_key: &T::SignerId,
+    ) {
+        let current_reward_period = reward_period.current;
+        let uptime_info = <NodeUptime<T>>::get(current_reward_period, &node);
+        if !Self::should_send_heartbeat(block_number, uptime_info, reward_period) {
+            return
+        }
+        let heartbeat_count = uptime_info.map(|info| info.count).unwrap_or(0);
+
+        let node_hex = hex::encode(node.encode());
+        log::info!(
+            "🛠️  Sending heartbeat for node: {node_hex}, reward period: {current_reward_period:?}, block number: {block_number:?}"
+        );
+
+        let Some(signature) =
+            signing_key.sign(&(HEARTBEAT_CONTEXT, heartbeat_count, current_reward_period).encode())
+        else {
+            log::error!(
+                "💔 Error signing heartbeat transaction. Node: {node_hex}, Reward period: {current_reward_period:?}, Block number: {block_number:?}");
+            return
         };
 
-        None
-    }
+        let call = Call::<T>::offchain_submit_heartbeat {
+            node,
+            reward_period_index: current_reward_period,
+            heartbeat_count,
+            signature,
+        };
 
-    pub fn search_node_id_by_signing_key(
-        local_keys: &[T::SignerId],
-    ) -> Option<(NodeId<T>, T::SignerId)> {
-        log::warn!("🔐 Fallback - Looking up node from onchain state storage.");
-        for key in local_keys.iter() {
-            if let Some(node_id) = SigningKeyToNodeId::<T>::get(key) {
-                // Optional safety: verify NodeRegistry still matches.
-                if let Some(info) = NodeRegistry::<T>::get(&node_id) {
-                    if info.signing_key == *key {
-                        return Some((node_id, key.clone()))
-                    }
-                }
-            }
+        match SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()) {
+            Ok(_) => log::info!(
+                "🛠️  heartbeat transaction sent. Node: {node_hex}, Reward period: {current_reward_period:?}, Block number: {block_number:?}"),
+            Err(e) => log::error!(
+                "💔 Error submitting heartbeat transaction. Node: {node_hex}, Period: {current_reward_period:?}, Heartbeat count: {heartbeat_count:?}, Error: {e:?}"),
         }
-
-        None
     }
+}
+
+/// Blocks between two attempts of the same key: `HEARTBEAT_ATTEMPT_INTERVAL`, capped at half the
+/// heartbeat period so a key gets at least two attempts per period.
+pub(crate) fn heartbeat_attempt_interval(heartbeat_period: u32) -> u64 {
+    HEARTBEAT_ATTEMPT_INTERVAL.min(heartbeat_period / 2).max(1) as u64
+}
+
+/// Whether the key at `key_index` of the sorted local keys may attempt a heartbeat at `block`.
+/// Keys are spread round-robin over the blocks of each `interval`.
+pub(crate) fn is_attempt_slot(key_index: usize, interval: u64, block: u64) -> bool {
+    let interval = interval.max(1);
+    (key_index as u64) % interval == block % interval
 }

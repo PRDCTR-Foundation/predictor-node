@@ -44,10 +44,7 @@ fn register_nodes(
         registered_nodes.push(register_node_and_send_heartbeat(registrar, owner, reward_period, i));
     }
 
-    let this_node = TestAccount::new([0_u8; 32]).account_id();
     let this_node_signing_key = 0;
-
-    set_ocw_node_id(this_node);
     UintAuthorityId::set_all_keys(vec![UintAuthorityId(this_node_signing_key)]);
 
     registered_nodes
@@ -97,17 +94,6 @@ fn incr_heartbeats(reward_period: RewardPeriodIndex, nodes: Vec<NodeId<TestRunti
             total.total_weight = total.total_weight.saturating_add(weight);
         });
     }
-}
-
-fn set_ocw_node_id(node_id: AccountId) {
-    let storage = StorageValueRef::persistent(REGISTERED_NODE_KEY);
-    storage
-        .mutate(|r: Result<Option<AccountId>, StorageRetrievalError>| match r {
-            Ok(Some(_)) => Ok(node_id),
-            Ok(None) => Ok(node_id),
-            _ => Err(()),
-        })
-        .unwrap();
 }
 
 #[test]
