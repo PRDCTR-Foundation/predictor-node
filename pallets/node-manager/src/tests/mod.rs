@@ -11,6 +11,7 @@
 pub(crate) mod mock;
 
 mod test_admin;
+mod test_calculate_reward;
 mod test_delegated_heartbeat;
 mod test_heartbeat;
 mod test_migrations;

@@ -6,7 +6,10 @@
 
 use crate::*;
 use frame_support::weights::WeightMeter;
-use sp_runtime::{ArithmeticError, SaturatedConversion};
+use sp_runtime::{
+    helpers_128bit::multiply_by_rational_with_rounding, ArithmeticError, Rounding,
+    SaturatedConversion,
+};
 
 impl<T: Config> Pallet<T> {
     // Nodes should not be able to submit over the min uptime required.
@@ -32,20 +35,25 @@ impl<T: Config> Pallet<T> {
         }
     }
 
+    /// The node's share of `total_reward`, rounded down
     pub fn calculate_reward(
         weight: u128,
         total_weight: &u128,
         total_reward: &BalanceOf<T>,
-    ) -> Result<(BalanceOf<T>, Perquintill), DispatchError> {
+    ) -> Result<BalanceOf<T>, DispatchError> {
         if total_weight.is_zero() {
             return Err(DispatchError::Arithmetic(ArithmeticError::DivisionByZero))
         }
 
-        // Convert everything to u128 to satisfy Perquintill requirements.
-        let ratio = Perquintill::from_rational(weight, *total_weight);
-        let total_rewards_u128: u128 = (*total_reward).saturated_into();
-
-        Ok((ratio.mul_floor(total_rewards_u128).saturated_into(), ratio))
+        let total_reward_u128: u128 = (*total_reward).saturated_into();
+        let reward = multiply_by_rational_with_rounding(
+            total_reward_u128,
+            weight,
+            *total_weight,
+            Rounding::Down,
+        )
+        .ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))?;
+        Ok(reward.saturated_into())
     }
 
     pub fn pay_reward(
@@ -53,7 +61,6 @@ impl<T: Config> Pallet<T> {
         node_id: NodeId<T>,
         node_info: &NodeInfo<T::SignerId, T::AccountId>,
         amount: BalanceOf<T>,
-        _reward_percentage: Perquintill,
     ) -> DispatchResult {
         let node_owner = node_info.owner.clone();
 
@@ -132,20 +139,19 @@ impl<T: Config> Pallet<T> {
         };
         let weight =
             Self::calculate_node_weight(&node, uptime_info, &node_info, pot_info.uptime_threshold);
-        let (amount, percentage) =
-            match Self::calculate_reward(weight, total_weight, &pot_info.total_reward) {
-                Ok(x) => x,
-                Err(e) => {
-                    Self::deposit_event(Event::ErrorPayingReward {
-                        reward_period: period,
-                        node,
-                        error: e,
-                    });
-                    return Err(())
-                },
-            };
+        let amount = match Self::calculate_reward(weight, total_weight, &pot_info.total_reward) {
+            Ok(x) => x,
+            Err(e) => {
+                Self::deposit_event(Event::ErrorPayingReward {
+                    reward_period: period,
+                    node,
+                    error: e,
+                });
+                return Err(())
+            },
+        };
 
-        if let Err(e) = Self::pay_reward(&period, node.clone(), &node_info, amount, percentage) {
+        if let Err(e) = Self::pay_reward(&period, node.clone(), &node_info, amount) {
             Self::deposit_event(Event::ErrorPayingReward { reward_period: period, node, error: e });
             return Err(())
         }
