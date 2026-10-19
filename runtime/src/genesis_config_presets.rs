@@ -1,5 +1,7 @@
 use crate::{
-    configs::genesis_config_helpers::{get_account_id_from_seed, get_validator_keys_from_seed},
+    configs::genesis_config_helpers::{
+        get_account_id_from_seed, get_from_seed, get_validator_keys_from_seed,
+    },
     opaque::SessionKeys,
     AccountId, AuraId, AuthorityDiscoveryId, AuthorsManagerConfig, AvnId, BalancesConfig,
     GrandpaId, ImOnlineId, NodeManagerConfig, RuntimeGenesisConfig, SessionConfig, SudoConfig,
@@ -8,12 +10,21 @@ use crate::{
 use alloc::{vec, vec::Vec};
 use frame_support::PalletId;
 use hex_literal::hex;
+use pallet_node_manager::types::ReservedNodeEntry;
 use serde_json::Value;
-use sp_core::{ecdsa, sr25519, ByteArray, H160, H256};
+use sp_core::{
+    crypto::{Derive, DeriveJunction},
+    ecdsa, sr25519, ByteArray, H160, H256,
+};
 use sp_genesis_builder::PresetId;
-use sp_runtime::traits::AccountIdConversion;
+use sp_runtime::{
+    traits::{AccountIdConversion, IdentifyAccount},
+    MultiSigner,
+};
 
 type EthPublicKey = ecdsa::Public;
+type NodeSignerId = pallet_node_manager::sr25519::AuthorityId;
+type GenesisNode = ReservedNodeEntry<AccountId, NodeSignerId>;
 use common_primitives::constants::{currency::BASE, BLOCKS_PER_DAY, BLOCKS_PER_MINUTE};
 
 pub const BILLION_BASE: u128 = BASE * 10u128.pow(9u32);
@@ -37,6 +48,8 @@ fn testnet_genesis(
     endowed_accounts: Vec<AccountId>,
     root: AccountId,
     registrar: Option<AccountId>,
+    registered_nodes: Vec<GenesisNode>,
+    reward_enabled: bool,
 ) -> Value {
     let eth_public_keys = local_ethereum_public_keys();
     // TokenManager treasury account, pre-funded so pallet-node-manager's
@@ -97,6 +110,8 @@ fn testnet_genesis(
             max_batch_size: 50u32,
             heartbeat_period: 5u32,
             registar_maybe: registrar,
+            reward_enabled,
+            registered_nodes,
             ..Default::default()
         },
         ..Default::default()
@@ -119,6 +134,8 @@ fn staging_testnet_genesis() -> Value {
         ],
         get_account_id_from_seed::<sr25519::Public>("prd-sudo"),
         None,
+        vec![],
+        false,
     )
 }
 
@@ -141,7 +158,9 @@ fn local_testnet_genesis() -> Value {
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
         ],
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        Some(get_account_id_from_seed::<sr25519::Public>("Ferdie")),
+        Some(get_account_id_from_seed::<sr25519::Public>("Charlie")),
+        local_genesis_nodes(),
+        true,
     )
 }
 
@@ -164,8 +183,46 @@ fn development_config_genesis() -> Value {
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
         ],
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        Some(get_account_id_from_seed::<sr25519::Public>("Ferdie")),
+        Some(get_account_id_from_seed::<sr25519::Public>("Charlie")),
+        dev_genesis_nodes(),
+        true,
     )
+}
+
+/// A genesis node whose account and signing key are both `key`.
+fn genesis_node(key: sr25519::Public, owner: &AccountId) -> GenesisNode {
+    GenesisNode {
+        node: MultiSigner::from(key).into_account(),
+        owner: owner.clone(),
+        signing_key: NodeSignerId::from(key),
+    }
+}
+
+/// Public key of `//{seed}/{index}`. Derived from the public key because soft-deriving the
+/// secret needs randomness, which is unavailable when presets are built in wasm.
+fn soft_derived_key(seed: &str, index: u64) -> sr25519::Public {
+    get_from_seed::<sr25519::Public>(seed)
+        .derive(core::iter::once(DeriveJunction::soft(index)))
+        .expect("sr25519 supports soft derivation; qed")
+}
+
+/// Dave and Eve as nodes, each owned by its own account, matching `scripts/inject_node_keys.sh`.
+fn dev_genesis_nodes() -> Vec<GenesisNode> {
+    ["Dave", "Eve"]
+        .into_iter()
+        .map(|seed| {
+            let key = get_from_seed::<sr25519::Public>(seed);
+            genesis_node(key, &MultiSigner::from(key).into_account())
+        })
+        .collect()
+}
+
+/// The dev nodes plus 5 nodes owned by Ferdie (`//Ferdie/0..=4`).
+fn local_genesis_nodes() -> Vec<GenesisNode> {
+    let owner = get_account_id_from_seed::<sr25519::Public>("Ferdie");
+    let mut nodes = dev_genesis_nodes();
+    nodes.extend((0..5u64).map(|i| genesis_node(soft_derived_key("Ferdie", i), &owner)));
+    nodes
 }
 
 /// Provides the JSON representation of predefined genesis config for given `id`.

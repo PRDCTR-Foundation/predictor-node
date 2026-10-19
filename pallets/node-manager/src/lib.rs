@@ -319,6 +319,11 @@ pub mod pallet {
         pub forfeiture_destination: Option<T::AccountId>,
         /// The registar account to use.
         pub registar_maybe: Option<T::AccountId>,
+        /// Start reward periods, heartbeats and payouts from genesis.
+        pub reward_enabled: bool,
+        /// Nodes registered at genesis, in order, with the same checks as `register_node`.
+        /// No registrar is required.
+        pub registered_nodes: Vec<ReservedNodeEntry<T::AccountId, T::SignerId>>,
     }
 
     impl<T: Config> Default for GenesisConfig<T> {
@@ -331,6 +336,8 @@ pub mod pallet {
                 lock_initial_penalty_percent: DEFAULT_LOCK_INITIAL_PENALTY_PERCENT,
                 forfeiture_destination: None,
                 registar_maybe: None,
+                reward_enabled: false,
+                registered_nodes: Vec::new(),
             }
         }
     }
@@ -374,6 +381,21 @@ pub mod pallet {
             }
             if let Some(ref destination) = self.forfeiture_destination {
                 ForfeitureDestination::<T>::put(destination.clone());
+            }
+            if let Some(ref registrar) = self.registar_maybe {
+                NodeRegistrar::<T>::put(registrar.clone());
+            }
+            RewardEnabled::<T>::put(self.reward_enabled);
+
+            // Genesis cannot return an error: an invalid entry must fail the chain spec build.
+            for (index, entry) in self.registered_nodes.iter().enumerate() {
+                if let Err(e) = Pallet::<T>::do_register_node(
+                    entry.node.clone(),
+                    entry.owner.clone(),
+                    entry.signing_key.clone(),
+                ) {
+                    panic!("genesis node {index} ({:?}) failed to register: {e:?}", entry.node);
+                }
             }
         }
     }
