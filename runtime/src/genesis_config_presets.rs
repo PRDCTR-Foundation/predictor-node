@@ -36,21 +36,19 @@ fn testnet_genesis(
     )>,
     endowed_accounts: Vec<AccountId>,
     root: AccountId,
+    registrar: Option<AccountId>,
 ) -> Value {
     let eth_public_keys = local_ethereum_public_keys();
     // TokenManager treasury account, pre-funded so pallet-node-manager's
     // reward-period rollover transfer into the reward pot succeeds.
     let treasury_account: AccountId = PalletId(*b"Treasury").into_account_truncating();
-    // The Dev registar account 5CiXuNy1qnhyWAn2ea8MqXNsMWmvf8VNWHvE2em5MqKJaYSL
-    let registar_account: AccountId =
-        hex!["1cd9d1d7badff11b789d2d0fa58fe636342bb720468f87d302b60cbb7650620a"].into();
 
-    let mut balances: Vec<(AccountId, u128)> = endowed_accounts
-        .iter()
-        .chain([registar_account.clone()].iter())
-        .cloned()
-        .map(|k| (k, 100 * THOUSAND_BASE))
-        .collect();
+    let mut balances: Vec<(AccountId, u128)> =
+        endowed_accounts.iter().cloned().map(|k| (k, 100 * THOUSAND_BASE)).collect();
+    // Balances genesis rejects duplicate accounts.
+    if let Some(registrar) = registrar.as_ref().filter(|r| !endowed_accounts.contains(r)) {
+        balances.push((registrar.clone(), 100 * THOUSAND_BASE));
+    }
     balances.push((treasury_account, 10 * BILLION_BASE));
     let config = RuntimeGenesisConfig {
         balances: BalancesConfig { balances },
@@ -98,7 +96,7 @@ fn testnet_genesis(
             reward_period: 120u32,
             max_batch_size: 50u32,
             heartbeat_period: 5u32,
-            registar_maybe: Some(registar_account),
+            registar_maybe: registrar,
             ..Default::default()
         },
         ..Default::default()
@@ -120,6 +118,7 @@ fn staging_testnet_genesis() -> Value {
             get_account_id_from_seed::<sr25519::Public>("prd-sudo"),
         ],
         get_account_id_from_seed::<sr25519::Public>("prd-sudo"),
+        None,
     )
 }
 
@@ -142,6 +141,7 @@ fn local_testnet_genesis() -> Value {
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
         ],
         get_account_id_from_seed::<sr25519::Public>("Alice"),
+        Some(get_account_id_from_seed::<sr25519::Public>("Ferdie")),
     )
 }
 
@@ -164,6 +164,7 @@ fn development_config_genesis() -> Value {
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
         ],
         get_account_id_from_seed::<sr25519::Public>("Alice"),
+        Some(get_account_id_from_seed::<sr25519::Public>("Ferdie")),
     )
 }
 
