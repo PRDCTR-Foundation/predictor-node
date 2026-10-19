@@ -5,6 +5,7 @@
 // Modified for PRDCTR on 2026-07-07.
 
 use crate::*;
+use serde::{Deserialize, Serialize};
 use sp_runtime::Saturating;
 // This is used to scale a single heartbeat so we can preserve precision when applying the reward
 // weight.
@@ -165,8 +166,11 @@ impl<
     }
 }
 
-/// One entry of an `AdminConfig::ReserveNodes` batch.
-#[derive(Encode, Decode, Clone, PartialEq, Debug, TypeInfo, MaxEncodedLen)]
+/// One entry of an `AdminConfig::ReserveNodes` batch, or a node registered at genesis.
+#[derive(
+    Encode, Decode, Clone, PartialEq, Debug, TypeInfo, MaxEncodedLen, Serialize, Deserialize,
+)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReservedNodeEntry<AccountId, SignerId> {
     /// The node ID to reserve
     pub node: AccountId,

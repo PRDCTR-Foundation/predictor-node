@@ -7617,6 +7617,7 @@ dependencies = [
  "parity-scale-codec",
  "parking_lot 0.12.3",
  "scale-info",
+ "serde",
  "sp-application-crypto",
  "sp-avn-common",
  "sp-core",
