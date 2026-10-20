@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.2...v1.4.0) (2026-10-20)
+
+
+### Features
+
+* **node-manager:** register nodes and enable rewards from genesis ([4527c82](https://github.com/PRDCTR-Foundation/predictor-node/commit/4527c82af00185d118d5f3580e03d5786c27cd48))
+
+
+### Bug Fixes
+
+* **node-manager:** round reward shares down exactly, not via a rounded ratio ([90a752b](https://github.com/PRDCTR-Foundation/predictor-node/commit/90a752bbbe3866ba12157ec17dafdac6701baed7))
+
 ## [1.3.2](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.1...v1.3.2) (2026-10-09)
 
 
