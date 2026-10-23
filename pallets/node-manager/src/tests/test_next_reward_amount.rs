@@ -7,7 +7,7 @@
 #![cfg(test)]
 
 use crate::{tests::mock::*, *};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, dispatch::Pays};
 use frame_system::RawOrigin;
 use sp_runtime::DispatchError;
 
@@ -58,7 +58,9 @@ fn root_can_fund_an_ended_period() {
         let amount = 20 * PRD;
         top_up(amount);
 
-        assert_ok!(NodeManager::set_reward_amount(RawOrigin::Root.into(), period, amount));
+        let info = NodeManager::set_reward_amount(RawOrigin::Root.into(), period, amount)
+            .expect("root must be able to set the reward amount");
+        assert_eq!(info.pays_fee, Pays::No);
 
         let pot = RewardPot::<TestRuntime>::get(period).expect("period must exist");
         assert_eq!(pot.total_reward, amount);
@@ -77,11 +79,9 @@ fn registrar_can_fund_an_ended_period() {
         let amount = 20 * PRD;
         top_up(amount);
 
-        assert_ok!(NodeManager::set_reward_amount(
-            RuntimeOrigin::signed(registrar),
-            period,
-            amount,
-        ));
+        let info = NodeManager::set_reward_amount(RuntimeOrigin::signed(registrar), period, amount)
+            .expect("registrar must be able to set the reward amount");
+        assert_eq!(info.pays_fee, Pays::No);
 
         let pot = RewardPot::<TestRuntime>::get(period).expect("period must exist");
         assert_eq!(pot.total_reward, amount);

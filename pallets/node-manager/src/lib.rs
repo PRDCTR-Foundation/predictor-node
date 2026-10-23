@@ -688,9 +688,6 @@ pub mod pallet {
                 MAX_RESERVED_NODES_PER_CALL,
             ))
         )]
-        // The `.into()` calls on the `Ok(Some(weight).into())` arms are required for the
-        // `DispatchResultWithPostInfo` return type; clippy misattributes them as useless through
-        // the pallet macro expansion.
         #[allow(clippy::useless_conversion)]
         pub fn set_admin_config(
             origin: OriginFor<T>,
@@ -819,19 +816,21 @@ pub mod pallet {
         /// Registrar or root: set the reward amount for an ended reward period. The amount
         /// can be changed until the period's update window closes; an unfunded period can
         /// always still be set. See `Pallet::do_set_reward_amount`.
+        #[allow(clippy::useless_conversion)]
         #[pallet::call_index(2)]
         #[pallet::weight(<T as Config>::WeightInfo::set_reward_amount())]
         pub fn set_reward_amount(
             origin: OriginFor<T>,
             period_index: RewardPeriodIndex,
             amount: BalanceOf<T>,
-        ) -> DispatchResult {
+        ) -> DispatchResultWithPostInfo {
             if let Some(who) = ensure_signed_or_root(origin)? {
                 let registrar = NodeRegistrar::<T>::get().ok_or(Error::<T>::RegistrarNotSet)?;
                 ensure!(who == registrar, Error::<T>::OriginNotRegistrar);
             }
 
-            Self::do_set_reward_amount(period_index, amount)
+            Self::do_set_reward_amount(period_index, amount)?;
+            Ok(Pays::No.into())
         }
 
         /// Offchain call: Submit heartbeat to show node is still alive
