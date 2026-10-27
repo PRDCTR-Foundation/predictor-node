@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.4.0...v1.4.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **node-manager:** make set_reward_amount fee-free ([#125](https://github.com/PRDCTR-Foundation/predictor-node/issues/125)) ([19a8dee](https://github.com/PRDCTR-Foundation/predictor-node/commit/19a8deedc52d7d6c5c558514bbf8152d165ab6eb))
+
 ## [1.4.0](https://github.com/PRDCTR-Foundation/predictor-node/compare/v1.3.2...v1.4.0) (2026-10-20)
 
 
