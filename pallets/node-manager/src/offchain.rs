@@ -10,9 +10,9 @@ use sp_runtime::traits::UniqueSaturatedInto;
 
 pub const OCW_ID: &[u8; 22] = b"node_manager::last_run";
 
-/// Upper bound, in blocks, between two heartbeat attempts of the same signing key (2 minutes at
+/// Upper bound, in blocks, between two heartbeat attempts of the same signing key (5 minutes at
 /// 6s blocks). It leaves time for a submitted heartbeat to reach the chain before the key retries.
-pub const HEARTBEAT_ATTEMPT_INTERVAL: u32 = 20;
+pub const HEARTBEAT_ATTEMPT_INTERVAL: u32 = 30;
 
 impl<T: Config> Pallet<T> {
     /// Sends a heartbeat for every registered node whose signing key is in the local keystore,
@@ -30,12 +30,21 @@ impl<T: Config> Pallet<T> {
         let reward_period = RewardPeriod::<T>::get();
         let block: u64 = block_number.unique_saturated_into();
         let interval = heartbeat_attempt_interval(reward_period.heartbeat_period);
-
-        for (_, signing_key) in local_keys
+        let due_keys: Vec<&T::SignerId> = local_keys
             .iter()
             .enumerate()
             .filter(|(index, _)| is_attempt_slot(*index, interval, block))
-        {
+            .map(|(_, key)| key)
+            .collect();
+
+        log::info!(
+            "🛠️  Heartbeat slot {}/{interval} at block {block_number:?}: {} of {} local keys due",
+            block % interval,
+            due_keys.len(),
+            local_keys.len()
+        );
+
+        for signing_key in due_keys {
             if let Some(node) = Self::registered_node_for_key(signing_key) {
                 Self::send_node_heartbeat_if_due(block_number, &reward_period, node, signing_key);
             }
@@ -92,15 +101,15 @@ impl<T: Config> Pallet<T> {
 
         let node_hex = hex::encode(node.encode());
         log::info!(
-            "🛠️  Sending heartbeat for node: {node_hex}, reward period: {current_reward_period:?}, block number: {block_number:?}"
+            "🛠️  Sending heartbeat for node: {node_hex}, heartbeat count: {heartbeat_count}, reward period: {current_reward_period:?}, block number: {block_number:?}"
         );
 
         let Some(signature) =
             signing_key.sign(&(HEARTBEAT_CONTEXT, heartbeat_count, current_reward_period).encode())
         else {
             log::error!(
-                "💔 Error signing heartbeat transaction. Node: {node_hex}, Reward period: {current_reward_period:?}, Block number: {block_number:?}");
-            return
+                "💔 Error signing heartbeat transaction. Node: {node_hex}, Heartbeat count: {heartbeat_count}, Reward period: {current_reward_period:?}, Block number: {block_number:?}");
+            return;
         };
 
         let call = Call::<T>::offchain_submit_heartbeat {
@@ -112,7 +121,7 @@ impl<T: Config> Pallet<T> {
 
         match SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()) {
             Ok(_) => log::info!(
-                "🛠️  heartbeat transaction sent. Node: {node_hex}, Reward period: {current_reward_period:?}, Block number: {block_number:?}"),
+                "🛠️  heartbeat transaction sent. Node: {node_hex}, Heartbeat count: {heartbeat_count}, Reward period: {current_reward_period:?}, Block number: {block_number:?}"),
             Err(e) => log::error!(
                 "💔 Error submitting heartbeat transaction. Node: {node_hex}, Period: {current_reward_period:?}, Heartbeat count: {heartbeat_count:?}, Error: {e:?}"),
         }

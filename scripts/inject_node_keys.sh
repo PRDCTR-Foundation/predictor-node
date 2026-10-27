@@ -12,6 +12,7 @@ for tool in subkey jq; do
 done
 
 insert() {  # $1 = suri (dev URI or 12 words)
+  sleep 0.005
   PUB=$(subkey inspect --scheme sr25519 --output-type json "$1" | jq -r .publicKey)
   echo "Injecting ${PUB} signing key to local setup."
   curl -s -H 'Content-Type: application/json' $RPC -d "{
