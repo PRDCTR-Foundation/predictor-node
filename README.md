@@ -157,6 +157,72 @@ endpoint to interact with the chain.
 > plugged into the `[relaychain]` slot of the config. This works because
 > Zombienet simply spawns the binary as a process.
 
+### Running a Node That Sends Heartbeats
+
+The node-manager offchain worker sends a heartbeat for every registered node
+whose signing key is in the local keystore. Each key needs:
+
+- a node registered on chain with that signing key (via `register_node`, or at
+  genesis; the `local` preset registers `//Dave`, `//Eve` and `//Ferdie/0..4`)
+- the matching sr25519 key in the keystore under key type `nodk`
+- offchain workers enabled. They only run on validators by default, so pass
+  `--offchain-worker always` on any other node
+- rewards enabled on chain (`RewardEnabled`, set at genesis or via
+  `set_admin_config`)
+
+Start the node with a persistent base path so the keystore survives restarts:
+
+```sh
+./target/release/predictor-node --chain local --base-path ./node-data --offchain-worker always
+```
+
+When running more than one node on the same host, give each a free `--avn-port`
+(default 2020), `--port` and `--rpc-port`.
+
+#### Option 1: `key insert` subcommand
+
+The keystore lives at `<base-path>/chains/<chain id>/keystore`, e.g.
+`./node-data/chains/prdctr_local_testnet/keystore` (`prdctr-dev` for `--dev`).
+Without `--base-path`, the default is `~/.local/share/predictor-node` on Linux.
+Use the same `--base-path` and `--chain` as the node:
+
+```sh
+./target/release/predictor-node key insert \
+  --base-path ./node-data --chain local \
+  --key-type nodk --scheme sr25519 --suri "//Ferdie/0"
+```
+
+Each key is stored as a file named `6e6f646b<public key>` (`6e6f646b` is
+`nodk` in hex). Pass `--keystore-path` instead to target a keystore directory
+directly.
+
+#### Option 2: `author_insertKey` RPC
+
+Insert into a running node. This is an unsafe RPC method, so it is only
+accepted on a local RPC endpoint (default `--rpc-methods auto`):
+
+```sh
+curl -s -H 'Content-Type: application/json' http://127.0.0.1:9944 -d '{
+  "jsonrpc":"2.0","id":1,"method":"author_insertKey",
+  "params":["nodk","//Ferdie/0","<public key hex>"]}'
+```
+
+Get the public key with `./target/release/predictor-node key inspect --scheme
+sr25519 "//Ferdie/0"`. Check a key with `author_hasKey`
+(`"params":["<public key hex>","nodk"]`).
+
+`scripts/inject_node_keys.sh` is a reference script that inserts the
+`//Ferdie/N` keys over RPC into the Zombienet `dave` node (port 9988). It needs
+`subkey` and `jq`.
+
+Keys are picked up on the next block, so no restart is needed. A working
+setup logs lines like:
+
+```
+🛠️  Heartbeat slot 3/30 at block 1203: 1 of 5 local keys due
+🛠️  heartbeat transaction sent. Node: ..., Heartbeat count: 2, ...
+```
+
 ### Benchmarking
 
 Pallet extrinsics are weighed using [FRAME
