@@ -1,0 +1,78 @@
+name: PR E2E Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zombienet:
+    name: Zombienet E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      CARGO_TERM_COLOR: always
+      PREDICTOR_TESTS_REF: ${{ vars.PREDICTOR_TESTS_REF || 'main' }}
+
+    steps:
+      - name: Checkout predictor-node
+        uses: actions/checkout@v6
+        with:
+          path: predictor-node
+
+      - name: Checkout predictor-tests
+        uses: actions/checkout@v6
+        with:
+          repository: Galactic-Media-Management/predictor-tests
+          ref: ${{ env.PREDICTOR_TESTS_REF }}
+          path: predictor-tests
+          token: ${{ secrets.PREDICTOR_TESTS_READ_TOKEN }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake libssl-dev libudev-dev llvm pkg-config protobuf-compiler
+
+      - name: Install Rust toolchain
+        working-directory: predictor-node
+        run: rustup toolchain install --no-self-update
+
+      - name: Build predictor-node release binary
+        working-directory: predictor-node
+        run: cargo build --locked --release -p predictor-node
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.30.3 --activate
+
+      - name: Install predictor-tests dependencies
+        working-directory: predictor-tests
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Zombienet E2E tests
+        working-directory: predictor-tests
+        run: pnpm test:zombienet
+
+      - name: Upload Zombienet logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zombienet-logs
+          path: |
+            /tmp/zombie-*
+            predictor-tests/tmp
+          if-no-files-found: ignore
