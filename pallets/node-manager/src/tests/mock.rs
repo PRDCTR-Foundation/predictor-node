@@ -399,7 +399,7 @@ pub(crate) fn period_weight() -> Weight {
 
 /// Weight the drain charges to pay one node, including deleting its `NodeUptime` entry.
 pub(crate) fn node_weight() -> Weight {
-    <TestRuntime as Config>::WeightInfo::pay_one_node()
+    NodeManager::pay_one_node_weight()
 }
 
 /// A drain budget covering the fixed reads, `periods` period completions and `nodes` payouts.

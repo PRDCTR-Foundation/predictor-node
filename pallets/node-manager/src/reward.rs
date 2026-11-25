@@ -67,7 +67,8 @@ impl<T: Config> Pallet<T> {
         // While the global lock window is active - or not yet configured
         // (lock-by-default, so rewards can't escape the lock through an ops
         // mis-ordering) - rewards accrue in `LockedRewards` and the funds
-        // stay in the reward pot, to be released via `withdraw_rewards`.
+        // stay in the reward pot under a balance lock, to be released via
+        // `withdraw_rewards`.
         // Once the window's penalty decays to zero the lock is spent and
         // payouts credit free balance directly again.
         let lock_active = match LockSchedule::<T>::get() {
@@ -83,6 +84,7 @@ impl<T: Config> Pallet<T> {
                     *locked = locked.saturating_add(amount)
                 });
                 TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_add(amount));
+                Self::sync_reward_pot_lock();
             }
 
             Self::deposit_event(Event::RewardLocked {
@@ -158,6 +160,13 @@ impl<T: Config> Pallet<T> {
         Ok(amount)
     }
 
+    /// Weight charged per node by the drain: the heavier of the direct-transfer and the
+    /// locked payout paths, since the path is only known once the node is paid.
+    pub(crate) fn pay_one_node_weight() -> Weight {
+        <T as Config>::WeightInfo::pay_one_node_direct()
+            .max(<T as Config>::WeightInfo::pay_one_node_locked())
+    }
+
     /// Pay out finished reward periods in order, starting at `OldestUnpaidRewardPeriodIndex`.
     ///
     /// Walks `oldest..current` and stops at the first period that must wait for its amount
@@ -182,7 +191,7 @@ impl<T: Config> Pallet<T> {
         // Entering a period must afford its completion plus one node, so every period that is
         // entered either completes or drains at least one entry.
         let min_step = <T as Config>::WeightInfo::complete_reward_period()
-            .saturating_add(<T as Config>::WeightInfo::pay_one_node());
+            .saturating_add(Self::pay_one_node_weight());
 
         // `complete_reward_payout` advances `OldestUnpaidRewardPeriodIndex` by one, so the
         // walk visits periods in the same order the cursor does.
@@ -233,7 +242,7 @@ impl<T: Config> Pallet<T> {
     /// has no rows left. With `payout` set to `(pot_info, total_weight)`, each removed node is
     /// paid; with `None`, rows are only deleted and no reward event is emitted.
     ///
-    /// `limit` is the smaller of `nodes_left` and the number of `WeightInfo::pay_one_node`
+    /// `limit` is the smaller of `nodes_left` and the number of `pay_one_node_weight`
     /// weights (which include deleting the entry) that fit in `meter` after reserving one
     /// `WeightInfo::complete_reward_period` for the completion.
     /// Both `meter` and `nodes_left` are charged for what is spent, and `meter` never exceeds
@@ -246,7 +255,7 @@ impl<T: Config> Pallet<T> {
         meter: &mut WeightMeter,
         nodes_left: &mut u32,
     ) -> bool {
-        let per_node = <T as Config>::WeightInfo::pay_one_node();
+        let per_node = Self::pay_one_node_weight();
         let completion = <T as Config>::WeightInfo::complete_reward_period();
         // A zero `per_node` returns `None`: weight then places no limit on the count.
         let by_weight: u32 = meter
@@ -326,6 +335,22 @@ impl<T: Config> Pallet<T> {
     /// The account ID of the reward pot.
     pub fn compute_reward_account_id() -> T::AccountId {
         T::RewardPotId::get().into_account_truncating()
+    }
+
+    /// Set the reward pot's balance lock to the stored `TotalLockedRewards`.
+    ///
+    /// `set_lock` replaces the existing `REWARD_POT_LOCK_ID` lock rather than adding to it,
+    /// so the lock always equals the stored total. A zero total removes the lock, since
+    /// `set_lock` ignores a zero amount. Pots that predate the lock need no migration: the
+    /// first call locks the full stored total.
+    pub(crate) fn sync_reward_pot_lock() {
+        let pot = Self::compute_reward_account_id();
+        let total = TotalLockedRewards::<T>::get();
+        if total.is_zero() {
+            T::Currency::remove_lock(REWARD_POT_LOCK_ID, &pot);
+        } else {
+            T::Currency::set_lock(REWARD_POT_LOCK_ID, &pot, total, WithdrawReasons::all());
+        }
     }
 
     /// The total amount of funds stored in this pallet

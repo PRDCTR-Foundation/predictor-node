@@ -65,6 +65,26 @@ fn fund_reward_pot<T: Config>() {
     T::Currency::make_free_balance_be(&reward_pot_address, reward_amount);
 }
 
+/// One open period with two uptime rows and a funded pot, for the `pay_one_node_*`
+/// benchmarks. With a one-node budget the period stays open, so its completion is not
+/// part of the measurement.
+fn setup_pay_one_node<T: Config>(
+) -> (RewardPeriodIndex, RewardPotInfo<BalanceOf<T>>, u128, T::AccountId) {
+    let reward_period = <RewardPeriod<T>>::get();
+    let period = reward_period.current;
+    let owner: T::AccountId = account("owner", 0, 0);
+    let _ = create_nodes_and_heartbeat::<T>(owner.clone(), period, 2);
+    let total_weight = <TotalUptime<T>>::get(period).total_weight;
+    let reward_amount: BalanceOf<T> = 1_000_000u32.into();
+    let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
+        reward_amount,
+        reward_period.uptime_threshold,
+        Pallet::<T>::time_now_sec(),
+        true,
+    );
+    (period, pot_info, total_weight, owner)
+}
+
 fn create_nodes_and_heartbeat<T: Config>(
     owner: T::AccountId,
     reward_period_index: RewardPeriodIndex,
@@ -449,31 +469,16 @@ mod benchmarks {
         assert_last_event::<T>(Event::SigningKeyUpdated { owner, node }.into());
     }
 
-    // Worst-case cost of paying one node in the `on_idle` drain: reading and deleting its
-    // `NodeUptime` entry, owner lookup, reward transfer from the pot, and the `RewardPaid` event.
+    // Cost of paying one node in the `on_idle` drain through the direct-transfer path: reading
+    // and deleting its `NodeUptime` entry, owner lookup, reward transfer from the pot, and the
+    // `RewardPaid` event.
     #[benchmark]
-    fn pay_one_node() {
+    fn pay_one_node_direct() {
         enable_rewards::<T>();
         fund_reward_pot::<T>();
-        // Expired lock window (zero penalty) so the pay path takes the direct
-        // transfer branch and credits the owner's free balance, exercising the
-        // heavier of the two per-node payout paths.
+        // Expired lock window (zero penalty): the reward is transferred to the owner.
         <LockSchedule<T>>::put(LockScheduleInfo::new(0u64, 0u32));
-
-        let reward_period = <RewardPeriod<T>>::get();
-        let period = reward_period.current;
-        let owner: T::AccountId = account("owner", 0, 0);
-        // Two rows and a one-node budget, so the period stays open and its completion is not
-        // part of the measurement.
-        let _ = create_nodes_and_heartbeat::<T>(owner.clone(), period, 2);
-        let total_weight = <TotalUptime<T>>::get(period).total_weight;
-        let reward_amount: BalanceOf<T> = 1_000_000u32.into();
-        let pot_info = RewardPotInfo::<BalanceOf<T>>::new(
-            reward_amount,
-            reward_period.uptime_threshold,
-            Pallet::<T>::time_now_sec(),
-            true,
-        );
+        let (period, pot_info, total_weight, owner) = setup_pay_one_node::<T>();
         let mut meter = WeightMeter::new();
         let mut nodes_left = 1u32;
 
@@ -489,6 +494,35 @@ mod benchmarks {
 
         assert_eq!(<NodeUptime<T>>::iter_prefix(period).count(), 1);
         assert!(T::Currency::free_balance(&owner) > BalanceOf::<T>::zero());
+    }
+
+    // Cost of paying one node in the `on_idle` drain through the locked path: reading and
+    // deleting its `NodeUptime` entry, owner lookup, accruing `LockedRewards` and
+    // `TotalLockedRewards`, creating the reward-pot balance lock, and the `RewardLocked` event.
+    #[benchmark]
+    fn pay_one_node_locked() {
+        enable_rewards::<T>();
+        fund_reward_pot::<T>();
+        // Active window at the week-one rate: the reward is locked.
+        <LockSchedule<T>>::put(LockScheduleInfo::new(Pallet::<T>::time_now_sec(), 52u32));
+        let (period, pot_info, total_weight, owner) = setup_pay_one_node::<T>();
+        let mut meter = WeightMeter::new();
+        let mut nodes_left = 1u32;
+
+        #[block]
+        {
+            let _ = Pallet::<T>::drain_period_in_batches(
+                period,
+                Some((&pot_info, total_weight)),
+                &mut meter,
+                &mut nodes_left,
+            );
+        }
+
+        assert_eq!(<NodeUptime<T>>::iter_prefix(period).count(), 1);
+        let locked = <LockedRewards<T>>::get(&owner);
+        assert!(!locked.is_zero());
+        assert_eq!(<TotalLockedRewards<T>>::get(), locked);
     }
 
     // Worst-case cost of completing one period in the `on_idle` drain: a funded period with no
@@ -590,6 +624,7 @@ mod benchmarks {
         T::Currency::make_free_balance_be(&owner, T::Currency::minimum_balance());
         <LockedRewards<T>>::insert(&owner, locked);
         <TotalLockedRewards<T>>::put(locked);
+        Pallet::<T>::sync_reward_pot_lock();
 
         #[extrinsic_call]
         withdraw_rewards(RawOrigin::Signed(owner.clone()), None);
@@ -597,6 +632,7 @@ mod benchmarks {
         assert!(<LockedRewards<T>>::get(&owner).is_zero());
         assert!(<TotalLockedRewards<T>>::get().is_zero());
         assert!(!T::Currency::free_balance(&destination).is_zero());
+        assert!(!T::Currency::free_balance(&owner).is_zero());
     }
 
     impl_benchmark_test_suite!(

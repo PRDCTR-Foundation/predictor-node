@@ -75,12 +75,24 @@ fn setup_unpaid_period_with_nodes(nodes_with_uptime: &[(AccountId, u64)]) -> Rew
 }
 
 /// Seed locked rewards directly: the accrual path is covered by the drain
-/// tests below; withdraw-focused tests start from a known locked balance.
+/// tests below; withdraw-focused tests start from a known locked balance,
+/// with the pot lock set as a live payout would leave it.
 fn seed_locked(owner: &AccountId, amount: u128) {
     LockedRewards::<TestRuntime>::insert(owner, amount);
     TotalLockedRewards::<TestRuntime>::put(amount);
     let pot = NodeManager::compute_reward_account_id();
     Balances::make_free_balance_be(&pot, amount + PRD);
+    NodeManager::sync_reward_pot_lock();
+}
+
+/// Amount frozen on the reward pot by `REWARD_POT_LOCK_ID`, or zero when no lock exists.
+fn pot_lock() -> u128 {
+    let pot = NodeManager::compute_reward_account_id();
+    pallet_balances::Locks::<TestRuntime>::get(pot)
+        .iter()
+        .find(|lock| lock.id == REWARD_POT_LOCK_ID)
+        .map(|lock| lock.amount)
+        .unwrap_or_default()
 }
 
 // ---- accrual via the on_idle drain ------------------------------------
@@ -109,6 +121,7 @@ fn payout_locks_when_schedule_unset() {
         assert!(locked > 0, "reward should have accrued into LockedRewards");
         assert_eq!(Balances::free_balance(owner), 0, "free balance must stay untouched");
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), locked);
+        assert_eq!(pot_lock(), locked, "pot balance is locked for the accrued claim");
         // The locked claim's funds never left the pot (only the reclaimed
         // empty-period reward did).
         assert_eq!(NodeManager::reward_pot_balance(), pot_before.saturating_sub(reclaimed));
@@ -200,6 +213,7 @@ fn locked_rewards_accumulate_across_periods() {
         let after_second = LockedRewards::<TestRuntime>::get(owner);
         assert!(after_second > after_first, "second period must accumulate");
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), after_second);
+        assert_eq!(pot_lock(), after_second, "pot lock tracks the total, not the sum of locks");
         assert_eq!(Balances::free_balance(owner), 0);
     });
 }
@@ -261,6 +275,7 @@ fn withdraw_full_at_week_one_forfeits_52_percent() {
         assert_eq!(LockedRewards::<TestRuntime>::get(owner), 0);
         assert!(!LockedRewards::<TestRuntime>::contains_key(owner));
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 0);
+        assert_eq!(pot_lock(), 0, "full withdrawal removes the pot lock");
         System::assert_has_event(
             Event::RewardWithdrawn {
                 owner,
@@ -289,6 +304,7 @@ fn withdraw_partial_with_limit_applies_penalty_to_slice() {
         assert_eq!(Balances::free_balance(owner), 29 * PRD + 6 * PRD / 10);
         assert_eq!(LockedRewards::<TestRuntime>::get(owner), 60 * PRD);
         assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 60 * PRD);
+        assert_eq!(pot_lock(), 60 * PRD, "only the withdrawn slice is unlocked");
 
         // The remainder withdraws at the same rate.
         assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
@@ -483,6 +499,125 @@ fn withdraw_error_paths() {
             NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), Some(0)),
             Error::<TestRuntime>::ZeroAmount
         );
+    });
+}
+
+// ---- reward-pot balance lock --------------------------------------------
+
+#[test]
+fn pot_lock_is_replaced_not_added() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let pot = NodeManager::compute_reward_account_id();
+        Balances::make_free_balance_be(&pot, 100 * PRD);
+
+        TotalLockedRewards::<TestRuntime>::put(5 * PRD);
+        NodeManager::sync_reward_pot_lock();
+        assert_eq!(pot_lock(), 5 * PRD);
+
+        TotalLockedRewards::<TestRuntime>::put(6 * PRD);
+        NodeManager::sync_reward_pot_lock();
+        assert_eq!(pot_lock(), 6 * PRD, "a second lock sets 6, not 5 + 6");
+        assert_eq!(pallet_balances::Locks::<TestRuntime>::get(pot).len(), 1);
+
+        TotalLockedRewards::<TestRuntime>::put(0);
+        NodeManager::sync_reward_pot_lock();
+        assert!(pallet_balances::Locks::<TestRuntime>::get(pot).is_empty());
+    });
+}
+
+/// Pre-upgrade state: `TotalLockedRewards` is non-zero but the pot has no lock.
+/// The first payout locks the full stored total, so no migration is needed.
+#[test]
+fn first_payout_after_upgrade_locks_full_stored_total() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let registrar = setup_registrar();
+        fast_periods();
+        set_lock_schedule(0, 52);
+        let node = register_node(registrar, 120, 20, 30);
+        let owner = TestAccount::new([120u8; 32]).account_id();
+        let legacy_owner = TestAccount::new([121u8; 32]).account_id();
+
+        let period = setup_unpaid_period_with_nodes(&[(node, 1)]);
+        let legacy = 50 * PRD;
+        LockedRewards::<TestRuntime>::insert(legacy_owner, legacy);
+        TotalLockedRewards::<TestRuntime>::put(legacy);
+        let pot = NodeManager::compute_reward_account_id();
+        Balances::make_free_balance_be(&pot, Balances::free_balance(pot) + legacy);
+        assert_eq!(pot_lock(), 0, "no lock before the first payout");
+
+        let _ = NodeManager::drain_outstanding_payouts(drain_budget(20, 20));
+
+        let accrued = LockedRewards::<TestRuntime>::get(owner);
+        assert!(accrued > 0);
+        assert_eq!(OldestUnpaidRewardPeriodIndex::<TestRuntime>::get(), period + 1);
+        assert_eq!(TotalLockedRewards::<TestRuntime>::get(), legacy + accrued);
+        assert_eq!(pot_lock(), legacy + accrued);
+    });
+}
+
+/// Pre-upgrade state with a withdrawal before any payout: the lock is set to
+/// the remaining stored total, and the withdrawn amount is paid out.
+#[test]
+fn first_withdraw_after_upgrade_locks_remaining_total() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let owner = TestAccount::new([122u8; 32]).account_id();
+        let other = TestAccount::new([123u8; 32]).account_id();
+        LockedRewards::<TestRuntime>::insert(owner, 40 * PRD);
+        LockedRewards::<TestRuntime>::insert(other, 60 * PRD);
+        TotalLockedRewards::<TestRuntime>::put(100 * PRD);
+        let pot = NodeManager::compute_reward_account_id();
+        Balances::make_free_balance_be(&pot, 100 * PRD + PRD);
+        set_lock_schedule(52, 52); // expired window: no forfeit
+
+        assert_ok!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None));
+
+        assert_eq!(Balances::free_balance(owner), 40 * PRD);
+        assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 60 * PRD);
+        assert_eq!(pot_lock(), 60 * PRD);
+    });
+}
+
+/// Locked funds cannot leave the pot through another payout path.
+#[test]
+fn locked_funds_cannot_be_reclaimed() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let owner = TestAccount::new([124u8; 32]).account_id();
+        seed_locked(&owner, 100 * PRD);
+        let pot = NodeManager::compute_reward_account_id();
+        let pot_before = Balances::free_balance(pot);
+
+        // Only `PRD` of the pot is unlocked; reclaiming more must fail.
+        NodeManager::reclaim_undistributed_reward(7, 2 * PRD);
+
+        assert_eq!(Balances::free_balance(pot), pot_before);
+        System::assert_has_event(
+            Event::UndistributedRewardReclaimFailed { reward_period: 7, amount: 2 * PRD }.into(),
+        );
+        assert_eq!(pot_lock(), 100 * PRD);
+    });
+}
+
+/// A failed withdrawal leaves the claim, the total and the pot lock unchanged.
+#[test]
+fn failed_withdraw_keeps_pot_lock() {
+    let mut ext = ExtBuilder::build_default().with_genesis_config().as_externality();
+    ext.execute_with(|| {
+        let owner = TestAccount::new([125u8; 32]).account_id();
+        seed_locked(&owner, 100 * PRD);
+        set_lock_schedule(52, 52);
+        // Underfund the pot so the payout transfer fails.
+        let pot = NodeManager::compute_reward_account_id();
+        Balances::make_free_balance_be(&pot, 10 * PRD);
+
+        assert!(NodeManager::withdraw_rewards(RawOrigin::Signed(owner).into(), None).is_err());
+
+        assert_eq!(LockedRewards::<TestRuntime>::get(owner), 100 * PRD);
+        assert_eq!(TotalLockedRewards::<TestRuntime>::get(), 100 * PRD);
+        assert_eq!(pot_lock(), 100 * PRD);
     });
 }
 

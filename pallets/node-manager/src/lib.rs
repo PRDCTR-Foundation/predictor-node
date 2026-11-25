@@ -14,7 +14,10 @@ use alloc::string::ToString;
 use frame_support::{
     dispatch::DispatchResult,
     pallet_prelude::*,
-    traits::{Currency, ExistenceRequirement, IsSubType, StorageVersion, UnixTime},
+    traits::{
+        Currency, ExistenceRequirement, IsSubType, LockIdentifier, LockableCurrency,
+        StorageVersion, UnixTime, WithdrawReasons,
+    },
     PalletId,
 };
 use frame_system::{
@@ -74,6 +77,8 @@ pub const STORAGE_VERSION: StorageVersion = StorageVersion::new(0);
 pub const AGGREGATE_HEARTBEAT_CONTEXT: &[u8] = b"aggregate_heartbeat";
 pub const MAX_NODES_TO_DEREGISTER: u32 = 64;
 pub const MAX_RESERVED_NODES_PER_CALL: u32 = 64;
+/// Balance lock on the reward-pot account that mirrors `TotalLockedRewards`.
+pub const REWARD_POT_LOCK_ID: LockIdentifier = *b"nm/rwdlk";
 
 // Error codes returned by validate unsigned methods
 /// Invalid signature for `heartbeat` transaction
@@ -271,15 +276,18 @@ pub mod pallet {
     pub type NextNodeSerialNumber<T: Config> = StorageValue<_, u32, ValueQuery>;
 
     /// Rewards earned by an owner while the global lock window is active.
-    /// The funds themselves stay in the reward-pot account; this map records
-    /// each owner's claim, realised via `withdraw_rewards`.
+    /// The funds themselves stay in the reward-pot account, frozen by the
+    /// `REWARD_POT_LOCK_ID` balance lock; this map records each owner's claim,
+    /// realised via `withdraw_rewards`.
     #[pallet::storage]
     pub type LockedRewards<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, BalanceOf<T>, ValueQuery>;
 
     /// Sum of all `LockedRewards` entries - the pot's outstanding locked
     /// liability. The reward-pot balance must always cover this plus any
-    /// undrained period pots.
+    /// undrained period pots. The reward pot's `REWARD_POT_LOCK_ID` lock is set
+    /// to this value after every change, so the locked funds cannot be spent by
+    /// any other payout path.
     #[pallet::storage]
     pub type TotalLockedRewards<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
@@ -601,8 +609,9 @@ pub mod pallet {
             + Dispatchable<RuntimeOrigin = <Self as frame_system::Config>::RuntimeOrigin>
             + IsSubType<Call<Self>>
             + From<Call<Self>>;
-        /// Currency used by this pallet
-        type Currency: Currency<Self::AccountId>;
+        /// Currency used by this pallet. Must support balance locks: locked
+        /// rewards are frozen on the reward-pot account.
+        type Currency: LockableCurrency<Self::AccountId>;
         // The identifier type for an offchain transaction signer.
         type SignerId: Member
             + Parameter
@@ -1098,9 +1107,21 @@ pub mod pallet {
             let forfeited = penalty.mul_floor(gross);
             let net = gross.saturating_sub(forfeited);
 
+            // Update the claim first, then lower the pot lock to the new total, so
+            // the withdrawn slice is unlocked before it is transferred out.
+            let remaining = locked.saturating_sub(gross);
+            if remaining.is_zero() {
+                LockedRewards::<T>::remove(&who);
+            } else {
+                LockedRewards::<T>::insert(&who, remaining);
+            }
+            TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_sub(gross));
+            Self::sync_reward_pot_lock();
+
             // Both transfers come out of the reward-pot account, where locked
             // rewards physically live. Extrinsic transactionality reverts the
-            // first transfer if the second fails.
+            // storage updates, the lock change and the first transfer if a
+            // transfer fails.
             let reward_pot = Self::compute_reward_account_id();
             if !net.is_zero() {
                 T::Currency::transfer(&reward_pot, &who, net, ExistenceRequirement::AllowDeath)?;
@@ -1115,14 +1136,6 @@ pub mod pallet {
                     ExistenceRequirement::AllowDeath,
                 )?;
             }
-
-            let remaining = locked.saturating_sub(gross);
-            if remaining.is_zero() {
-                LockedRewards::<T>::remove(&who);
-            } else {
-                LockedRewards::<T>::insert(&who, remaining);
-            }
-            TotalLockedRewards::<T>::mutate(|total| *total = total.saturating_sub(gross));
 
             Self::deposit_event(Event::RewardWithdrawn {
                 owner: who,
