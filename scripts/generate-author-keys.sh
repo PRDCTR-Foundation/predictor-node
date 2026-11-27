@@ -137,11 +137,11 @@ for ((i = 1; i <= AUTHOR_COUNT; i++)); do
   generate_substrate_key sr25519
   account_json="$(substrate_json)"
   account_full_json="$(substrate_full_json)"
+  T2_PUBLIC_KEYS[$i]="$PUBLIC_KEY"
 
   generate_substrate_key sr25519
   avnk_json="$(substrate_json)"
   avnk_full_json="$(substrate_full_json)"
-  T2_PUBLIC_KEYS[$i]="$PUBLIC_KEY"
 
   generate_substrate_key sr25519
   aura_json="$(substrate_json)"
